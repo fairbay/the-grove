@@ -1,17 +1,5 @@
+/* The Grove — minimal reset. Walking view uses inline styles. */
+/* Tailwind is retained for VaultDashboard. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap');
-* { font-family: 'Outfit', sans-serif; }
-@keyframes growIn {
-  from { opacity: 0; transform: translateY(20px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes sway { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1deg); } }
-@keyframes drift {
-  0% { transform: translateY(0) translateX(0); }
-  33% { transform: translateY(-8px) translateX(4px); }
-  66% { transform: translateY(4px) translateX(-3px); }
-  100% { transform: translateY(0) translateX(0); }
-}
-body { background: #0a0a0a; }
