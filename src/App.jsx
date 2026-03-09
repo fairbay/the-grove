@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 
 /*
   The Grove — A nature-themed portfolio of ideas.
   Each idea's maturity is depicted as a stage of plant growth.
-  Reads from a projects.json data file for easy PushCraft updates.
+  Receives project data as props from GroveRouter, which fetches vault.json.
 */
 
 // ─── Nature Stage System ───
@@ -17,60 +17,6 @@ const STAGES = {
   parked:   { label: "Dormant",   emoji: "🍂", color: "#B8860B", bg: "from-yellow-950/20 to-amber-950/30", desc: "Resting for now" },
   killed:   { label: "Returned to Soil", emoji: "🍃", color: "#696969", bg: "from-stone-900/30 to-zinc-900/30", desc: "Composted into wisdom" },
 };
-
-// ─── Sample Data (replace with projects.json in production) ───
-const SAMPLE_PROJECTS = [
-  {
-    title: "DateWeave",
-    one_liner: "Discover surprising connections between your dates and the moments that shaped the world.",
-    status: "deployed",
-    tags: ["consumer", "dates", "PWA"],
-    impact_score: 62,
-    business_score: 44,
-    deploy_url: "https://dateweave.vercel.app",
-    hero_description: "Enter your birthday, add the people who matter, pick historical eras — and DateWeave weaves them together into surprising connections you never noticed.",
-  },
-  {
-    title: "PushCraft",
-    one_liner: "Push code from Claude to GitHub from your phone. No terminal required.",
-    status: "shipped",
-    tags: ["developer tools", "mobile", "GitHub"],
-    impact_score: 58,
-    business_score: 51,
-    deploy_url: "https://pushcraft.vercel.app",
-    hero_description: "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push — all from your phone.",
-  },
-  {
-    title: "RepairShield",
-    one_liner: "Home repair triage for low-income homeowners and the nonprofits that help them.",
-    status: "scouted",
-    tags: ["social impact", "housing", "nonprofit"],
-    impact_score: 76,
-    business_score: 59,
-    deploy_url: null,
-    hero_description: "Prioritizes which repairs matter most, connects homeowners with the right assistance programs, and helps nonprofits allocate limited repair budgets effectively.",
-  },
-  {
-    title: "Crisis Cascade Navigator",
-    one_liner: "Jurisdiction-aware action sequencer for people facing overlapping crises.",
-    status: "scouted",
-    tags: ["social impact", "legal", "crisis"],
-    impact_score: 81,
-    business_score: 38,
-    deploy_url: null,
-    hero_description: "When you lose your job AND face eviction AND need medical care — the order you act in matters. This tool sequences the right moves for your specific jurisdiction.",
-  },
-  {
-    title: "Shelf Life",
-    one_liner: "Predict which retail items will become future collectibles using anomaly detection.",
-    status: "raw",
-    tags: ["consumer", "prediction", "collectibles"],
-    impact_score: null,
-    business_score: null,
-    deploy_url: null,
-    hero_description: "Watches for manufacturing errors, rapid branding changes, recalls, and cultural moments that turn ordinary products into tomorrow's treasures.",
-  },
-];
 
 // ─── Score Ring Component ───
 function ScoreRing({ value, label, size = 48 }) {
@@ -224,17 +170,9 @@ function ProjectCard({ project, index }) {
 }
 
 // ─── Main App ───
-export default function TheGrove() {
-  const [projects, setProjects] = useState([]);
+export default function TheGrove({ projects = [] }) {
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("status");
-
-  useEffect(() => {
-    fetch("/projects.json")
-      .then(r => r.json())
-      .then(setProjects)
-      .catch(() => setProjects(SAMPLE_PROJECTS));
-  }, []);
 
   const stageOrder = ["shipped", "deployed", "in-dev", "building", "scouted", "raw", "parked", "killed"];
 
