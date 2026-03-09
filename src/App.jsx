@@ -1,310 +1,648 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 /*
-  The Grove — A nature-themed portfolio of ideas.
-  Each idea's maturity is depicted as a stage of plant growth.
-  Receives project data as props from GroveRouter, which fetches vault.json.
+  The Grove — First-person walk through your idea garden.
+  
+  Based on hand-drawn sketch: path converges to vanishing point ~40% from top.
+  Closest plants are HUGE (filling 1/3+ of screen). Farthest are tiny specks.
+  Plants sit on the ground plane. Signs sit between plant and path.
+  Hills on the horizon add depth.
 */
 
-// ─── Nature Stage System ───
+// Project data comes from vault.json via GroveRouter props.
+
 const STAGES = {
-  raw:      { label: "Seed",      emoji: "🌰", color: "#8B7355", bg: "from-amber-950/20 to-stone-900/40", desc: "Buried potential" },
-  scouted:  { label: "Sprout",    emoji: "🌱", color: "#6B8E23", bg: "from-lime-950/20 to-emerald-950/30", desc: "Evaluated & promising" },
-  building: { label: "Sapling",   emoji: "🌿", color: "#2E8B57", bg: "from-emerald-950/20 to-green-950/30", desc: "Actively growing" },
-  "in-dev": { label: "Young Tree",emoji: "🌳", color: "#228B22", bg: "from-green-950/20 to-emerald-950/30", desc: "Taking shape" },
-  deployed: { label: "Flowering", emoji: "🌸", color: "#DB7093", bg: "from-pink-950/20 to-rose-950/30", desc: "In bloom" },
-  shipped:  { label: "Bearing Fruit", emoji: "🍎", color: "#CD5C5C", bg: "from-red-950/20 to-orange-950/20", desc: "Mature & producing" },
-  parked:   { label: "Dormant",   emoji: "🍂", color: "#B8860B", bg: "from-yellow-950/20 to-amber-950/30", desc: "Resting for now" },
-  killed:   { label: "Returned to Soil", emoji: "🍃", color: "#696969", bg: "from-stone-900/30 to-zinc-900/30", desc: "Composted into wisdom" },
+  raw:      { label: "Seed",          color: "#8B7355", heightScale: 0.2 },
+  scouted:  { label: "Sprout",        color: "#6B8E23", heightScale: 0.35 },
+  building: { label: "Sapling",       color: "#2E8B57", heightScale: 0.55 },
+  "in-dev": { label: "Young Tree",    color: "#228B22", heightScale: 0.75 },
+  deployed: { label: "Flowering",     color: "#C06078", heightScale: 0.9 },
+  shipped:  { label: "Bearing Fruit", color: "#CD5C5C", heightScale: 1.0 },
+  parked:   { label: "Dormant",       color: "#B8860B", heightScale: 0.6 },
+  killed:   { label: "Composted",     color: "#696969", heightScale: 0.15 },
 };
 
-// ─── Score Ring Component ───
-function ScoreRing({ value, label, size = 48 }) {
-  if (value === null || value === undefined) return null;
-  const radius = (size - 6) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - value / 100);
-  const color = value >= 56 ? "#4ade80" : value >= 40 ? "#fbbf24" : "#f87171";
+// ─── SVG Plants ───
+// Ground rule: the very bottom of each viewBox IS where trunk meets ground.
+// Flowers (pink) = impact score. Fruit (red) = business score.
+// Score drives count: null=0, 1-30→1, 31-55→2, 56-70→3, 71-85→4, 86+→5-6
 
+// Deployed+ plants with null scores still deserve decorations.
+// Returns { impact, business } with minimums inferred from lifecycle stage.
+function effectiveScores(impact, business, status) {
+  const minimums = {
+    deployed:  { impact: 65, business: 50 },
+    shipped:   { impact: 75, business: 65 },
+  };
+  const min = minimums[status];
+  if (!min) return { impact, business };
+  return {
+    impact:  impact  != null ? impact  : min.impact,
+    business: business != null ? business : min.business,
+  };
+}
+
+// Compute actual score ranges from project data so decoration counts
+// are relative: the project with the highest score gets the most,
+// the lowest scored project gets the fewest.
+function computeScoreRanges(projects) {
+  const impacts = [];
+  const businesses = [];
+  projects.forEach(p => {
+    const eff = effectiveScores(p.impact_score, p.business_score, p.status);
+    if (eff.impact != null) impacts.push(eff.impact);
+    if (eff.business != null) businesses.push(eff.business);
+  });
+  return {
+    impact:  impacts.length  ? { min: Math.min(...impacts),  max: Math.max(...impacts)  } : null,
+    business: businesses.length ? { min: Math.min(...businesses), max: Math.max(...businesses) } : null,
+  };
+}
+
+// Map score to count relative to data range.
+// minScore → 1, maxScore → maxSlots. null → 0.
+function scoreToCount(score, maxSlots, range) {
+  if (score == null || score === 0) return 0;
+  if (!range || range.max === range.min) return Math.ceil(maxSlots / 2);
+  const t = Math.max(0, Math.min(1, (score - range.min) / (range.max - range.min)));
+  return Math.max(1, Math.round(1 + t * (maxSlots - 1)));
+}
+
+// Flowers: 5-petal blossom shape (not circles). scale=0.25 on non-trees.
+function Flowers({ positions, count, scale = 1 }) {
+  if (count === 0) return null;
+  const petalR = 2.4 * scale;
+  const spread = 2.8 * scale;
+  const centerR = 1.3 * scale;
+  return positions.slice(0, count).map(([x, y], i) => (
+    <g key={`f${i}`}>
+      {[0, 72, 144, 216, 288].map((deg, j) => {
+        const rad = deg * Math.PI / 180;
+        const px = x + Math.cos(rad) * spread;
+        const py = y + Math.sin(rad) * spread;
+        return <ellipse key={j} cx={px} cy={py} rx={petalR} ry={petalR * 0.6}
+          fill="#F4A0B8" opacity="0.85"
+          transform={`rotate(${deg} ${px} ${py})`} />;
+      })}
+      <circle cx={x} cy={y} r={centerR} fill="#FFD700" opacity="0.9" />
+    </g>
+  ));
+}
+
+// Fruit: round with highlight. scale=0.25 on non-trees.
+function Fruit({ positions, count, scale = 1 }) {
+  if (count === 0) return null;
+  const r = 4.5 * scale;
+  const hr = 1.5 * scale;
+  const stemH = 3 * scale;
+  return positions.slice(0, count).map(([x, y], i) => (
+    <g key={`r${i}`}>
+      <line x1={x} y1={y - r} x2={x + stemH * 0.3} y2={y - r - stemH} stroke="#5C4033" strokeWidth={Math.max(0.4, 0.8 * scale)} strokeLinecap="round" />
+      <circle cx={x} cy={y} r={r} fill="#CD5C5C" opacity="0.9" />
+      <circle cx={x - r * 0.25} cy={y - r * 0.25} r={hr} fill="#E88080" opacity="0.5" />
+    </g>
+  ));
+}
+
+function SeedPlant() {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth="3"
-          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 1s ease-out" }} />
-      </svg>
-      <div className="absolute flex flex-col items-center justify-center" style={{ width: size, height: size }}>
-        <span className="text-xs font-bold" style={{ color }}>{value}%</span>
-      </div>
-      <span className="text-xs text-stone-500 uppercase tracking-wider" style={{ fontSize: 9 }}>{label}</span>
+    <svg viewBox="0 0 60 30" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      <ellipse cx="30" cy="26" rx="20" ry="5" fill="#A0926B" />
+      <ellipse cx="30" cy="22" rx="5" ry="4" fill="#6B4E2E" />
+      <path d="M30 18 Q32 13 30 9" stroke="#8B7355" strokeWidth="1.2" fill="none" opacity="0.6" />
+      {/* Tiny dense tuft emerging from seed */}
+      <path d="M26 12 Q24 7 27 5 Q30 3 33 5 Q36 7 34 12 Q30 10 26 12Z" fill="#5C8A1E" opacity="0.8" />
+      <path d="M27 11 Q26 6 30 4 Q34 6 33 11 Q30 9 27 11Z" fill="#7BA428" opacity="0.75" />
+      <path d="M28 10 Q29 6 30 5 Q31 6 32 10 Q30 8 28 10Z" fill="#90C040" opacity="0.65" />
+    </svg>
+  );
+}
+
+function SproutPlant({ impact, business, scoreRanges }) {
+  const flowerSpots = [[32, 14], [48, 10]];
+  const fruitSpots = [[40, 6]];
+  return (
+    <svg viewBox="0 0 80 55" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      {/* Stem */}
+      <path d="M40 55 Q39 37 40 18" stroke="#4A7A2E" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {/* Single connected canopy — dense but small reach */}
+      <path d="M22 26 Q18 18 22 12 Q26 6 32 4 Q36 2 40 3 Q44 2 48 4 Q54 6 58 12 Q62 18 58 26 Q54 30 48 32 Q44 34 40 35 Q36 34 32 32 Q26 30 22 26Z" fill="#3A6E1A" opacity="0.9" />
+      <path d="M25 24 Q22 16 26 10 Q32 5 40 4 Q48 5 54 10 Q58 16 55 24 Q50 28 44 30 Q40 31 36 30 Q30 28 25 24Z" fill="#4A7A2E" opacity="0.85" />
+      <path d="M28 22 Q26 14 30 8 Q36 4 40 5 Q44 4 50 8 Q54 14 52 22 Q48 26 42 28 Q38 28 32 26 Q28 24 28 22Z" fill="#6B8E23" opacity="0.8" />
+      <path d="M32 18 Q30 12 34 8 Q38 6 42 6 Q46 8 48 12 Q48 18 44 22 Q40 24 36 22 Q32 20 32 18Z" fill="#7BA428" opacity="0.65" />
+      <path d="M36 14 Q36 10 40 8 Q44 10 44 14 Q42 18 40 18 Q38 18 36 14Z" fill="#8CBC38" opacity="0.5" />
+      <Flowers positions={flowerSpots} count={scoreToCount(impact, 2, scoreRanges.impact)} scale={0.25} />
+      <Fruit positions={fruitSpots} count={scoreToCount(business, 1, scoreRanges.business)} scale={0.25} />
+    </svg>
+  );
+}
+
+function SaplingPlant({ impact, business, scoreRanges }) {
+  const flowerSpots = [[32, 30], [58, 22], [46, 14]];
+  const fruitSpots = [[40, 20], [65, 32]];
+  return (
+    <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      {/* Trunk — branches hidden by canopy */}
+      <path d="M50 100 Q49 75 50 38" stroke="#6B4E2E" strokeWidth="5" fill="none" strokeLinecap="round" />
+      {/* Single canopy silhouette — bumpy organic edge, covers all branch endpoints */}
+      <path d="M16 54 Q10 44 14 34 Q18 24 24 18 Q30 12 38 8 Q44 5 50 6 Q56 5 62 8 Q70 12 76 18 Q82 24 84 34 Q86 44 80 54 Q76 60 68 58 Q60 56 50 58 Q40 56 32 58 Q24 60 16 54Z" fill="#1A5E1A" opacity="0.9" />
+      {/* Mid tone — offset for depth */}
+      <path d="M20 50 Q14 40 18 30 Q24 20 32 14 Q40 8 50 8 Q60 8 68 14 Q76 20 80 30 Q84 40 78 50 Q72 55 62 52 Q52 50 42 52 Q32 55 20 50Z" fill="#228B22" opacity="0.85" />
+      {/* Bright upper mass */}
+      <path d="M26 42 Q22 32 28 22 Q34 14 42 10 Q50 8 58 10 Q66 14 72 22 Q76 32 72 42 Q66 48 56 46 Q48 44 40 46 Q32 48 26 42Z" fill="#2E9B2E" opacity="0.7" />
+      {/* Light patches */}
+      <path d="M34 32 Q30 24 36 16 Q44 12 50 12 Q56 12 62 16 Q68 24 64 32 Q58 38 50 36 Q42 38 34 32Z" fill="#3AAA3A" opacity="0.55" />
+      <path d="M42 24 Q40 18 46 14 Q52 14 56 18 Q56 24 52 28 Q46 28 42 24Z" fill="#48B848" opacity="0.4" />
+      <Flowers positions={flowerSpots} count={scoreToCount(impact, 3, scoreRanges.impact)} scale={0.25} />
+      <Fruit positions={fruitSpots} count={scoreToCount(business, 2, scoreRanges.business)} scale={0.25} />
+    </svg>
+  );
+}
+
+function YoungTreePlant({ impact, business, scoreRanges }) {
+  const flowerSpots = [[36, 50], [78, 38], [55, 22], [94, 48]];
+  const fruitSpots = [[48, 34], [84, 46], [64, 18]];
+  return (
+    <svg viewBox="0 0 130 130" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      {/* Trunk — branches hidden inside canopy mass */}
+      <path d="M65 130 Q63 95 65 40" stroke="#6B4E2E" strokeWidth="6" fill="none" strokeLinecap="round" />
+      {/* Single connected canopy silhouette — wide, irregular, engulfs all branches */}
+      <path d="M18 72 Q8 58 12 42 Q16 28 26 18 Q36 10 48 6 Q58 3 66 4 Q74 3 84 6 Q96 10 106 18 Q116 28 118 42 Q120 58 112 72 Q106 78 96 74 Q86 70 76 72 Q66 74 56 72 Q46 70 36 74 Q26 78 18 72Z" fill="#16581A" opacity="0.9" />
+      {/* Mid canopy — shifted up-right for light direction */}
+      <path d="M24 66 Q14 52 18 36 Q24 22 36 14 Q48 8 60 6 Q72 6 84 10 Q96 16 106 28 Q114 42 110 58 Q106 68 96 64 Q84 60 72 62 Q60 64 48 62 Q36 64 24 66Z" fill="#1E6B1E" opacity="0.85" />
+      {/* Bright mass */}
+      <path d="M30 58 Q22 44 26 30 Q34 18 46 12 Q58 8 68 8 Q80 10 92 18 Q102 28 104 44 Q104 58 96 60 Q86 56 74 56 Q62 58 50 56 Q38 58 30 58Z" fill="#228B22" opacity="0.75" />
+      {/* Highlight patches */}
+      <path d="M38 48 Q32 36 38 24 Q46 16 56 12 Q66 10 76 14 Q86 22 90 34 Q92 46 86 50 Q76 48 66 46 Q56 48 46 48 Q40 48 38 48Z" fill="#2E9B2E" opacity="0.6" />
+      <path d="M48 36 Q44 26 50 18 Q58 14 68 14 Q78 18 82 26 Q84 36 78 40 Q68 38 60 36 Q52 38 48 36Z" fill="#3AAA3A" opacity="0.45" />
+      <path d="M56 28 Q54 20 62 16 Q70 16 74 22 Q76 28 70 32 Q64 30 56 28Z" fill="#48B848" opacity="0.35" />
+      <Flowers positions={flowerSpots} count={scoreToCount(impact, 4, scoreRanges.impact)} />
+      <Fruit positions={fruitSpots} count={scoreToCount(business, 3, scoreRanges.business)} />
+    </svg>
+  );
+}
+
+function FloweringPlant({ impact, business, scoreRanges }) {
+  const flowerSpots = [[40, 72], [65, 28], [92, 24], [116, 52], [54, 42], [104, 68]];
+  const fruitSpots = [[50, 50], [100, 58], [76, 26], [60, 68]];
+  return (
+    <svg viewBox="0 0 155 155" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      {/* Trunk — most hidden inside canopy */}
+      <path d="M78 155 Q75 108 78 48" stroke="#6B4E2E" strokeWidth="7" fill="none" strokeLinecap="round" />
+      {/* A bit of lower branch peeking out below canopy */}
+      <path d="M76 115 Q62 105 52 97" stroke="#7B5E3E" strokeWidth="3" fill="none" />
+      <path d="M78 108 Q92 98 102 92" stroke="#7B5E3E" strokeWidth="2.5" fill="none" />
+      {/* Single massive canopy silhouette — wide irregular crown */}
+      <path d="M18 88 Q4 68 10 46 Q18 26 32 14 Q46 4 60 2 Q72 0 82 2 Q96 4 110 14 Q124 26 132 46 Q138 68 124 88 Q116 94 106 88 Q94 82 82 84 Q70 82 58 84 Q46 88 36 90 Q26 94 18 88Z" fill="#14521A" opacity="0.9" />
+      {/* Mid canopy */}
+      <path d="M24 82 Q10 62 16 40 Q26 22 40 12 Q54 4 68 2 Q82 2 96 8 Q112 18 122 36 Q130 56 122 76 Q114 86 102 80 Q90 74 78 76 Q66 74 54 76 Q42 80 30 84 Q24 84 24 82Z" fill="#1E6B1E" opacity="0.85" />
+      {/* Bright mass — upper canopy catches light */}
+      <path d="M32 72 Q20 52 26 34 Q36 18 50 10 Q64 4 78 4 Q92 6 106 16 Q118 30 122 48 Q124 66 116 72 Q104 68 92 66 Q78 68 66 66 Q52 68 40 72 Q34 72 32 72Z" fill="#228B22" opacity="0.75" />
+      {/* Highlight zones */}
+      <path d="M42 60 Q32 42 38 26 Q50 14 66 8 Q80 6 94 14 Q108 26 112 42 Q114 58 106 62 Q94 58 82 56 Q68 58 56 58 Q46 60 42 60Z" fill="#2A9A2A" opacity="0.6" />
+      <path d="M52 48 Q44 34 52 22 Q62 14 76 10 Q90 14 100 24 Q106 36 104 48 Q96 50 84 48 Q72 46 62 48 Q54 50 52 48Z" fill="#34AA34" opacity="0.45" />
+      <path d="M62 38 Q58 28 66 18 Q76 14 86 18 Q94 28 92 38 Q84 40 76 38 Q68 38 62 38Z" fill="#40B840" opacity="0.35" />
+      <path d="M72 30 Q70 22 78 18 Q86 22 84 30 Q80 32 72 30Z" fill="#4CC84C" opacity="0.25" />
+      <Flowers positions={flowerSpots} count={scoreToCount(impact, 6, scoreRanges.impact)} />
+      <Fruit positions={fruitSpots} count={scoreToCount(business, 4, scoreRanges.business)} />
+    </svg>
+  );
+}
+
+function FruitTreePlant({ impact, business, scoreRanges }) {
+  const flowerSpots = [[38, 76], [66, 26], [108, 32], [130, 56], [52, 44], [116, 70]];
+  const fruitSpots = [[46, 80], [72, 30], [100, 26], [126, 52], [56, 48], [112, 68]];
+  return (
+    <svg viewBox="0 0 165 165" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      {/* Trunk — branches all hidden inside canopy */}
+      <path d="M82 165 Q79 115 82 46" stroke="#5C4033" strokeWidth="8" fill="none" strokeLinecap="round" />
+      {/* Lower branch stubs peeking below canopy */}
+      <path d="M80 123 Q64 111 52 102" stroke="#6B4E2E" strokeWidth="3.5" fill="none" />
+      <path d="M82 116 Q96 106 108 98" stroke="#6B4E2E" strokeWidth="3" fill="none" />
+      {/* Massive single canopy silhouette — biggest, most irregular */}
+      <path d="M14 94 Q-2 70 6 44 Q16 22 32 10 Q48 0 64 -2 Q78 -4 88 -2 Q104 0 120 10 Q136 22 146 44 Q154 70 140 94 Q130 102 118 94 Q104 86 90 88 Q76 86 62 88 Q48 92 36 96 Q24 102 14 94Z" fill="#123E14" opacity="0.9" />
+      {/* Mid canopy — the main body */}
+      <path d="M20 88 Q4 64 12 40 Q24 18 42 8 Q58 0 72 -2 Q86 -2 100 2 Q118 10 132 28 Q142 48 142 70 Q140 88 128 86 Q114 80 100 80 Q86 78 72 80 Q58 82 44 86 Q30 90 20 88Z" fill="#1A5A1A" opacity="0.88" />
+      {/* Rich green layer */}
+      <path d="M28 80 Q14 58 20 36 Q32 16 50 6 Q66 0 80 0 Q96 2 112 12 Q126 26 134 46 Q138 66 130 80 Q118 76 104 74 Q88 72 74 74 Q60 76 46 80 Q34 82 28 80Z" fill="#1E6B1E" opacity="0.82" />
+      {/* Bright mass */}
+      <path d="M36 72 Q22 52 28 32 Q40 14 56 6 Q72 0 86 2 Q102 6 116 18 Q128 34 132 52 Q134 70 124 72 Q112 68 98 66 Q82 64 68 66 Q54 70 42 72 Q38 72 36 72Z" fill="#228B22" opacity="0.72" />
+      {/* Highlight zones — cascading brightness */}
+      <path d="M46 62 Q34 44 40 26 Q52 12 68 6 Q84 4 100 10 Q114 22 120 40 Q122 58 114 62 Q102 58 88 56 Q74 54 62 58 Q50 62 46 62Z" fill="#2A9A2A" opacity="0.58" />
+      <path d="M56 50 Q46 34 54 20 Q66 10 82 8 Q98 12 108 24 Q114 38 110 50 Q100 48 88 46 Q76 44 66 48 Q58 50 56 50Z" fill="#34AA34" opacity="0.42" />
+      <path d="M66 40 Q60 28 68 18 Q80 12 92 16 Q102 26 98 38 Q90 40 80 38 Q70 38 66 40Z" fill="#40B840" opacity="0.32" />
+      <path d="M76 32 Q74 22 82 16 Q92 20 90 30 Q84 34 76 32Z" fill="#4CC84C" opacity="0.22" />
+      <Flowers positions={flowerSpots} count={scoreToCount(impact, 6, scoreRanges.impact)} />
+      <Fruit positions={fruitSpots} count={scoreToCount(business, 6, scoreRanges.business)} />
+    </svg>
+  );
+}
+
+function DormantPlant() {
+  return (
+    <svg viewBox="0 0 110 100" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      <path d="M55 100 Q53 70 55 30" stroke="#8B7355" strokeWidth="5" fill="none" strokeLinecap="round" />
+      <path d="M54 72 Q40 61 32 53" stroke="#8B7355" strokeWidth="2.5" fill="none" />
+      <path d="M55 55 Q68 45 76 39" stroke="#8B7355" strokeWidth="2" fill="none" />
+      <path d="M54 43 Q44 35 38 27" stroke="#8B7355" strokeWidth="1.5" fill="none" />
+      {/* Dried leaf wisps */}
+      <path d="M28 54 Q24 48 28 44 Q34 46 32 52 Q30 54 28 54Z" fill="#B8960B" opacity="0.35" />
+      <path d="M76 38 Q80 32 78 28 Q74 30 72 36 Q74 38 76 38Z" fill="#A88B10" opacity="0.3" />
+      <path d="M36 28 Q32 22 36 20 Q40 22 38 26 Q36 28 36 28Z" fill="#B8960B" opacity="0.25" />
+    </svg>
+  );
+}
+
+function StumpPlant() {
+  return (
+    <svg viewBox="0 0 50 28" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+      <rect x="12" y="8" width="26" height="20" rx="3" fill="#696969" />
+      <ellipse cx="25" cy="8" rx="14" ry="5" fill="#7A7A7A" />
+      <ellipse cx="25" cy="8" rx="10" ry="3.5" fill="none" stroke="#5A5A5A" strokeWidth="0.7" />
+      <ellipse cx="25" cy="8" rx="5" ry="2" fill="none" stroke="#5A5A5A" strokeWidth="0.5" />
+    </svg>
+  );
+}
+
+function PlantForStatus({ status, impact, business, scoreRanges }) {
+  const eff = effectiveScores(impact, business, status);
+  const props = { impact: eff.impact, business: eff.business, scoreRanges };
+  switch (status) {
+    case "raw": return <SeedPlant />;
+    case "scouted": return <SproutPlant {...props} />;
+    case "building": return <SaplingPlant {...props} />;
+    case "in-dev": return <YoungTreePlant {...props} />;
+    case "deployed": return <FloweringPlant {...props} />;
+    case "shipped": return <FruitTreePlant {...props} />;
+    case "parked": return <DormantPlant />;
+    case "killed": return <StumpPlant />;
+    default: return <SeedPlant />;
+  }
+}
+
+// ─── Score Vis ───
+function ScoreVis({ impact, business }) {
+  if (!impact && !business) return null;
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "4px 10px", background: "rgba(255,255,255,0.65)", borderRadius: 8, backdropFilter: "blur(4px)", border: "1px solid rgba(139,115,85,0.2)" }}>
+      {impact != null && <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2 L7 12" stroke="#228B22" strokeWidth="2" strokeLinecap="round" /><path d="M7 4 Q4 6 3 8" stroke="#228B22" strokeWidth="1.5" fill="none" /><path d="M7 6 Q10 8 11 10" stroke="#228B22" strokeWidth="1.5" fill="none" /></svg>
+        <span style={{ fontSize: 11, color: "#4A5E3A", fontWeight: 600 }}>{impact}%</span>
+        <span style={{ fontSize: 9, color: "#7A8A6A" }}>impact</span>
+      </div>}
+      {business != null && <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="5" r="3.5" fill="none" stroke="#6B8E23" strokeWidth="1.5" /><path d="M7 8.5 L7 12" stroke="#6B8E23" strokeWidth="1.5" strokeLinecap="round" /></svg>
+        <span style={{ fontSize: 11, color: "#5A6A3A", fontWeight: 600 }}>{business}%</span>
+        <span style={{ fontSize: 9, color: "#7A8A6A" }}>business</span>
+      </div>}
     </div>
   );
 }
 
-// ─── Growth Indicator ───
-function GrowthBar({ status }) {
-  const stages = ["raw", "scouted", "building", "in-dev", "deployed", "shipped"];
-  const activeIdx = stages.indexOf(status);
-  const isSpecial = status === "parked" || status === "killed";
-
-  if (isSpecial) return null;
-
-  return (
-    <div className="flex gap-1 items-center">
-      {stages.map((s, i) => (
-        <div key={s} className="flex items-center gap-1">
-          <div
-            className="rounded-full transition-all duration-500"
-            style={{
-              width: i <= activeIdx ? 8 : 5,
-              height: i <= activeIdx ? 8 : 5,
-              backgroundColor: i <= activeIdx ? STAGES[s].color : "rgba(255,255,255,0.1)",
-              boxShadow: i === activeIdx ? `0 0 8px ${STAGES[s].color}40` : "none",
-            }}
-          />
-          {i < stages.length - 1 && (
-            <div className="h-px w-2" style={{ backgroundColor: i < activeIdx ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)" }} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Project Card ───
-function ProjectCard({ project, index }) {
+// ─── Detail Modal ───
+function DetailModal({ project, onClose }) {
   const stage = STAGES[project.status] || STAGES.raw;
-  const [hovered, setHovered] = useState(false);
-
   return (
-    <div
-      className={`relative rounded-2xl border border-white/5 overflow-hidden transition-all duration-500 ${hovered ? "border-white/10 scale-[1.01]" : ""}`}
-      style={{
-        animationDelay: `${index * 120}ms`,
-        animation: "growIn 0.7s ease-out both",
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* Gradient background based on stage */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${stage.bg}`} />
-
-      {/* Texture overlay */}
-      <div className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage: `radial-gradient(circle at 20% 80%, rgba(34,139,34,0.05) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(139,115,85,0.05) 0%, transparent 50%)`,
-        }}
-      />
-
-      <div className="relative p-6 md:p-8">
-        {/* Header row: stage + growth */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{stage.emoji}</span>
-            <div>
-              <span className="text-xs uppercase tracking-widest font-medium" style={{ color: stage.color }}>{stage.label}</span>
-              <div className="text-xs text-stone-600 mt-0.5 italic">{stage.desc}</div>
-            </div>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 12px", background: "rgba(0,0,0,0.3)", backdropFilter: "blur(6px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, maxHeight: "85vh", overflowY: "auto", background: "linear-gradient(180deg, #FDFCF8 0%, #F5F0E8 100%)", borderRadius: 16, border: "1px solid #D2C8B8", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 24, paddingBottom: 8, background: "linear-gradient(180deg, #E8F0E0 0%, #FDFCF8 100%)" }}>
+          <div style={{ width: 120, height: 120 }}>
+            <PlantForStatus status={project.status} impact={project.impact_score} business={project.business_score} scoreRanges={{ impact: null, business: null }} />
           </div>
-          <GrowthBar status={project.status} />
         </div>
-
-        {/* Title */}
-        <h2 style={{ fontFamily: "'Cormorant Garamond', serif" }}
-          className="text-2xl md:text-3xl font-bold text-stone-100 mb-2 leading-tight">
-          {project.title}
-        </h2>
-
-        {/* One-liner */}
-        <p className="text-stone-400 text-sm leading-relaxed mb-4">
-          {project.hero_description || project.one_liner}
-        </p>
-
-        {/* Tags */}
-        <div className="flex flex-wrap gap-2 mb-5">
-          {project.tags.map(tag => (
-            <span key={tag} className="text-xs px-2.5 py-1 rounded-full bg-white/5 text-stone-500 border border-white/5">
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        {/* Bottom row: scores + action */}
-        <div className="flex items-end justify-between">
-          <div className="flex gap-4">
-            {project.impact_score !== null && (
-              <div className="relative">
-                <ScoreRing value={project.impact_score} label="Impact" />
-              </div>
-            )}
-            {project.business_score !== null && (
-              <div className="relative">
-                <ScoreRing value={project.business_score} label="Business" />
-              </div>
-            )}
-            {project.impact_score === null && (
-              <div className="text-xs text-stone-600 italic py-2">Awaiting evaluation</div>
-            )}
+        <div style={{ padding: "0 24px 24px" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 10, color: stage.color, textTransform: "uppercase", letterSpacing: 2, fontWeight: 700, background: `${stage.color}15`, padding: "3px 12px", borderRadius: 20, border: `1px solid ${stage.color}30` }}>{stage.label}</span>
           </div>
-
-          {project.deploy_url && (
-            <a href={project.deploy_url} target="_blank" rel="noopener noreferrer"
-              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300"
-              style={{
-                backgroundColor: `${stage.color}20`,
-                color: stage.color,
-                border: `1px solid ${stage.color}30`,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${stage.color}35`; }}
-              onMouseLeave={e => { e.currentTarget.style.backgroundColor = `${stage.color}20`; }}
-            >
-              Visit
-              <span className="text-xs opacity-60 group-hover:translate-x-0.5 transition-transform">→</span>
-            </a>
-          )}
+          <h2 style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#2C1810", textAlign: "center", marginBottom: 8, lineHeight: 1.2 }}>{project.title}</h2>
+          <p style={{ fontSize: 14, color: "#5C4A3A", lineHeight: 1.6, textAlign: "center", marginBottom: 16 }}>{project.hero_description || project.one_liner}</p>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <ScoreVis impact={project.impact_score} business={project.business_score} />
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6, marginBottom: 20 }}>
+            {(project.tags || []).map(tag => <span key={tag} style={{ fontSize: 10, padding: "2px 10px", borderRadius: 12, background: "#EDE8DF", color: "#7A6A5A", border: "1px solid #D8D0C4" }}>{tag}</span>)}
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+            {project.deploy_url && <a href={project.deploy_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, padding: "8px 24px", borderRadius: 10, background: stage.color, color: "white", textDecoration: "none" }}>Visit →</a>}
+            <button onClick={onClose} style={{ fontSize: 13, padding: "8px 20px", borderRadius: 10, background: "transparent", color: "#8A7A6A", border: "1px solid #D2C8B8", cursor: "pointer" }}>Close</button>
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+// ─── Perspective Projection ───
+const VP_Y = 0.50;
+const VP_X = 0.50;
+
+function perspectiveProject(distanceAhead, side, viewW, viewH) {
+  if (distanceAhead > 1.05 || distanceAhead < -0.15) {
+    return { x: 0, y: 0, scale: 0, opacity: 0, visible: false, plantSize: 0 };
+  }
+
+  const d = Math.max(0.005, distanceAhead);
+  const isPortrait = viewH > viewW;
+
+  // Perspective scale
+  const perspScale = 1 / (d * 2.2 + 0.08);
+
+  // Y: PERSPECTIVE-CORRECT ground position.
+  // dRef = distance at which plant base reaches screen bottom.
+  // Larger dRef = plants spread more evenly across the ground.
+  const dRef = 0.12;
+  const yDisplacement = Math.min(1, ((1 / d) - 1) / ((1 / dRef) - 1));
+  const y = (VP_Y + (1.0 - VP_Y) * yDisplacement) * viewH;
+
+  // X spread
+  const spreadFactor = isPortrait ? 0.28 : 0.36;
+  const sideSign = side === "left" ? -1 : 1;
+  const xSpread = sideSign * Math.pow(1 - d, 1.2) * viewW * spreadFactor;
+  const x = VP_X * viewW + xSpread;
+
+  // Plant size
+  const maxPlant = isPortrait ? viewH * 1.8 : viewH * 2.0;
+  const plantSize = Math.max(5, Math.min(maxPlant, perspScale * (isPortrait ? 180 : 250)));
+
+  // Opacity
+  let opacity = 1;
+  if (distanceAhead > 0.88) opacity = Math.max(0, (1.05 - distanceAhead) / 0.17);
+  if (distanceAhead < 0.02) opacity = Math.max(0, distanceAhead / 0.02);
+
+  // Blur for very distant
+  const blur = d > 0.7 ? (d - 0.7) * 5 : 0;
+
+  return { x, y, scale: perspScale, opacity, plantSize, blur, visible: opacity > 0.01, isPortrait };
 }
 
 // ─── Main App ───
 export default function TheGrove({ projects = [] }) {
-  const [filter, setFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("status");
+  const [selected, setSelected] = useState(null);
+  const scoreRanges = useMemo(() => computeScoreRanges(projects), [projects]);
+  const [walkPos, setWalkPos] = useState(0);
+  const [viewSize, setViewSize] = useState({ w: 800, h: 600 });
+  const containerRef = useRef(null);
 
-  const stageOrder = ["shipped", "deployed", "in-dev", "building", "scouted", "raw", "parked", "killed"];
+  const totalItems = projects.length || 0;
+  const SPACING = 0.20; // spacing along the path between plants
+  const LOOP_LEN = totalItems * SPACING;
 
-  const filtered = useMemo(() => {
-    let list = [...projects];
-    if (filter === "live") list = list.filter(p => p.deploy_url);
-    else if (filter === "growing") list = list.filter(p => ["building", "in-dev", "scouted"].includes(p.status));
-    else if (filter === "seeds") list = list.filter(p => p.status === "raw");
+  useEffect(() => {
+    const update = () => setViewSize({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
-    list.sort((a, b) => {
-      if (sortBy === "status") return stageOrder.indexOf(a.status) - stageOrder.indexOf(b.status);
-      if (sortBy === "impact") return (b.impact_score || 0) - (a.impact_score || 0);
-      return 0;
-    });
-    return list;
-  }, [projects, filter, sortBy]);
+  // Wheel + touch to walk
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  // Count by category
-  const counts = useMemo(() => ({
-    all: projects.length,
-    live: projects.filter(p => p.deploy_url).length,
-    growing: projects.filter(p => ["building", "in-dev", "scouted"].includes(p.status)).length,
-    seeds: projects.filter(p => p.status === "raw").length,
-  }), [projects]);
+    const onWheel = (e) => {
+      e.preventDefault();
+      setWalkPos(prev => prev + e.deltaY * 0.0006);
+    };
 
+    let lastY = 0;
+    const onTouchStart = (e) => { lastY = e.touches[0].clientY; };
+    const onTouchMove = (e) => {
+      e.preventDefault();
+      const dy = lastY - e.touches[0].clientY;
+      lastY = e.touches[0].clientY;
+      setWalkPos(prev => prev + dy * 0.002);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+    };
+  }, []);
+
+  const visiblePlants = useMemo(() => {
+    if (totalItems === 0) return [];
+    const result = [];
+    const { w, h } = viewSize;
+
+    for (let i = 0; i < totalItems; i++) {
+      const side = i % 2 === 0 ? "left" : "right";
+      const pathPos = i * SPACING;
+
+      // Wrap distance for infinite loop
+      let dist = pathPos - walkPos;
+      dist = ((dist % LOOP_LEN) + LOOP_LEN) % LOOP_LEN; // normalize to [0, LOOP_LEN)
+
+      const proj = perspectiveProject(dist, side, w, h);
+      if (!proj.visible) continue;
+
+      result.push({ project: projects[i], index: i, side, distanceAhead: dist, ...proj });
+    }
+
+    // Far items render first (behind)
+    result.sort((a, b) => b.distanceAhead - a.distanceAhead);
+    return result;
+  }, [walkPos, viewSize, projects, totalItems, LOOP_LEN]);
+
+  if (totalItems === 0) {
+    return (
+      <div style={{ width: "100vw", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#6BA34E", fontFamily: "'Outfit', sans-serif" }}>
+        <div style={{ textAlign: "center", color: "#2C3E1F" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🌱</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>No ideas in the grove yet</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-950 via-stone-950 to-emerald-950/20 text-stone-200">
-      
+    <div ref={containerRef} style={{ width: "100vw", height: "100vh", overflow: "hidden", position: "relative", fontFamily: "'Outfit', sans-serif", cursor: "ns-resize", userSelect: "none", touchAction: "none", WebkitOverflowScrolling: "auto" }}>
 
-      {/* Subtle organic background textures */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-20"
-          style={{
-            background: `
-              radial-gradient(ellipse at 10% 20%, rgba(34,139,34,0.04) 0%, transparent 60%),
-              radial-gradient(ellipse at 90% 80%, rgba(139,115,85,0.03) 0%, transparent 60%),
-              radial-gradient(ellipse at 50% 50%, rgba(46,139,87,0.02) 0%, transparent 70%)
-            `
-          }}
-        />
-        {/* Floating particles */}
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="absolute rounded-full opacity-10"
-            style={{
-              width: 3 + i * 2,
-              height: 3 + i * 2,
-              backgroundColor: i % 2 === 0 ? "#228B22" : "#8B7355",
-              left: `${15 + i * 15}%`,
-              top: `${10 + i * 12}%`,
-              animation: `drift ${8 + i * 2}s ease-in-out infinite`,
-              animationDelay: `${i * 1.5}s`,
-            }}
-          />
-        ))}
+      {/* ─── Background ─── */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        {/* Sky — flat horizon, sharp transition at 50% */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(180deg,
+            #7EC8E3 0%,
+            #9DD4EA 20%,
+            #B0D6E5 38%,
+            #A8D0E0 49.5%,
+            #6BA34E 50.5%,
+            #5A9340 65%,
+            #4D8838 82%,
+            #458030 100%)`,
+        }} />
+
+        {/* Sun glow */}
+        <div style={{
+          position: "absolute", top: "6%", left: "50%", transform: "translateX(-50%)",
+          width: 110, height: 110, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(255,252,240,0.65) 0%, rgba(255,248,220,0.15) 50%, transparent 70%)",
+        }} />
+
+        {/* Path — vanishing point at 50% */}
+        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} preserveAspectRatio="none" viewBox="0 0 1000 1000">
+          {(() => {
+            const vpx = 500, vpy = 500;
+            const pathHW = 6;
+            const baseHW = 300;
+            return (
+              <>
+                <polygon
+                  points={`${vpx-pathHW},${vpy} ${vpx+pathHW},${vpy} ${vpx+baseHW},1000 ${vpx-baseHW},1000`}
+                  fill="#C8A96E"
+                />
+                <polygon
+                  points={`${vpx-pathHW*0.4},${vpy} ${vpx+pathHW*0.4},${vpy} ${vpx+baseHW*0.6},1000 ${vpx-baseHW*0.6},1000`}
+                  fill="#D8BC82" opacity="0.3"
+                />
+                {[0.03, 0.08, 0.15, 0.25, 0.38, 0.52, 0.68, 0.82, 0.93].map((t, i) => {
+                  const y = vpy + (1000 - vpy) * t;
+                  const hw = pathHW + (baseHW - pathHW) * t;
+                  return <line key={i} x1={vpx-hw+3} y1={y} x2={vpx+hw-3} y2={y} stroke="#BFA060" strokeWidth={0.3 + t * 1} opacity={0.1 + t * 0.1} />;
+                })}
+                <line x1={vpx-pathHW} y1={vpy} x2={vpx-baseHW} y2={1000} stroke="#A08050" strokeWidth="1" opacity="0.2" />
+                <line x1={vpx+pathHW} y1={vpy} x2={vpx+baseHW} y2={1000} stroke="#A08050" strokeWidth="1" opacity="0.2" />
+              </>
+            );
+          })()}
+        </svg>
+
+        {/* Clouds */}
+        <svg style={{ position: "absolute", top: "3%", left: "6%", opacity: 0.28 }} width="150" height="50" viewBox="0 0 150 50">
+          <ellipse cx="75" cy="28" rx="62" ry="17" fill="white" /><ellipse cx="45" cy="25" rx="38" ry="14" fill="white" /><ellipse cx="108" cy="26" rx="32" ry="12" fill="white" />
+        </svg>
+        <svg style={{ position: "absolute", top: "8%", right: "4%", opacity: 0.2 }} width="120" height="40" viewBox="0 0 120 40">
+          <ellipse cx="60" cy="22" rx="50" ry="14" fill="white" /><ellipse cx="35" cy="20" rx="28" ry="11" fill="white" />
+        </svg>
       </div>
 
-      {/* Header */}
-      <header className="relative pt-16 pb-12 md:pt-24 md:pb-16 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="text-4xl mb-4" style={{ animation: "sway 4s ease-in-out infinite" }}>🌿</div>
-          <h1 style={{ fontFamily: "'Cormorant Garamond', serif" }}
-            className="text-4xl md:text-6xl font-bold text-stone-100 mb-3 tracking-tight">
-            The Grove
-          </h1>
-          <p className="text-stone-500 text-base md:text-lg max-w-md mx-auto leading-relaxed">
-            Ideas at every stage of growth — from seeds waiting in the soil
-            to trees bearing fruit.
-          </p>
-        </div>
-      </header>
+      {/* ─── Plants Layer ─── */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none" }}>
+        {visiblePlants.map(({ project, index, side, x, y, scale, opacity, plantSize, blur, distanceAhead, isPortrait }) => {
+          const stage = STAGES[project.status] || STAGES.raw;
+          const isLeft = side === "left";
 
-      {/* Filters */}
-      <div className="relative px-6 pb-8">
-        <div className="max-w-3xl mx-auto flex flex-wrap gap-2 justify-center">
-          {[
-            ["all", "All", counts.all],
-            ["live", "In Bloom", counts.live],
-            ["growing", "Growing", counts.growing],
-            ["seeds", "Seeds", counts.seeds],
-          ].map(([key, label, count]) => (
-            <button key={key} onClick={() => setFilter(key)}
-              className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-300 ${
-                filter === key
-                  ? "bg-emerald-900/40 text-emerald-400 border border-emerald-800/50"
-                  : "bg-white/3 text-stone-500 border border-white/5 hover:border-white/10 hover:text-stone-400"
-              }`}>
-              {label}
-              <span className="ml-1.5 opacity-50">{count}</span>
-            </button>
-          ))}
+          // Scale plant height by growth stage: seeds are tiny, shipped trees are full size
+          const statusHeight = plantSize * stage.heightScale;
+          // Width scales proportionally but less aggressively (plants get taller not just bigger)
+          const statusWidth = plantSize * (0.4 + stage.heightScale * 0.6);
 
-          <div className="w-px h-6 bg-white/5 self-center mx-1" />
+          // Show name when plant is large enough to read next to
+          const nameVisible = statusHeight > 20;
+          const nameFontSize = Math.max(8, Math.min(14, statusHeight * 0.08));
+          const nameOpacity = Math.min(1, (statusHeight - 20) / 40);
 
-          <button onClick={() => setSortBy(s => s === "status" ? "impact" : "status")}
-            className="px-3 py-2 rounded-full text-xs text-stone-600 border border-white/5 hover:text-stone-400 transition-colors">
-            Sort: {sortBy === "status" ? "Growth Stage" : "Impact"}
-          </button>
-        </div>
-      </div>
+          // Clickable: name is visible AND plant isn't so close it's overhead/passing
+          // Once a plant is huge and fading out, disable clicks so you can reach plants behind it
+          const isOverhead = statusHeight > (isPortrait ? viewSize.h * 0.6 : viewSize.h * 0.7);
+          const isClickable = nameVisible && opacity > 0.2 && !isOverhead;
 
-      {/* Project Grid */}
-      <main className="relative px-6 pb-24">
-        <div className="max-w-3xl mx-auto flex flex-col gap-5">
-          {filtered.map((project, i) => (
-            <ProjectCard key={project.title} project={project} index={i} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="text-center py-16 text-stone-600">
-              <div className="text-3xl mb-2">🌑</div>
-              Nothing growing here yet.
+          return (
+            <div
+              key={index}
+              style={{
+                position: "absolute",
+                left: x,
+                top: y,
+                transform: `translate(${isLeft ? "-70%" : "-30%"}, -100%)`,
+                opacity,
+                filter: blur > 0 ? `blur(${blur}px)` : undefined,
+                // Critical: let clicks pass through overhead/non-clickable plants
+                pointerEvents: isClickable ? "auto" : "none",
+                zIndex: Math.round((1 - distanceAhead) * 100),
+              }}
+            >
+              <div
+                onClick={() => isClickable && setSelected(project)}
+                style={{
+                  cursor: isClickable ? "pointer" : "default",
+                  width: statusWidth,
+                  height: statusHeight,
+                  position: "relative",
+                }}
+              >
+                <PlantForStatus status={project.status} impact={project.impact_score} business={project.business_score} scoreRanges={scoreRanges} />
+
+                {/* Project name — text faded in over/near the plant */}
+                {nameVisible && (
+                  <div style={{
+                    position: "absolute",
+                    // Position at roughly the middle of the plant, toward the path side
+                    top: "35%",
+                    [isLeft ? "right" : "left"]: 0,
+                    transform: `translate(${isLeft ? "60%" : "-60%"}, -50%)`,
+                    opacity: nameOpacity,
+                    pointerEvents: "none",
+                    whiteSpace: "nowrap",
+                  }}>
+                    <div style={{
+                      fontFamily: "'Crimson Text', Georgia, serif",
+                      fontSize: nameFontSize,
+                      fontWeight: 700,
+                      color: "#2C1810",
+                      textShadow: "0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7), 0 1px 3px rgba(255,255,255,0.95)",
+                      lineHeight: 1.2,
+                    }}>
+                      {project.title}
+                    </div>
+                    <div style={{
+                      fontSize: Math.max(6, nameFontSize * 0.7),
+                      fontWeight: 600,
+                      color: stage.color,
+                      textShadow: "0 0 6px rgba(255,255,255,0.9), 0 0 12px rgba(255,255,255,0.7)",
+                      lineHeight: 1.1,
+                    }}>
+                      {stage.label}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      </main>
+          );
+        })}
+      </div>
 
-      {/* Footer */}
-      <footer className="relative border-t border-white/5 py-8 px-6">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="text-xs text-stone-700">
-            {projects.length} idea{projects.length !== 1 ? "s" : ""} in the grove
-          </div>
-          <div className="flex gap-3 text-xs text-stone-700">
-            <span>🌰 Seed</span>
-            <span>🌱 Sprout</span>
-            <span>🌿 Sapling</span>
-            <span>🌳 Tree</span>
-            <span>🌸 Flower</span>
-            <span>🍎 Fruit</span>
-          </div>
+      {/* ─── Title ─── */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, display: "flex", justifyContent: "center", paddingTop: 14, pointerEvents: "none" }}>
+        <div style={{
+          background: "rgba(255,255,255,0.45)", backdropFilter: "blur(8px)",
+          borderRadius: 14, padding: "8px 20px",
+          border: "1px solid rgba(255,255,255,0.35)",
+          boxShadow: "0 3px 14px rgba(0,0,0,0.04)",
+          textAlign: "center", pointerEvents: "auto",
+          maxWidth: "80vw",
+        }}>
+          <h1 style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 700, color: "#2C3E1F", margin: 0, lineHeight: 1 }}>The Grove</h1>
+          <p style={{ fontSize: "clamp(8px, 2.5vw, 10px)", color: "#5A7A4A", marginTop: 2, letterSpacing: 1.2, textTransform: "uppercase" }}>Ideas at every stage of growth</p>
         </div>
-      </footer>
+      </div>
+
+      {/* ─── Version ─── */}
+      <div style={{ position: 'absolute', bottom: 4, right: 8, zIndex: 10, fontSize: 9, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }}>v2.0.0</div>
+
+      {/* ─── Scroll hint ─── */}
+      <div style={{ position: "absolute", bottom: 14, left: 0, right: 0, zIndex: 10, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ background: "rgba(255,255,255,0.35)", backdropFilter: "blur(4px)", borderRadius: 20, padding: "5px 14px", fontSize: 11, color: "#5A7A4A" }}>
+          ↕ scroll to walk the path
+        </div>
+      </div>
+
+      {/* ─── Modal ─── */}
+      {selected && <DetailModal project={selected} onClose={() => setSelected(null)} />}
+
+      {/* ─── Styles ─── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #root { height: 100%; overflow: hidden; position: fixed; width: 100%; }
+        html { overscroll-behavior: none; }
+        body { overscroll-behavior: none; -webkit-overflow-scrolling: auto; }
+      `}</style>
     </div>
   );
 }
