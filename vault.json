@@ -23,7 +23,8 @@
       "pivot_chosen": "",
       "deploy_url": "https://dateweave.vercel.app",
       "portfolio_visible": true,
-      "notes": "Built as first test of the Claude \u2192 PushCraft \u2192 Vercel pipeline. Has forward-looking engine, custom birthday picker, life events support. Quick-scored: fun but not life-changing, hard to monetize. Serves its purpose as pipeline proof-of-concept."
+      "notes": "Built as first test of the Claude \u2192 PushCraft \u2192 Vercel pipeline. Has forward-looking engine, custom birthday picker, life events support. Quick-scored: fun but not life-changing, hard to monetize. Serves its purpose as pipeline proof-of-concept.",
+      "hero_description": "Enter your birthday, add the people who matter, pick historical eras \u2014 and DateWeave weaves them together into surprising connections you never noticed."
     },
     {
       "title": "PushCraft",
@@ -46,7 +47,8 @@
       "pivot_chosen": "",
       "deploy_url": "https://pushcraft.vercel.app",
       "portfolio_visible": true,
-      "notes": "v4: multi-file atomic commit, quick push, token persistence (sessionStorage), scaffold templates (Vite + Expo). Self-bootstrapping \u2014 upgrades itself. Quick-scored: genuine gap in tooling, niche reach limits business score."
+      "notes": "v4: multi-file atomic commit, quick push, token persistence (sessionStorage), scaffold templates (Vite + Expo). Self-bootstrapping \u2014 upgrades itself. Quick-scored: genuine gap in tooling, niche reach limits business score.",
+      "hero_description": "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push \u2014 all from your phone."
     },
     {
       "title": "RepairShield",
@@ -69,7 +71,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Scored Unicorn. Prioritizes repairs, connects homeowners with assistance programs, helps nonprofits allocate limited budgets. Highest combined score in the vault."
+      "notes": "Scored Unicorn. Prioritizes repairs, connects homeowners with assistance programs, helps nonprofits allocate limited budgets. Highest combined score in the vault.",
+      "hero_description": "Prioritizes which repairs matter most, connects homeowners with the right assistance programs, and helps nonprofits allocate limited repair budgets effectively."
     },
     {
       "title": "Crisis Cascade Navigator",
@@ -92,7 +95,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Highest impact score in the vault. Architecture designed: YAML crisis graphs, ZIP-code lookup, static site on Cloudflare. MVP estimated 8 weeks for two people. Starting point: eviction defense in TX, CA, NY. Process Navigator could be the platform layer."
+      "notes": "Highest impact score in the vault. Architecture designed: YAML crisis graphs, ZIP-code lookup, static site on Cloudflare. MVP estimated 8 weeks for two people. Starting point: eviction defense in TX, CA, NY. Process Navigator could be the platform layer.",
+      "hero_description": "When you lose your job AND face eviction AND need medical care \u2014 the order you act in matters. This tool sequences the right moves for your specific jurisdiction."
     },
     {
       "title": "Shelf Life",
@@ -114,7 +118,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Quick-scored: interesting concept but unclear demand signal. Subscription model is plausible but unproven. CPSC/FDA recall APIs, news scraping for rebrands/discontinuations. Rule-based scoring for MVP, ML later."
+      "notes": "Quick-scored: interesting concept but unclear demand signal. Subscription model is plausible but unproven. CPSC/FDA recall APIs, news scraping for rebrands/discontinuations. Rule-based scoring for MVP, ML later.",
+      "hero_description": "Watches for manufacturing errors, rapid branding changes, recalls, and cultural moments that turn ordinary products into tomorrow's treasures."
     },
     {
       "title": "TC Relocation Guide",
@@ -136,7 +141,8 @@
       "pivot_chosen": "Pivot C: TC-specific relocation guide",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Personal tool for summer 2026 move. 9 neighborhood profiles, seasonal pricing charts, buyer strategy. Quick-scored: high personal utility, audience of ~1. Not a business \u2014 and that's fine."
+      "notes": "Personal tool for summer 2026 move. 9 neighborhood profiles, seasonal pricing charts, buyer strategy. Quick-scored: high personal utility, audience of ~1. Not a business \u2014 and that's fine.",
+      "hero_description": ""
     },
     {
       "title": "Map Mosaic",
@@ -159,7 +165,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Quick-scored: creative and novel but unclear demand. Public domain maps from David Rumsey Collection and Library of Congress. Moderate difficulty \u2014 few weekends for prototype, 2-3 months polished."
+      "notes": "Quick-scored: creative and novel but unclear demand. Public domain maps from David Rumsey Collection and Library of Congress. Moderate difficulty \u2014 few weekends for prototype, 2-3 months polished.",
+      "hero_description": ""
     },
     {
       "title": "Dice Party Game",
@@ -181,7 +188,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Physical game concept \u2014 outside the Claude-first pipeline. Quick-scored: proven market (people pay $20-40 for party games) but manufacturing/distribution is a different beast. Accessibility flagged as concern."
+      "notes": "Physical game concept \u2014 outside the Claude-first pipeline. Quick-scored: proven market (people pay $20-40 for party games) but manufacturing/distribution is a different beast. Accessibility flagged as concern.",
+      "hero_description": ""
     },
     {
       "title": "Storyweaver",
@@ -202,9 +210,10 @@
       "date_updated": "2026-03-09",
       "key_insight": "The interactive fiction space is extremely crowded (Talefy, NovelistAI, Character.AI Stories, Sudowrite, NovelCrafter, Rosebud). Differentiation is the key question.",
       "pivot_chosen": "",
-      "deploy_url": "",
+      "deploy_url": "https://story-lemon-iota.vercel.app",
       "portfolio_visible": true,
-      "notes": "Deployed with git repo at github.com/fairbay/story. Quick-scored: crowded space drags gap score down hard. Unless there's a unique angle the competitors miss, this is a personal/creative project rather than a business."
+      "notes": "Deployed with git repo at github.com/fairbay/story. Quick-scored: crowded space drags gap score down hard. Unless there's a unique angle the competitors miss, this is a personal/creative project rather than a business.",
+      "hero_description": "AI-powered interactive fiction with procedural art, voice input, and 16 genre engines. Pick a genre, set preferences, and the story adapts to you."
     },
     {
       "title": "Shadowrun Story App",
@@ -227,7 +236,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Not scored \u2014 IP question must be answered first. If licensing is prohibitive, pivot to original cyberpunk setting using Storyweaver as the platform."
+      "notes": "Not scored \u2014 IP question must be answered first. If licensing is prohibitive, pivot to original cyberpunk setting using Storyweaver as the platform.",
+      "hero_description": ""
     },
     {
       "title": "Arboreal Sentience (Sci-Fi Worldbuild)",
@@ -250,7 +260,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Creative writing project, not a product \u2014 scoring framework doesn't apply. Five paths to sentience designed. Classic dramatic structure mapped onto alien civilization. Ongoing worldbuilding."
+      "notes": "Creative writing project, not a product \u2014 scoring framework doesn't apply. Five paths to sentience designed. Classic dramatic structure mapped onto alien civilization. Ongoing worldbuilding.",
+      "hero_description": ""
     },
     {
       "title": "Parking Incentive Inversion",
@@ -272,7 +283,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Formalized earlier calibration score of 22/54. Invention Disclosure Form drafted. Wariness about long-term financial relationships with large institutions. Requires parking system + scheduling system integration. Correctly parked."
+      "notes": "Formalized earlier calibration score of 22/54. Invention Disclosure Form drafted. Wariness about long-term financial relationships with large institutions. Requires parking system + scheduling system integration. Correctly parked.",
+      "hero_description": ""
     },
     {
       "title": "Bluetooth Busy Light",
@@ -294,7 +306,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Pass. Clinical room status indicator (Pivot C) was the only angle with whitespace, but would require hallway conversations with clinical staff to validate."
+      "notes": "Pass. Clinical room status indicator (Pivot C) was the only angle with whitespace, but would require hallway conversations with clinical staff to validate.",
+      "hero_description": ""
     },
     {
       "title": "The Unsolvable Conversations",
@@ -317,7 +330,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Quick-scored: impact close to 56% threshold but not there. The 'hold questions open' angle is genuinely novel \u2014 every competitor tries to resolve. Monetization is the weak link. Could work as a premium meditative/reflective experience."
+      "notes": "Quick-scored: impact close to 56% threshold but not there. The 'hold questions open' angle is genuinely novel \u2014 every competitor tries to resolve. Monetization is the weak link. Could work as a premium meditative/reflective experience.",
+      "hero_description": ""
     },
     {
       "title": "Process Navigator",
@@ -340,7 +354,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Process Navigator v2 built as React artifact (interactive flow editor, JSON import/export). Could be the platform layer for Crisis Cascade Navigator. Quick-scored: strong impact from broad reach + meaningful depth. Business score held back by monetization uncertainty."
+      "notes": "Process Navigator v2 built as React artifact (interactive flow editor, JSON import/export). Could be the platform layer for Crisis Cascade Navigator. Quick-scored: strong impact from broad reach + meaningful depth. Business score held back by monetization uncertainty.",
+      "hero_description": "Visual flow editor for building and sharing step-by-step processes. Import, export, and navigate complex workflows with branching logic."
     },
     {
       "title": "The Grove",
@@ -362,7 +377,8 @@
       "pivot_chosen": "",
       "deploy_url": "https://bayleemiller.org",
       "portfolio_visible": false,
-      "notes": "Portfolio site \u2014 scoring framework doesn't apply (infrastructure, not product). Reads from projects.json for easy PushCraft updates. Vercel deploy + AWS custom domain at bayleemiller.org. Active development: perspective walk, score-driven plant features, stage-scaled heights."
+      "notes": "Portfolio site \u2014 scoring framework doesn't apply (infrastructure, not product). Reads from projects.json for easy PushCraft updates. Vercel deploy + AWS custom domain at bayleemiller.org. Active development: perspective walk, score-driven plant features, stage-scaled heights.",
+      "hero_description": ""
     },
     {
       "title": "ShadowScale",
@@ -385,7 +401,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Ship & Shelve track. Best version: pure client-side, deploy to Vercel + itch.io."
+      "notes": "Ship & Shelve track. Best version: pure client-side, deploy to Vercel + itch.io.",
+      "hero_description": ""
     },
     {
       "title": "Traffic-Aware Road Repair Scheduler",
@@ -407,7 +424,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Killed. Scores not high enough to justify build effort even with best pivot."
+      "notes": "Killed. Scores not high enough to justify build effort even with best pivot.",
+      "hero_description": ""
     },
     {
       "title": "Variant Forge",
@@ -430,7 +448,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Infrastructure tool for the pipeline. Quick-built, serves its purpose."
+      "notes": "Infrastructure tool for the pipeline. Quick-built, serves its purpose.",
+      "hero_description": ""
     },
     {
       "title": "Neon Sorcery RPG",
@@ -453,7 +472,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Deployed to Netlify. Key lesson: always add explicit React import; drag-and-drop Netlify deployment can serve cached versions."
+      "notes": "Deployed to Netlify. Key lesson: always add explicit React import; drag-and-drop Netlify deployment can serve cached versions.",
+      "hero_description": ""
     },
     {
       "title": "Colored Pencil Bandolier",
@@ -475,7 +495,8 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Killed. 37%/35% \u2014 clear pass."
+      "notes": "Killed. 37%/35% \u2014 clear pass.",
+      "hero_description": ""
     }
   ]
 }
