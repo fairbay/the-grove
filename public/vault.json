@@ -15,7 +15,7 @@
       ],
       "impact_pct": 50,
       "business_pct": 46,
-      "sustainability_pct": null,
+      "sustainability_pct": 78,
       "verdict": "Pass",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -23,7 +23,7 @@
       "pivot_chosen": "",
       "deploy_url": "https://dateweave.vercel.app",
       "portfolio_visible": true,
-      "notes": "Built as first test of the Claude \u2192 PushCraft \u2192 Vercel pipeline. Has forward-looking engine, custom birthday picker, life events support. Quick-scored: fun but not life-changing, hard to monetize. Serves its purpose as pipeline proof-of-concept.",
+      "notes": "Built as first test of the Claude \u2192 PushCraft \u2192 Vercel pipeline. Has forward-looking engine, custom birthday picker, life events support. Quick-scored: fun but not life-changing, hard to monetize. Serves its purpose as pipeline proof-of-concept. Sustainability 78%: pure client-side, no API deps, nothing to break.",
       "hero_description": "Enter your birthday, add the people who matter, pick historical eras \u2014 and DateWeave weaves them together into surprising connections you never noticed."
     },
     {
@@ -39,7 +39,7 @@
       ],
       "impact_pct": 61,
       "business_pct": 50,
-      "sustainability_pct": null,
+      "sustainability_pct": 69,
       "verdict": "Public good",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -47,7 +47,7 @@
       "pivot_chosen": "",
       "deploy_url": "https://pushcraft.vercel.app",
       "portfolio_visible": true,
-      "notes": "v4: multi-file atomic commit, quick push, token persistence (sessionStorage), scaffold templates (Vite + Expo). Self-bootstrapping \u2014 upgrades itself. Quick-scored: genuine gap in tooling, niche reach limits business score.",
+      "notes": "v4: multi-file atomic commit, quick push, token persistence (sessionStorage), scaffold templates (Vite + Expo). Self-bootstrapping \u2014 upgrades itself. Quick-scored: genuine gap in tooling, niche reach limits business score. Sustainability 69%: GitHub API CORS/token behavior is the main risk.",
       "hero_description": "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push \u2014 all from your phone."
     },
     {
@@ -63,7 +63,7 @@
       ],
       "impact_pct": 76,
       "business_pct": 59,
-      "sustainability_pct": null,
+      "sustainability_pct": 44,
       "verdict": "Unicorn",
       "date_added": "2026-02-24",
       "date_updated": "2026-03-09",
@@ -71,7 +71,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Scored Unicorn. Prioritizes repairs, connects homeowners with assistance programs, helps nonprofits allocate limited budgets. Highest combined score in the vault.",
+      "notes": "Scored Unicorn. Prioritizes repairs, connects homeowners with assistance programs, helps nonprofits allocate limited budgets. Highest combined score in the vault. Sustainability 44%: assistance program data decays fast, ongoing support burden expected.",
       "hero_description": "Prioritizes which repairs matter most, connects homeowners with the right assistance programs, and helps nonprofits allocate limited repair budgets effectively."
     },
     {
@@ -87,7 +87,7 @@
       ],
       "impact_pct": 81,
       "business_pct": 38,
-      "sustainability_pct": null,
+      "sustainability_pct": 67,
       "verdict": "Public good",
       "date_added": "2026-02-24",
       "date_updated": "2026-03-09",
@@ -95,7 +95,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Highest impact score in the vault. Architecture designed: YAML crisis graphs, ZIP-code lookup, static site on Cloudflare. MVP estimated 8 weeks for two people. Starting point: eviction defense in TX, CA, NY. Process Navigator could be the platform layer.",
+      "notes": "Highest impact score in the vault. Architecture designed: YAML crisis graphs, ZIP-code lookup, static site on Cloudflare. MVP estimated 8 weeks for two people. Starting point: eviction defense in TX, CA, NY. Process Navigator could be the platform layer. Sustainability 67%: hosting is simple but legal/jurisdictional content decays and stale info could harm someone.",
       "hero_description": "When you lose your job AND face eviction AND need medical care \u2014 the order you act in matters. This tool sequences the right moves for your specific jurisdiction."
     },
     {
@@ -110,7 +110,7 @@
       ],
       "impact_pct": 43,
       "business_pct": 43,
-      "sustainability_pct": null,
+      "sustainability_pct": 37,
       "verdict": "Pass",
       "date_added": "2026-02-25",
       "date_updated": "2026-03-09",
@@ -118,7 +118,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Quick-scored: interesting concept but unclear demand signal. Subscription model is plausible but unproven. CPSC/FDA recall APIs, news scraping for rebrands/discontinuations. Rule-based scoring for MVP, ML later.",
+      "notes": "Quick-scored: interesting concept but unclear demand signal. Subscription model is plausible but unproven. CPSC/FDA recall APIs, news scraping for rebrands/discontinuations. Rule-based scoring for MVP, ML later. Sustainability 37%: heavy API dependencies, content decays daily, many breakage points.",
       "hero_description": "Watches for manufacturing errors, rapid branding changes, recalls, and cultural moments that turn ordinary products into tomorrow's treasures."
     },
     {
@@ -133,7 +133,7 @@
       ],
       "impact_pct": 50,
       "business_pct": 39,
-      "sustainability_pct": null,
+      "sustainability_pct": 78,
       "verdict": "Pass",
       "date_added": "2026-03-01",
       "date_updated": "2026-03-09",
@@ -141,7 +141,7 @@
       "pivot_chosen": "Pivot C: TC-specific relocation guide",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Personal tool for summer 2026 move. 9 neighborhood profiles, seasonal pricing charts, buyer strategy. Quick-scored: high personal utility, audience of ~1. Not a business \u2014 and that's fine.",
+      "notes": "Personal tool for summer 2026 move. 9 neighborhood profiles, seasonal pricing charts, buyer strategy. Quick-scored: high personal utility, audience of ~1. Not a business \u2014 and that's fine. Sustainability 78%: static content, no APIs, but neighborhood data will age after the move.",
       "hero_description": ""
     },
     {
@@ -157,7 +157,7 @@
       ],
       "impact_pct": 44,
       "business_pct": 41,
-      "sustainability_pct": null,
+      "sustainability_pct": 57,
       "verdict": "Pass",
       "date_added": "2026-02-02",
       "date_updated": "2026-03-09",
@@ -165,7 +165,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Quick-scored: creative and novel but unclear demand. Public domain maps from David Rumsey Collection and Library of Congress. Moderate difficulty \u2014 few weekends for prototype, 2-3 months polished.",
+      "notes": "Quick-scored: creative and novel but unclear demand. Public domain maps from David Rumsey Collection and Library of Congress. Moderate difficulty \u2014 few weekends for prototype, 2-3 months polished. Sustainability 57%: map tile dependency and projection alignment are breakage risks.",
       "hero_description": ""
     },
     {
@@ -180,7 +180,7 @@
       ],
       "impact_pct": 43,
       "business_pct": 44,
-      "sustainability_pct": null,
+      "sustainability_pct": 70,
       "verdict": "Pass",
       "date_added": "2026-01-31",
       "date_updated": "2026-03-09",
@@ -188,7 +188,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Physical game concept \u2014 outside the Claude-first pipeline. Quick-scored: proven market (people pay $20-40 for party games) but manufacturing/distribution is a different beast. Accessibility flagged as concern.",
+      "notes": "Physical game concept \u2014 outside the Claude-first pipeline. Quick-scored: proven market (people pay $20-40 for party games) but manufacturing/distribution is a different beast. Accessibility flagged as concern. Sustainability 70%: no dependencies or decay (physical product), but hosting simplicity is N/A \u2014 scored low on that dimension since it's not a web deploy.",
       "hero_description": ""
     },
     {
@@ -204,7 +204,7 @@
       ],
       "impact_pct": 50,
       "business_pct": 43,
-      "sustainability_pct": null,
+      "sustainability_pct": 50,
       "verdict": "Pass",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -212,7 +212,7 @@
       "pivot_chosen": "",
       "deploy_url": "https://story-lemon-iota.vercel.app",
       "portfolio_visible": true,
-      "notes": "Deployed with git repo at github.com/fairbay/story. Quick-scored: crowded space drags gap score down hard. Unless there's a unique angle the competitors miss, this is a personal/creative project rather than a business.",
+      "notes": "Deployed with git repo at github.com/fairbay/story. Quick-scored: crowded space drags gap score down hard. Unless there's a unique angle the competitors miss, this is a personal/creative project rather than a business. Sustainability 50%: Anthropic API dependency is the biggest risk \u2014 one pricing or CORS change breaks it.",
       "hero_description": "AI-powered interactive fiction with procedural art, voice input, and 16 genre engines. Pick a genre, set preferences, and the story adapts to you."
     },
     {
@@ -228,7 +228,7 @@
       ],
       "impact_pct": null,
       "business_pct": null,
-      "sustainability_pct": null,
+      "sustainability_pct": 39,
       "verdict": "Blocked",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -236,7 +236,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Not scored \u2014 IP question must be answered first. If licensing is prohibitive, pivot to original cyberpunk setting using Storyweaver as the platform.",
+      "notes": "Not scored \u2014 IP question must be answered first. If licensing is prohibitive, pivot to original cyberpunk setting using Storyweaver as the platform. Sustainability 39%: AI API dependency + IP licensing risk compound badly.",
       "hero_description": ""
     },
     {
@@ -252,7 +252,7 @@
       ],
       "impact_pct": null,
       "business_pct": null,
-      "sustainability_pct": null,
+      "sustainability_pct": 93,
       "verdict": "Creative project",
       "date_added": "2026-02-27",
       "date_updated": "2026-03-09",
@@ -260,7 +260,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Creative writing project, not a product \u2014 scoring framework doesn't apply. Five paths to sentience designed. Classic dramatic structure mapped onto alien civilization. Ongoing worldbuilding.",
+      "notes": "Creative writing project, not a product \u2014 scoring framework doesn't apply. Five paths to sentience designed. Classic dramatic structure mapped onto alien civilization. Ongoing worldbuilding. Sustainability 93%: pure text, zero dependencies, nothing decays or breaks.",
       "hero_description": ""
     },
     {
@@ -322,7 +322,7 @@
       ],
       "impact_pct": 52,
       "business_pct": 43,
-      "sustainability_pct": null,
+      "sustainability_pct": 50,
       "verdict": "Pass",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -330,7 +330,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Quick-scored: impact close to 56% threshold but not there. The 'hold questions open' angle is genuinely novel \u2014 every competitor tries to resolve. Monetization is the weak link. Could work as a premium meditative/reflective experience.",
+      "notes": "Quick-scored: impact close to 56% threshold but not there. The 'hold questions open' angle is genuinely novel \u2014 every competitor tries to resolve. Monetization is the weak link. Could work as a premium meditative/reflective experience. Sustainability 50%: AI API dependency tanks it.",
       "hero_description": ""
     },
     {
@@ -346,7 +346,7 @@
       ],
       "impact_pct": 61,
       "business_pct": 52,
-      "sustainability_pct": null,
+      "sustainability_pct": 67,
       "verdict": "Public good",
       "date_added": "2026-02-25",
       "date_updated": "2026-03-09",
@@ -354,7 +354,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Process Navigator v2 built as React artifact (interactive flow editor, JSON import/export). Could be the platform layer for Crisis Cascade Navigator. Quick-scored: strong impact from broad reach + meaningful depth. Business score held back by monetization uncertainty.",
+      "notes": "Process Navigator v2 built as React artifact (interactive flow editor, JSON import/export). Could be the platform layer for Crisis Cascade Navigator. Quick-scored: strong impact from broad reach + meaningful depth. Business score held back by monetization uncertainty. Sustainability 67%: no API deps but community content needs moderation and process data can decay.",
       "hero_description": "Visual flow editor for building and sharing step-by-step processes. Import, export, and navigate complex workflows with branching logic."
     },
     {
@@ -369,7 +369,7 @@
       ],
       "impact_pct": null,
       "business_pct": null,
-      "sustainability_pct": null,
+      "sustainability_pct": 83,
       "verdict": "Infrastructure",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -377,7 +377,7 @@
       "pivot_chosen": "",
       "deploy_url": "https://bayleemiller.org",
       "portfolio_visible": false,
-      "notes": "Portfolio site \u2014 scoring framework doesn't apply (infrastructure, not product). Reads from projects.json for easy PushCraft updates. Vercel deploy + AWS custom domain at bayleemiller.org. Active development: perspective walk, score-driven plant features, stage-scaled heights.",
+      "notes": "Portfolio site \u2014 scoring framework doesn't apply (infrastructure, not product). Reads from projects.json for easy PushCraft updates. Vercel deploy + AWS custom domain at bayleemiller.org. Active development: perspective walk, score-driven plant features, stage-scaled heights. Sustainability 83%: pure client-side React, reads from static JSON, only breakage risk is Vercel config or vault schema changes.",
       "hero_description": ""
     },
     {
@@ -440,7 +440,7 @@
       ],
       "impact_pct": null,
       "business_pct": null,
-      "sustainability_pct": null,
+      "sustainability_pct": 57,
       "verdict": "Infrastructure",
       "date_added": "2026-03-08",
       "date_updated": "2026-03-09",
@@ -448,7 +448,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Infrastructure tool for the pipeline. Quick-built, serves its purpose.",
+      "notes": "Infrastructure tool for the pipeline. Quick-built, serves its purpose. Sustainability 57%: Gemini API dependency is the core risk.",
       "hero_description": ""
     },
     {
@@ -464,7 +464,7 @@
       ],
       "impact_pct": null,
       "business_pct": null,
-      "sustainability_pct": null,
+      "sustainability_pct": 87,
       "verdict": "Creative project",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
@@ -472,7 +472,7 @@
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": false,
-      "notes": "Deployed to Netlify. Key lesson: always add explicit React import; drag-and-drop Netlify deployment can serve cached versions.",
+      "notes": "Deployed to Netlify. Key lesson: always add explicit React import; drag-and-drop Netlify deployment can serve cached versions. Sustainability 87%: pure client-side, seeded RNG, zero external deps.",
       "hero_description": ""
     },
     {
