@@ -623,7 +623,7 @@ export default function TheGrove({ projects = [] }) {
       </div>
 
       {/* ─── Version ─── */}
-      <div style={{ position: 'absolute', bottom: 4, right: 8, zIndex: 10, fontSize: 9, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }}>v2.0.0</div>
+      <div style={{ position: 'absolute', bottom: 4, right: 8, zIndex: 10, fontSize: 9, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }}>v2.1.0</div>
 
       {/* ─── Scroll hint ─── */}
       <div style={{ position: "absolute", bottom: 14, left: 0, right: 0, zIndex: 10, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
