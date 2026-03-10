@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
 import VaultDashboard from "./VaultDashboard";
 import Garden from "./App";
+import BookPage from "./BookPage";
 
 /*
- * GroveRouter v2.0.0
+ * GroveRouter v2.1.0
  * 
  * Routes:
- * - /vault → VaultDashboard (fetches vault.json itself)
+ * - /vault → VaultDashboard
+ * - /books/stage-directions → BookPage
  * - / (default) → The Grove walking garden
- * 
- * Fetches vault.json, filters portfolio_visible entries,
- * maps to the shape the garden expects, renders the garden.
  */
 
-// Map vault.json entries → the shape App.jsx expects
 function vaultToProjects(ideas) {
   return ideas
     .filter((i) => i.portfolio_visible)
@@ -32,10 +30,12 @@ function vaultToProjects(ideas) {
 export default function GroveRouter() {
   const [projects, setProjects] = useState(null);
   const [error, setError] = useState(null);
-  const isVault = window.location.pathname === "/vault";
+  const path = window.location.pathname;
+  const isVault = path === "/vault";
+  const isBook = path.startsWith("/books/");
 
   useEffect(() => {
-    if (isVault) return;
+    if (isVault || isBook) return;
     fetch("/vault.json")
       .then((r) => {
         if (!r.ok) throw new Error(`Failed to load vault.json: ${r.status}`);
@@ -47,9 +47,10 @@ export default function GroveRouter() {
         setError(e.message);
         setProjects([]);
       });
-  }, [isVault]);
+  }, [isVault, isBook]);
 
   if (isVault) return <VaultDashboard />;
+  if (isBook) return <BookPage />;
 
   if (projects === null) {
     return (
