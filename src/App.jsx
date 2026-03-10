@@ -23,12 +23,6 @@ const STAGES = {
 };
 
 // ─── SVG Plants ───
-// Ground rule: the very bottom of each viewBox IS where trunk meets ground.
-// Flowers (pink) = impact score. Fruit (red) = business score.
-// Score drives count: null=0, 1-30→1, 31-55→2, 56-70→3, 71-85→4, 86+→5-6
-
-// Deployed+ plants with null scores still deserve decorations.
-// Returns { impact, business } with minimums inferred from lifecycle stage.
 function effectiveScores(impact, business, status) {
   const minimums = {
     deployed:  { impact: 65, business: 50 },
@@ -42,9 +36,6 @@ function effectiveScores(impact, business, status) {
   };
 }
 
-// Compute actual score ranges from project data so decoration counts
-// are relative: the project with the highest score gets the most,
-// the lowest scored project gets the fewest.
 function computeScoreRanges(projects) {
   const impacts = [];
   const businesses = [];
@@ -59,8 +50,6 @@ function computeScoreRanges(projects) {
   };
 }
 
-// Map score to count relative to data range.
-// minScore → 1, maxScore → maxSlots. null → 0.
 function scoreToCount(score, maxSlots, range) {
   if (score == null || score === 0) return 0;
   if (!range || range.max === range.min) return Math.ceil(maxSlots / 2);
@@ -68,7 +57,6 @@ function scoreToCount(score, maxSlots, range) {
   return Math.max(1, Math.round(1 + t * (maxSlots - 1)));
 }
 
-// Flowers: 5-petal blossom shape (not circles). scale=0.25 on non-trees.
 function Flowers({ positions, count, scale = 1 }) {
   if (count === 0) return null;
   const petalR = 2.4 * scale;
@@ -89,7 +77,6 @@ function Flowers({ positions, count, scale = 1 }) {
   ));
 }
 
-// Fruit: round with highlight. scale=0.25 on non-trees.
 function Fruit({ positions, count, scale = 1 }) {
   if (count === 0) return null;
   const r = 4.5 * scale;
@@ -110,7 +97,6 @@ function SeedPlant() {
       <ellipse cx="30" cy="26" rx="20" ry="5" fill="#A0926B" />
       <ellipse cx="30" cy="22" rx="5" ry="4" fill="#6B4E2E" />
       <path d="M30 18 Q32 13 30 9" stroke="#8B7355" strokeWidth="1.2" fill="none" opacity="0.6" />
-      {/* Tiny dense tuft emerging from seed */}
       <path d="M26 12 Q24 7 27 5 Q30 3 33 5 Q36 7 34 12 Q30 10 26 12Z" fill="#5C8A1E" opacity="0.8" />
       <path d="M27 11 Q26 6 30 4 Q34 6 33 11 Q30 9 27 11Z" fill="#7BA428" opacity="0.75" />
       <path d="M28 10 Q29 6 30 5 Q31 6 32 10 Q30 8 28 10Z" fill="#90C040" opacity="0.65" />
@@ -123,9 +109,7 @@ function SproutPlant({ impact, business, scoreRanges }) {
   const fruitSpots = [[40, 6]];
   return (
     <svg viewBox="0 0 80 55" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
-      {/* Stem */}
       <path d="M40 55 Q39 37 40 18" stroke="#4A7A2E" strokeWidth="3" fill="none" strokeLinecap="round" />
-      {/* Single connected canopy — dense but small reach */}
       <path d="M22 26 Q18 18 22 12 Q26 6 32 4 Q36 2 40 3 Q44 2 48 4 Q54 6 58 12 Q62 18 58 26 Q54 30 48 32 Q44 34 40 35 Q36 34 32 32 Q26 30 22 26Z" fill="#3A6E1A" opacity="0.9" />
       <path d="M25 24 Q22 16 26 10 Q32 5 40 4 Q48 5 54 10 Q58 16 55 24 Q50 28 44 30 Q40 31 36 30 Q30 28 25 24Z" fill="#4A7A2E" opacity="0.85" />
       <path d="M28 22 Q26 14 30 8 Q36 4 40 5 Q44 4 50 8 Q54 14 52 22 Q48 26 42 28 Q38 28 32 26 Q28 24 28 22Z" fill="#6B8E23" opacity="0.8" />
@@ -142,15 +126,10 @@ function SaplingPlant({ impact, business, scoreRanges }) {
   const fruitSpots = [[40, 20], [65, 32]];
   return (
     <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
-      {/* Trunk — branches hidden by canopy */}
       <path d="M50 100 Q49 75 50 38" stroke="#6B4E2E" strokeWidth="5" fill="none" strokeLinecap="round" />
-      {/* Single canopy silhouette — bumpy organic edge, covers all branch endpoints */}
       <path d="M16 54 Q10 44 14 34 Q18 24 24 18 Q30 12 38 8 Q44 5 50 6 Q56 5 62 8 Q70 12 76 18 Q82 24 84 34 Q86 44 80 54 Q76 60 68 58 Q60 56 50 58 Q40 56 32 58 Q24 60 16 54Z" fill="#1A5E1A" opacity="0.9" />
-      {/* Mid tone — offset for depth */}
       <path d="M20 50 Q14 40 18 30 Q24 20 32 14 Q40 8 50 8 Q60 8 68 14 Q76 20 80 30 Q84 40 78 50 Q72 55 62 52 Q52 50 42 52 Q32 55 20 50Z" fill="#228B22" opacity="0.85" />
-      {/* Bright upper mass */}
       <path d="M26 42 Q22 32 28 22 Q34 14 42 10 Q50 8 58 10 Q66 14 72 22 Q76 32 72 42 Q66 48 56 46 Q48 44 40 46 Q32 48 26 42Z" fill="#2E9B2E" opacity="0.7" />
-      {/* Light patches */}
       <path d="M34 32 Q30 24 36 16 Q44 12 50 12 Q56 12 62 16 Q68 24 64 32 Q58 38 50 36 Q42 38 34 32Z" fill="#3AAA3A" opacity="0.55" />
       <path d="M42 24 Q40 18 46 14 Q52 14 56 18 Q56 24 52 28 Q46 28 42 24Z" fill="#48B848" opacity="0.4" />
       <Flowers positions={flowerSpots} count={scoreToCount(impact, 3, scoreRanges.impact)} scale={0.25} />
@@ -164,15 +143,10 @@ function YoungTreePlant({ impact, business, scoreRanges }) {
   const fruitSpots = [[48, 34], [84, 46], [64, 18]];
   return (
     <svg viewBox="0 0 130 130" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
-      {/* Trunk — branches hidden inside canopy mass */}
       <path d="M65 130 Q63 95 65 40" stroke="#6B4E2E" strokeWidth="6" fill="none" strokeLinecap="round" />
-      {/* Single connected canopy silhouette — wide, irregular, engulfs all branches */}
       <path d="M18 72 Q8 58 12 42 Q16 28 26 18 Q36 10 48 6 Q58 3 66 4 Q74 3 84 6 Q96 10 106 18 Q116 28 118 42 Q120 58 112 72 Q106 78 96 74 Q86 70 76 72 Q66 74 56 72 Q46 70 36 74 Q26 78 18 72Z" fill="#16581A" opacity="0.9" />
-      {/* Mid canopy — shifted up-right for light direction */}
       <path d="M24 66 Q14 52 18 36 Q24 22 36 14 Q48 8 60 6 Q72 6 84 10 Q96 16 106 28 Q114 42 110 58 Q106 68 96 64 Q84 60 72 62 Q60 64 48 62 Q36 64 24 66Z" fill="#1E6B1E" opacity="0.85" />
-      {/* Bright mass */}
       <path d="M30 58 Q22 44 26 30 Q34 18 46 12 Q58 8 68 8 Q80 10 92 18 Q102 28 104 44 Q104 58 96 60 Q86 56 74 56 Q62 58 50 56 Q38 58 30 58Z" fill="#228B22" opacity="0.75" />
-      {/* Highlight patches */}
       <path d="M38 48 Q32 36 38 24 Q46 16 56 12 Q66 10 76 14 Q86 22 90 34 Q92 46 86 50 Q76 48 66 46 Q56 48 46 48 Q40 48 38 48Z" fill="#2E9B2E" opacity="0.6" />
       <path d="M48 36 Q44 26 50 18 Q58 14 68 14 Q78 18 82 26 Q84 36 78 40 Q68 38 60 36 Q52 38 48 36Z" fill="#3AAA3A" opacity="0.45" />
       <path d="M56 28 Q54 20 62 16 Q70 16 74 22 Q76 28 70 32 Q64 30 56 28Z" fill="#48B848" opacity="0.35" />
@@ -187,18 +161,12 @@ function FloweringPlant({ impact, business, scoreRanges }) {
   const fruitSpots = [[50, 50], [100, 58], [76, 26], [60, 68]];
   return (
     <svg viewBox="0 0 155 155" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
-      {/* Trunk — most hidden inside canopy */}
       <path d="M78 155 Q75 108 78 48" stroke="#6B4E2E" strokeWidth="7" fill="none" strokeLinecap="round" />
-      {/* A bit of lower branch peeking out below canopy */}
       <path d="M76 115 Q62 105 52 97" stroke="#7B5E3E" strokeWidth="3" fill="none" />
       <path d="M78 108 Q92 98 102 92" stroke="#7B5E3E" strokeWidth="2.5" fill="none" />
-      {/* Single massive canopy silhouette — wide irregular crown */}
       <path d="M18 88 Q4 68 10 46 Q18 26 32 14 Q46 4 60 2 Q72 0 82 2 Q96 4 110 14 Q124 26 132 46 Q138 68 124 88 Q116 94 106 88 Q94 82 82 84 Q70 82 58 84 Q46 88 36 90 Q26 94 18 88Z" fill="#14521A" opacity="0.9" />
-      {/* Mid canopy */}
       <path d="M24 82 Q10 62 16 40 Q26 22 40 12 Q54 4 68 2 Q82 2 96 8 Q112 18 122 36 Q130 56 122 76 Q114 86 102 80 Q90 74 78 76 Q66 74 54 76 Q42 80 30 84 Q24 84 24 82Z" fill="#1E6B1E" opacity="0.85" />
-      {/* Bright mass — upper canopy catches light */}
       <path d="M32 72 Q20 52 26 34 Q36 18 50 10 Q64 4 78 4 Q92 6 106 16 Q118 30 122 48 Q124 66 116 72 Q104 68 92 66 Q78 68 66 66 Q52 68 40 72 Q34 72 32 72Z" fill="#228B22" opacity="0.75" />
-      {/* Highlight zones */}
       <path d="M42 60 Q32 42 38 26 Q50 14 66 8 Q80 6 94 14 Q108 26 112 42 Q114 58 106 62 Q94 58 82 56 Q68 58 56 58 Q46 60 42 60Z" fill="#2A9A2A" opacity="0.6" />
       <path d="M52 48 Q44 34 52 22 Q62 14 76 10 Q90 14 100 24 Q106 36 104 48 Q96 50 84 48 Q72 46 62 48 Q54 50 52 48Z" fill="#34AA34" opacity="0.45" />
       <path d="M62 38 Q58 28 66 18 Q76 14 86 18 Q94 28 92 38 Q84 40 76 38 Q68 38 62 38Z" fill="#40B840" opacity="0.35" />
@@ -214,20 +182,13 @@ function FruitTreePlant({ impact, business, scoreRanges }) {
   const fruitSpots = [[46, 80], [72, 30], [100, 26], [126, 52], [56, 48], [112, 68]];
   return (
     <svg viewBox="0 0 165 165" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
-      {/* Trunk — branches all hidden inside canopy */}
       <path d="M82 165 Q79 115 82 46" stroke="#5C4033" strokeWidth="8" fill="none" strokeLinecap="round" />
-      {/* Lower branch stubs peeking below canopy */}
       <path d="M80 123 Q64 111 52 102" stroke="#6B4E2E" strokeWidth="3.5" fill="none" />
       <path d="M82 116 Q96 106 108 98" stroke="#6B4E2E" strokeWidth="3" fill="none" />
-      {/* Massive single canopy silhouette — biggest, most irregular */}
       <path d="M14 94 Q-2 70 6 44 Q16 22 32 10 Q48 0 64 -2 Q78 -4 88 -2 Q104 0 120 10 Q136 22 146 44 Q154 70 140 94 Q130 102 118 94 Q104 86 90 88 Q76 86 62 88 Q48 92 36 96 Q24 102 14 94Z" fill="#123E14" opacity="0.9" />
-      {/* Mid canopy — the main body */}
       <path d="M20 88 Q4 64 12 40 Q24 18 42 8 Q58 0 72 -2 Q86 -2 100 2 Q118 10 132 28 Q142 48 142 70 Q140 88 128 86 Q114 80 100 80 Q86 78 72 80 Q58 82 44 86 Q30 90 20 88Z" fill="#1A5A1A" opacity="0.88" />
-      {/* Rich green layer */}
       <path d="M28 80 Q14 58 20 36 Q32 16 50 6 Q66 0 80 0 Q96 2 112 12 Q126 26 134 46 Q138 66 130 80 Q118 76 104 74 Q88 72 74 74 Q60 76 46 80 Q34 82 28 80Z" fill="#1E6B1E" opacity="0.82" />
-      {/* Bright mass */}
       <path d="M36 72 Q22 52 28 32 Q40 14 56 6 Q72 0 86 2 Q102 6 116 18 Q128 34 132 52 Q134 70 124 72 Q112 68 98 66 Q82 64 68 66 Q54 70 42 72 Q38 72 36 72Z" fill="#228B22" opacity="0.72" />
-      {/* Highlight zones — cascading brightness */}
       <path d="M46 62 Q34 44 40 26 Q52 12 68 6 Q84 4 100 10 Q114 22 120 40 Q122 58 114 62 Q102 58 88 56 Q74 54 62 58 Q50 62 46 62Z" fill="#2A9A2A" opacity="0.58" />
       <path d="M56 50 Q46 34 54 20 Q66 10 82 8 Q98 12 108 24 Q114 38 110 50 Q100 48 88 46 Q76 44 66 48 Q58 50 56 50Z" fill="#34AA34" opacity="0.42" />
       <path d="M66 40 Q60 28 68 18 Q80 12 92 16 Q102 26 98 38 Q90 40 80 38 Q70 38 66 40Z" fill="#40B840" opacity="0.32" />
@@ -245,7 +206,6 @@ function DormantPlant() {
       <path d="M54 72 Q40 61 32 53" stroke="#8B7355" strokeWidth="2.5" fill="none" />
       <path d="M55 55 Q68 45 76 39" stroke="#8B7355" strokeWidth="2" fill="none" />
       <path d="M54 43 Q44 35 38 27" stroke="#8B7355" strokeWidth="1.5" fill="none" />
-      {/* Dried leaf wisps */}
       <path d="M28 54 Q24 48 28 44 Q34 46 32 52 Q30 54 28 54Z" fill="#B8960B" opacity="0.35" />
       <path d="M76 38 Q80 32 78 28 Q74 30 72 36 Q74 38 76 38Z" fill="#A88B10" opacity="0.3" />
       <path d="M36 28 Q32 22 36 20 Q40 22 38 26 Q36 28 36 28Z" fill="#B8960B" opacity="0.25" />
@@ -340,38 +300,22 @@ function perspectiveProject(distanceAhead, side, viewW, viewH) {
   if (distanceAhead > 1.05 || distanceAhead < -0.15) {
     return { x: 0, y: 0, scale: 0, opacity: 0, visible: false, plantSize: 0 };
   }
-
   const d = Math.max(0.005, distanceAhead);
   const isPortrait = viewH > viewW;
-
-  // Perspective scale
   const perspScale = 1 / (d * 2.2 + 0.08);
-
-  // Y: PERSPECTIVE-CORRECT ground position.
-  // dRef = distance at which plant base reaches screen bottom.
-  // Larger dRef = plants spread more evenly across the ground.
   const dRef = 0.12;
   const yDisplacement = Math.min(1, ((1 / d) - 1) / ((1 / dRef) - 1));
   const y = (VP_Y + (1.0 - VP_Y) * yDisplacement) * viewH;
-
-  // X spread
   const spreadFactor = isPortrait ? 0.28 : 0.36;
   const sideSign = side === "left" ? -1 : 1;
   const xSpread = sideSign * Math.pow(1 - d, 1.2) * viewW * spreadFactor;
   const x = VP_X * viewW + xSpread;
-
-  // Plant size
   const maxPlant = isPortrait ? viewH * 1.8 : viewH * 2.0;
   const plantSize = Math.max(5, Math.min(maxPlant, perspScale * (isPortrait ? 180 : 250)));
-
-  // Opacity
   let opacity = 1;
   if (distanceAhead > 0.88) opacity = Math.max(0, (1.05 - distanceAhead) / 0.17);
   if (distanceAhead < 0.02) opacity = Math.max(0, distanceAhead / 0.02);
-
-  // Blur for very distant
   const blur = d > 0.7 ? (d - 0.7) * 5 : 0;
-
   return { x, y, scale: perspScale, opacity, plantSize, blur, visible: opacity > 0.01, isPortrait };
 }
 
@@ -384,7 +328,7 @@ export default function TheGrove({ projects = [] }) {
   const containerRef = useRef(null);
 
   const totalItems = projects.length || 0;
-  const SPACING = 0.20; // spacing along the path between plants
+  const SPACING = 0.20;
   const LOOP_LEN = totalItems * SPACING;
 
   useEffect(() => {
@@ -394,55 +338,32 @@ export default function TheGrove({ projects = [] }) {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Wheel + touch to walk
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
-    const onWheel = (e) => {
-      e.preventDefault();
-      setWalkPos(prev => prev + e.deltaY * 0.0006);
-    };
-
+    const onWheel = (e) => { e.preventDefault(); setWalkPos(prev => prev + e.deltaY * 0.0006); };
     let lastY = 0;
     const onTouchStart = (e) => { lastY = e.touches[0].clientY; };
-    const onTouchMove = (e) => {
-      e.preventDefault();
-      const dy = lastY - e.touches[0].clientY;
-      lastY = e.touches[0].clientY;
-      setWalkPos(prev => prev + dy * 0.002);
-    };
-
+    const onTouchMove = (e) => { e.preventDefault(); const dy = lastY - e.touches[0].clientY; lastY = e.touches[0].clientY; setWalkPos(prev => prev + dy * 0.002); };
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
-    return () => {
-      el.removeEventListener("wheel", onWheel);
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-    };
+    return () => { el.removeEventListener("wheel", onWheel); el.removeEventListener("touchstart", onTouchStart); el.removeEventListener("touchmove", onTouchMove); };
   }, []);
 
   const visiblePlants = useMemo(() => {
     if (totalItems === 0) return [];
     const result = [];
     const { w, h } = viewSize;
-
     for (let i = 0; i < totalItems; i++) {
       const side = i % 2 === 0 ? "left" : "right";
       const pathPos = i * SPACING;
-
-      // Wrap distance for infinite loop
       let dist = pathPos - walkPos;
-      dist = ((dist % LOOP_LEN) + LOOP_LEN) % LOOP_LEN; // normalize to [0, LOOP_LEN)
-
+      dist = ((dist % LOOP_LEN) + LOOP_LEN) % LOOP_LEN;
       const proj = perspectiveProject(dist, side, w, h);
       if (!proj.visible) continue;
-
       result.push({ project: projects[i], index: i, side, distanceAhead: dist, ...proj });
     }
-
-    // Far items render first (behind)
     result.sort((a, b) => b.distanceAhead - a.distanceAhead);
     return result;
   }, [walkPos, viewSize, projects, totalItems, LOOP_LEN]);
@@ -463,43 +384,22 @@ export default function TheGrove({ projects = [] }) {
 
       {/* ─── Background ─── */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-        {/* Sky — flat horizon, sharp transition at 50% */}
         <div style={{
           position: "absolute", inset: 0,
-          background: `linear-gradient(180deg,
-            #7EC8E3 0%,
-            #9DD4EA 20%,
-            #B0D6E5 38%,
-            #A8D0E0 49.5%,
-            #6BA34E 50.5%,
-            #5A9340 65%,
-            #4D8838 82%,
-            #458030 100%)`,
+          background: `linear-gradient(180deg, #7EC8E3 0%, #9DD4EA 20%, #B0D6E5 38%, #A8D0E0 49.5%, #6BA34E 50.5%, #5A9340 65%, #4D8838 82%, #458030 100%)`,
         }} />
-
-        {/* Sun glow */}
         <div style={{
           position: "absolute", top: "6%", left: "50%", transform: "translateX(-50%)",
           width: 110, height: 110, borderRadius: "50%",
           background: "radial-gradient(circle, rgba(255,252,240,0.65) 0%, rgba(255,248,220,0.15) 50%, transparent 70%)",
         }} />
-
-        {/* Path — vanishing point at 50% */}
         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} preserveAspectRatio="none" viewBox="0 0 1000 1000">
           {(() => {
-            const vpx = 500, vpy = 500;
-            const pathHW = 6;
-            const baseHW = 300;
+            const vpx = 500, vpy = 500, pathHW = 6, baseHW = 300;
             return (
               <>
-                <polygon
-                  points={`${vpx-pathHW},${vpy} ${vpx+pathHW},${vpy} ${vpx+baseHW},1000 ${vpx-baseHW},1000`}
-                  fill="#C8A96E"
-                />
-                <polygon
-                  points={`${vpx-pathHW*0.4},${vpy} ${vpx+pathHW*0.4},${vpy} ${vpx+baseHW*0.6},1000 ${vpx-baseHW*0.6},1000`}
-                  fill="#D8BC82" opacity="0.3"
-                />
+                <polygon points={`${vpx-pathHW},${vpy} ${vpx+pathHW},${vpy} ${vpx+baseHW},1000 ${vpx-baseHW},1000`} fill="#C8A96E" />
+                <polygon points={`${vpx-pathHW*0.4},${vpy} ${vpx+pathHW*0.4},${vpy} ${vpx+baseHW*0.6},1000 ${vpx-baseHW*0.6},1000`} fill="#D8BC82" opacity="0.3" />
                 {[0.03, 0.08, 0.15, 0.25, 0.38, 0.52, 0.68, 0.82, 0.93].map((t, i) => {
                   const y = vpy + (1000 - vpy) * t;
                   const hw = pathHW + (baseHW - pathHW) * t;
@@ -511,8 +411,6 @@ export default function TheGrove({ projects = [] }) {
             );
           })()}
         </svg>
-
-        {/* Clouds */}
         <svg style={{ position: "absolute", top: "3%", left: "6%", opacity: 0.28 }} width="150" height="50" viewBox="0 0 150 50">
           <ellipse cx="75" cy="28" rx="62" ry="17" fill="white" /><ellipse cx="45" cy="25" rx="38" ry="14" fill="white" /><ellipse cx="108" cy="26" rx="32" ry="12" fill="white" />
         </svg>
@@ -526,77 +424,35 @@ export default function TheGrove({ projects = [] }) {
         {visiblePlants.map(({ project, index, side, x, y, scale, opacity, plantSize, blur, distanceAhead, isPortrait }) => {
           const stage = STAGES[project.status] || STAGES.raw;
           const isLeft = side === "left";
-
-          // Scale plant height by growth stage: seeds are tiny, shipped trees are full size
           const statusHeight = plantSize * stage.heightScale;
-          // Width scales proportionally but less aggressively (plants get taller not just bigger)
           const statusWidth = plantSize * (0.4 + stage.heightScale * 0.6);
-
-          // Show name when plant is large enough to read next to
           const nameVisible = statusHeight > 20;
           const nameFontSize = Math.max(8, Math.min(14, statusHeight * 0.08));
           const nameOpacity = Math.min(1, (statusHeight - 20) / 40);
-
-          // Clickable: name is visible AND plant isn't so close it's overhead/passing
-          // Once a plant is huge and fading out, disable clicks so you can reach plants behind it
           const isOverhead = statusHeight > (isPortrait ? viewSize.h * 0.6 : viewSize.h * 0.7);
           const isClickable = nameVisible && opacity > 0.2 && !isOverhead;
 
           return (
-            <div
-              key={index}
-              style={{
-                position: "absolute",
-                left: x,
-                top: y,
-                transform: `translate(${isLeft ? "-70%" : "-30%"}, -100%)`,
-                opacity,
-                filter: blur > 0 ? `blur(${blur}px)` : undefined,
-                // Critical: let clicks pass through overhead/non-clickable plants
-                pointerEvents: isClickable ? "auto" : "none",
-                zIndex: Math.round((1 - distanceAhead) * 100),
-              }}
-            >
-              <div
-                onClick={() => isClickable && setSelected(project)}
-                style={{
-                  cursor: isClickable ? "pointer" : "default",
-                  width: statusWidth,
-                  height: statusHeight,
-                  position: "relative",
-                }}
-              >
+            <div key={index} style={{
+              position: "absolute", left: x, top: y,
+              transform: `translate(${isLeft ? "-70%" : "-30%"}, -100%)`,
+              opacity, filter: blur > 0 ? `blur(${blur}px)` : undefined,
+              pointerEvents: isClickable ? "auto" : "none",
+              zIndex: Math.round((1 - distanceAhead) * 100),
+            }}>
+              <div onClick={() => isClickable && setSelected(project)} style={{ cursor: isClickable ? "pointer" : "default", width: statusWidth, height: statusHeight, position: "relative" }}>
                 <PlantForStatus status={project.status} impact={project.impact_score} business={project.business_score} scoreRanges={scoreRanges} />
-
-                {/* Project name — text faded in over/near the plant */}
                 {nameVisible && (
                   <div style={{
-                    position: "absolute",
-                    // Position at roughly the middle of the plant, toward the path side
-                    top: "35%",
+                    position: "absolute", top: "35%",
                     [isLeft ? "right" : "left"]: 0,
                     transform: `translate(${isLeft ? "60%" : "-60%"}, -50%)`,
-                    opacity: nameOpacity,
-                    pointerEvents: "none",
-                    whiteSpace: "nowrap",
+                    opacity: nameOpacity, pointerEvents: "none", whiteSpace: "nowrap",
                   }}>
-                    <div style={{
-                      fontFamily: "'Crimson Text', Georgia, serif",
-                      fontSize: nameFontSize,
-                      fontWeight: 700,
-                      color: "#2C1810",
-                      textShadow: "0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7), 0 1px 3px rgba(255,255,255,0.95)",
-                      lineHeight: 1.2,
-                    }}>
+                    <div style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: nameFontSize, fontWeight: 700, color: "#2C1810", textShadow: "0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7), 0 1px 3px rgba(255,255,255,0.95)", lineHeight: 1.2 }}>
                       {project.title}
                     </div>
-                    <div style={{
-                      fontSize: Math.max(6, nameFontSize * 0.7),
-                      fontWeight: 600,
-                      color: stage.color,
-                      textShadow: "0 0 6px rgba(255,255,255,0.9), 0 0 12px rgba(255,255,255,0.7)",
-                      lineHeight: 1.1,
-                    }}>
+                    <div style={{ fontSize: Math.max(6, nameFontSize * 0.7), fontWeight: 600, color: stage.color, textShadow: "0 0 6px rgba(255,255,255,0.9), 0 0 12px rgba(255,255,255,0.7)", lineHeight: 1.1 }}>
                       {stage.label}
                     </div>
                   </div>
@@ -609,21 +465,14 @@ export default function TheGrove({ projects = [] }) {
 
       {/* ─── Title ─── */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 10, display: "flex", justifyContent: "center", paddingTop: 14, pointerEvents: "none" }}>
-        <div style={{
-          background: "rgba(255,255,255,0.45)", backdropFilter: "blur(8px)",
-          borderRadius: 14, padding: "8px 20px",
-          border: "1px solid rgba(255,255,255,0.35)",
-          boxShadow: "0 3px 14px rgba(0,0,0,0.04)",
-          textAlign: "center", pointerEvents: "auto",
-          maxWidth: "80vw",
-        }}>
+        <div style={{ background: "rgba(255,255,255,0.45)", backdropFilter: "blur(8px)", borderRadius: 14, padding: "8px 20px", border: "1px solid rgba(255,255,255,0.35)", boxShadow: "0 3px 14px rgba(0,0,0,0.04)", textAlign: "center", pointerEvents: "auto", maxWidth: "80vw" }}>
           <h1 style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 700, color: "#2C3E1F", margin: 0, lineHeight: 1 }}>The Grove</h1>
           <p style={{ fontSize: "clamp(8px, 2.5vw, 10px)", color: "#5A7A4A", marginTop: 2, letterSpacing: 1.2, textTransform: "uppercase" }}>Ideas at every stage of growth</p>
         </div>
       </div>
 
       {/* ─── Version ─── */}
-      <div style={{ position: 'absolute', bottom: 4, right: 8, zIndex: 10, fontSize: 9, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }}>v2.1.0</div>
+      <div style={{ position: 'absolute', bottom: 4, right: 8, zIndex: 10, fontSize: 9, color: 'rgba(255,255,255,0.3)', pointerEvents: 'none' }}>v{__APP_VERSION__}</div>
 
       {/* ─── Scroll hint ─── */}
       <div style={{ position: "absolute", bottom: 14, left: 0, right: 0, zIndex: 10, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
@@ -632,10 +481,8 @@ export default function TheGrove({ projects = [] }) {
         </div>
       </div>
 
-      {/* ─── Modal ─── */}
       {selected && <DetailModal project={selected} onClose={() => setSelected(null)} />}
 
-      {/* ─── Styles ─── */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
