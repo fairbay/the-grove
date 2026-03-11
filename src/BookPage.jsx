@@ -27,7 +27,7 @@ export default function BookPage() {
   const [hoveredCh, setHoveredCh] = useState(null);
 
   useEffect(() => {
-    document.title = "Stage Directions \u2014 Wisdom from the World\u2019s Players";
+    document.title = "Stage Directions — Wisdom from the World's Players";
   }, []);
 
   return (
@@ -99,7 +99,7 @@ export default function BookPage() {
           fontFamily: "'Outfit', sans-serif",
           letterSpacing: "0.03em",
         }}>
-          Written by Claude \u00b7 Directed by Baylee Miller
+          Written by Claude · Directed by Baylee Miller
         </p>
 
         {/* CTA */}
@@ -126,7 +126,7 @@ export default function BookPage() {
           Download free
         </a>
         <p style={{ fontSize: 12, color: "#8A7A6A", marginTop: 10, fontFamily: "'Outfit', sans-serif" }}>
-          epub \u00b7 opens in Apple Books, Google Play Books, or any ebook reader
+          epub · opens in Apple Books, Google Play Books, or any ebook reader
         </p>
         <a
           href="https://bayleemill.gumroad.com/l/stage-directions"
@@ -134,7 +134,7 @@ export default function BookPage() {
           rel="noopener noreferrer"
           style={{ fontSize: 13, color: "#8A7A6A", fontFamily: "'Outfit', sans-serif", textDecoration: "none", marginTop: 12, display: "inline-block" }}
         >
-          Enjoyed it? Support this project on Gumroad \u2192
+          {"Enjoyed it? Support this project on Gumroad \u2192"}
         </a>
       </div>
 
@@ -155,7 +155,7 @@ export default function BookPage() {
         </p>
         <p style={{ fontSize: 18, lineHeight: 1.7, color: "#3A4E2A", marginBottom: 20 }}>
           This book takes fourteen concepts from theatre and maps each one to a practical life skill,
-          drawing on the work of researchers and writers like Bren\u00e9 Brown, Oliver Burkeman, Angela Duckworth,
+          drawing on the work of researchers and writers like Brené Brown, Oliver Burkeman, Angela Duckworth,
           Tina Fey, Erving Goffman, and two dozen others.
         </p>
         <p style={{ fontSize: 16, lineHeight: 1.7, color: "#5C6A4A" }}>
@@ -277,13 +277,13 @@ export default function BookPage() {
             rel="noopener noreferrer"
             style={{ fontSize: 13, color: "#8A7A6A", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}
           >
-            Enjoyed it? Support this project on Gumroad \u2192
+            {"Enjoyed it? Support this project on Gumroad \u2192"}
           </a>
         </div>
 
         <div style={{ marginTop: 24 }}>
           <a href="/" style={{ fontSize: 13, color: "#5A7A4A", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}>
-            \u2190 The Grove
+            {"\u2190 The Grove"}
           </a>
         </div>
       </div>
