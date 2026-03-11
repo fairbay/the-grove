@@ -132,7 +132,18 @@ export default function BookPage() {
           href="https://bayleemill.gumroad.com/l/stage-directions"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ fontSize: 13, color: "#8A7A6A", fontFamily: "'Outfit', sans-serif", textDecoration: "none", marginTop: 12, display: "inline-block" }}
+          style={{
+            fontSize: 15,
+            color: "#5A7A4A",
+            fontFamily: "'Outfit', sans-serif",
+            textDecoration: "underline",
+            textUnderlineOffset: "3px",
+            marginTop: 14,
+            display: "inline-block",
+            transition: "color 0.15s ease",
+          }}
+          onMouseOver={e => { e.target.style.color = "#3A6A28"; }}
+          onMouseOut={e => { e.target.style.color = "#5A7A4A"; }}
         >
           {"Enjoyed it? Support this project on Gumroad \u2192"}
         </a>
@@ -275,7 +286,16 @@ export default function BookPage() {
             href="https://bayleemill.gumroad.com/l/stage-directions"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 13, color: "#8A7A6A", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}
+            style={{
+              fontSize: 15,
+              color: "#5A7A4A",
+              fontFamily: "'Outfit', sans-serif",
+              textDecoration: "underline",
+              textUnderlineOffset: "3px",
+              transition: "color 0.15s ease",
+            }}
+            onMouseOver={e => { e.target.style.color = "#3A6A28"; }}
+            onMouseOut={e => { e.target.style.color = "#5A7A4A"; }}
           >
             {"Enjoyed it? Support this project on Gumroad \u2192"}
           </a>
