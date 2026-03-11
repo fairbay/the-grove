@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 /*
  * BookPage — Landing page for Stage Directions ebook.
  * Renders at /books/stage-directions
- * Links out to Gumroad for purchase.
+ * Color scheme aligned with The Grove's nature palette.
  */
 
 const CHAPTERS = [
@@ -27,22 +27,22 @@ export default function BookPage() {
   const [hoveredCh, setHoveredCh] = useState(null);
 
   useEffect(() => {
-    document.title = "Stage Directions — Wisdom from the World's Players";
+    document.title = "Stage Directions \u2014 Wisdom from the World\u2019s Players";
   }, []);
 
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#1a0a0a",
-      color: "#e8e0d8",
+      background: "linear-gradient(180deg, #F5F0E8 0%, #EDE8DF 100%)",
+      color: "#2C3E1F",
       fontFamily: "'Crimson Text', Georgia, serif",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
-        body { overscroll-behavior: none; }
-        ::selection { background: #8B2020; color: #fff; }
+        body { overscroll-behavior: none; background: #F5F0E8; }
+        ::selection { background: #6BA34E; color: #fff; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
@@ -61,7 +61,7 @@ export default function BookPage() {
           width: "min(280px, 60vw)",
           borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(180,40,40,0.15)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15), 0 0 80px rgba(107,163,78,0.1)",
           marginBottom: 36,
         }}>
           <img
@@ -78,14 +78,14 @@ export default function BookPage() {
           textAlign: "center",
           lineHeight: 1.1,
           marginBottom: 8,
-          color: "#f0e8e0",
+          color: "#2C3E1F",
         }}>
           Stage Directions
         </h1>
         <p style={{
           fontSize: "clamp(16px, 3.5vw, 22px)",
           fontStyle: "italic",
-          color: "#b8a898",
+          color: "#5A7A4A",
           textAlign: "center",
           marginBottom: 16,
         }}>
@@ -93,46 +93,53 @@ export default function BookPage() {
         </p>
         <p style={{
           fontSize: 14,
-          color: "#887868",
+          color: "#8A7A6A",
           textAlign: "center",
           marginBottom: 32,
           fontFamily: "'Outfit', sans-serif",
           letterSpacing: "0.03em",
         }}>
-          Written by Claude · Directed by Baylee Miller
+          Written by Claude \u00b7 Directed by Baylee Miller
         </p>
 
         {/* CTA */}
         <a
-          href="https://bayleemill.gumroad.com/l/stage-directions"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="/Stage-Directions.epub"
+          download="Stage-Directions.epub"
           style={{
             display: "inline-block",
             padding: "14px 40px",
             borderRadius: 8,
-            background: "#B83030",
+            background: "#5A9340",
             color: "#fff",
             fontSize: 16,
             fontWeight: 600,
             fontFamily: "'Outfit', sans-serif",
             textDecoration: "none",
             letterSpacing: "0.02em",
-            boxShadow: "0 4px 20px rgba(180,40,40,0.3)",
+            boxShadow: "0 4px 20px rgba(90,147,64,0.3)",
             transition: "transform 0.15s ease, box-shadow 0.15s ease",
           }}
-          onMouseOver={e => { e.target.style.transform = "translateY(-2px)"; e.target.style.boxShadow = "0 6px 28px rgba(180,40,40,0.4)"; }}
-          onMouseOut={e => { e.target.style.transform = ""; e.target.style.boxShadow = "0 4px 20px rgba(180,40,40,0.3)"; }}
+          onMouseOver={e => { e.target.style.transform = "translateY(-2px)"; e.target.style.boxShadow = "0 6px 28px rgba(90,147,64,0.4)"; }}
+          onMouseOut={e => { e.target.style.transform = ""; e.target.style.boxShadow = "0 4px 20px rgba(90,147,64,0.3)"; }}
         >
-          Get the book — pay what you want
+          Download free
         </a>
-        <p style={{ fontSize: 12, color: "#665848", marginTop: 10, fontFamily: "'Outfit', sans-serif" }}>
-          Free download · epub + docx
+        <p style={{ fontSize: 12, color: "#8A7A6A", marginTop: 10, fontFamily: "'Outfit', sans-serif" }}>
+          epub \u00b7 opens in Apple Books, Google Play Books, or any ebook reader
         </p>
+        <a
+          href="https://bayleemill.gumroad.com/l/stage-directions"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 13, color: "#8A7A6A", fontFamily: "'Outfit', sans-serif", textDecoration: "none", marginTop: 12, display: "inline-block" }}
+        >
+          Enjoyed it? Support this project on Gumroad \u2192
+        </a>
       </div>
 
       {/* Divider */}
-      <div style={{ width: 40, height: 1, background: "#3a2a2a", margin: "0 auto 48px" }} />
+      <div style={{ width: 40, height: 1, background: "#D2C8B8", margin: "0 auto 48px" }} />
 
       {/* Pitch */}
       <div style={{
@@ -141,18 +148,18 @@ export default function BookPage() {
         padding: "0 24px 48px",
         animation: "fadeUp 0.6s ease 0.15s both",
       }}>
-        <p style={{ fontSize: 18, lineHeight: 1.7, color: "#c8b8a8", marginBottom: 20 }}>
+        <p style={{ fontSize: 18, lineHeight: 1.7, color: "#3A4E2A", marginBottom: 20 }}>
           For thousands of years, theatre has been humanity's laboratory for the problems of being alive.
           How do I show up when I'm terrified? How do I hear criticism without falling apart?
           When do I follow the script, and when do I throw it away?
         </p>
-        <p style={{ fontSize: 18, lineHeight: 1.7, color: "#c8b8a8", marginBottom: 20 }}>
+        <p style={{ fontSize: 18, lineHeight: 1.7, color: "#3A4E2A", marginBottom: 20 }}>
           This book takes fourteen concepts from theatre and maps each one to a practical life skill,
-          drawing on the work of researchers and writers like Brené Brown, Oliver Burkeman, Angela Duckworth,
+          drawing on the work of researchers and writers like Bren\u00e9 Brown, Oliver Burkeman, Angela Duckworth,
           Tina Fey, Erving Goffman, and two dozen others.
         </p>
-        <p style={{ fontSize: 16, lineHeight: 1.7, color: "#a09080" }}>
-          <strong style={{ color: "#c8b8a8" }}>This book was written by Claude, an AI made by Anthropic.</strong>{" "}
+        <p style={{ fontSize: 16, lineHeight: 1.7, color: "#5C6A4A" }}>
+          <strong style={{ color: "#2C3E1F" }}>This book was written by Claude, an AI made by Anthropic.</strong>{" "}
           That's stated on page one, because a book about honesty shouldn't start with a secret.
           The ideas belong to the human experts cited in every chapter.
         </p>
@@ -164,9 +171,10 @@ export default function BookPage() {
         justifyContent: "center",
         gap: "clamp(24px, 6vw, 56px)",
         padding: "24px",
-        borderTop: "1px solid #2a1a1a",
-        borderBottom: "1px solid #2a1a1a",
+        borderTop: "1px solid #D2C8B8",
+        borderBottom: "1px solid #D2C8B8",
         marginBottom: 48,
+        background: "rgba(107,163,78,0.06)",
         animation: "fadeUp 0.6s ease 0.3s both",
       }}>
         {[
@@ -175,8 +183,8 @@ export default function BookPage() {
           { number: "~1 hr", label: "reading time" },
         ].map(s => (
           <div key={s.label} style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#e8d8c8" }}>{s.number}</div>
-            <div style={{ fontSize: 11, color: "#887868", fontFamily: "'Outfit', sans-serif", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "#2C3E1F" }}>{s.number}</div>
+            <div style={{ fontSize: 11, color: "#5A7A4A", fontFamily: "'Outfit', sans-serif", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -192,7 +200,7 @@ export default function BookPage() {
           fontSize: 13,
           fontFamily: "'Outfit', sans-serif",
           fontWeight: 600,
-          color: "#887868",
+          color: "#5A7A4A",
           textTransform: "uppercase",
           letterSpacing: "0.12em",
           marginBottom: 20,
@@ -206,7 +214,7 @@ export default function BookPage() {
             onMouseOut={() => setHoveredCh(null)}
             style={{
               padding: "12px 0",
-              borderBottom: "1px solid #1e1414",
+              borderBottom: "1px solid #DDD8D0",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "baseline",
@@ -218,7 +226,7 @@ export default function BookPage() {
             <span style={{
               fontSize: 17,
               fontWeight: 600,
-              color: hoveredCh === i ? "#f0e0d0" : "#c8b8a8",
+              color: hoveredCh === i ? "#2C3E1F" : "#3A4E2A",
               transition: "color 0.15s",
             }}>
               {ch.title}
@@ -226,7 +234,7 @@ export default function BookPage() {
             <span style={{
               fontSize: 14,
               fontStyle: "italic",
-              color: "#887868",
+              color: "#8A7A6A",
               whiteSpace: "nowrap",
               flexShrink: 0,
             }}>
@@ -240,35 +248,42 @@ export default function BookPage() {
       <div style={{
         textAlign: "center",
         padding: "32px 24px 60px",
-        borderTop: "1px solid #2a1a1a",
+        borderTop: "1px solid #D2C8B8",
       }}>
         <a
-          href="https://bayleemill.gumroad.com/l/stage-directions"
-          target="_blank"
-          rel="noopener noreferrer"
+          href="/Stage-Directions.epub"
+          download="Stage-Directions.epub"
           style={{
             display: "inline-block",
             padding: "14px 40px",
             borderRadius: 8,
-            background: "#B83030",
+            background: "#5A9340",
             color: "#fff",
             fontSize: 16,
             fontWeight: 600,
             fontFamily: "'Outfit', sans-serif",
             textDecoration: "none",
             letterSpacing: "0.02em",
-            boxShadow: "0 4px 20px rgba(180,40,40,0.3)",
+            boxShadow: "0 4px 20px rgba(90,147,64,0.3)",
           }}
         >
-          Get the book — pay what you want
+          Download free
         </a>
 
-        <div style={{ marginTop: 32, display: "flex", justifyContent: "center", gap: 24 }}>
-          <a href="/" style={{ fontSize: 13, color: "#665848", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}>
-            ← The Grove
+        <div style={{ marginTop: 20 }}>
+          <a
+            href="https://bayleemill.gumroad.com/l/stage-directions"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 13, color: "#8A7A6A", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}
+          >
+            Enjoyed it? Support this project on Gumroad \u2192
           </a>
-          <a href="https://ko-fi.com/bayleemiller" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#665848", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}>
-            Leave a tip ♥
+        </div>
+
+        <div style={{ marginTop: 24 }}>
+          <a href="/" style={{ fontSize: 13, color: "#5A7A4A", fontFamily: "'Outfit', sans-serif", textDecoration: "none" }}>
+            \u2190 The Grove
           </a>
         </div>
       </div>
