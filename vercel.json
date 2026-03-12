@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/((?!assets|vault\\.json|favicon\\.svg|stage-directions-cover\\.png).*)", "destination": "/index.html" }
+    { "source": "/((?!assets|vault\\.json|favicon\\.svg|.*\\.epub).*)", "destination": "/index.html" }
   ]
 }
