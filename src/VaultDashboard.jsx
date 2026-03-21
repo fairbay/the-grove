@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 
+const VAULT_URL = "https://script.google.com/macros/s/AKfycbwuseoPyb3kt1lajUFWgwwQJ9FZQo7tZY5Vt7U0-qZds8e_hJpAy9jP22QaKSWp-8BW/exec?format=json";
+
 const STATUS_COLORS = {
   deployed: { bg: "#1a3a1a", text: "#6ee06e", border: "#2d5a2d" },
   building: { bg: "#3a3a1a", text: "#e0d86e", border: "#5a5a2d" },
@@ -85,7 +87,7 @@ export default function VaultDashboard() {
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
-    fetch("/vault.json")
+    fetch(VAULT_URL)
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.json();
@@ -138,7 +140,7 @@ export default function VaultDashboard() {
     return (
       <div style={{ minHeight: "100vh", background: "#0d0d0d", color: "#c07070", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Mono', monospace" }}>
         <div style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 18 }}>Failed to load vault.json</p>
+          <p style={{ fontSize: 18 }}>Failed to load vault</p>
           <p style={{ fontSize: 13, color: "#666", marginTop: 8 }}>{error}</p>
         </div>
       </div>
