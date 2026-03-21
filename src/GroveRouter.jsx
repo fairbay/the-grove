@@ -4,13 +4,17 @@ import Garden from "./App";
 import BookPage from "./BookPage";
 
 /*
- * GroveRouter v2.1.0
+ * GroveRouter v2.2.0
  * 
  * Routes:
  * - /vault → VaultDashboard
  * - /books/stage-directions → BookPage
  * - / (default) → The Grove walking garden
+ *
+ * Vault data fetched from VaultSync (Google Apps Script).
  */
+
+const VAULT_URL = "https://script.google.com/macros/s/AKfycbwuseoPyb3kt1lajUFWgwwQJ9FZQo7tZY5Vt7U0-qZds8e_hJpAy9jP22QaKSWp-8BW/exec?format=json";
 
 function vaultToProjects(ideas) {
   return ideas
@@ -36,9 +40,9 @@ export default function GroveRouter() {
 
   useEffect(() => {
     if (isVault || isBook) return;
-    fetch("/vault.json")
+    fetch(VAULT_URL)
       .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load vault.json: ${r.status}`);
+        if (!r.ok) throw new Error(`Failed to load vault: ${r.status}`);
         return r.json();
       })
       .then((vault) => setProjects(vaultToProjects(vault.ideas)))
