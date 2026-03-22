@@ -4,36 +4,41 @@ const VAULT_URL = "https://script.google.com/macros/s/AKfycbwuseoPyb3kt1lajUFWgw
 
 const STATUS_COLORS = {
   deployed: { bg: "#1a3a1a", text: "#6ee06e", border: "#2d5a2d" },
+  shipped: { bg: "#1a3a2a", text: "#6ee0a0", border: "#2d5a4a" },
   building: { bg: "#3a3a1a", text: "#e0d86e", border: "#5a5a2d" },
+  "in-dev": { bg: "#3a2a1a", text: "#e0a86e", border: "#5a4a2d" },
   scouted: { bg: "#1a2a3a", text: "#6eb8e0", border: "#2d4a5a" },
   raw: { bg: "#2a2a2a", text: "#a0a0a0", border: "#404040" },
+  shelved: { bg: "#2a2a1a", text: "#c0b060", border: "#4a4a2d" },
   parked: { bg: "#2a1a2a", text: "#b88ec0", border: "#4a2d4a" },
   killed: { bg: "#3a1a1a", text: "#c07070", border: "#5a2d2d" },
-  shipped: { bg: "#1a3a2a", text: "#6ee0a0", border: "#2d5a4a" },
-  "in-dev": { bg: "#3a2a1a", text: "#e0a86e", border: "#5a4a2d" },
 };
 
 const VERDICT_ICONS = {
-  Unicorn: "🦄",
-  "Public good": "🌱",
-  Pass: "—",
-  Infrastructure: "🔧",
-  "Creative project": "🎨",
-  Blocked: "🚫",
+  Unicorn: "\u{1F984}",
+  "Public good": "\u{1F331}",
+  Pass: "\u2014",
+  Infrastructure: "\u{1F527}",
+  "Creative project": "\u{1F3A8}",
+  Blocked: "\u{1F6AB}",
+  "personal-use": "\u{1F3E0}",
 };
 
-const SORT_OPTIONS = [
-  { key: "title", label: "Name" },
-  { key: "impact_pct", label: "Impact" },
-  { key: "business_pct", label: "Business" },
-  { key: "date_updated", label: "Updated" },
-  { key: "status", label: "Status" },
+const STATUS_ORDER = ["deployed", "shipped", "building", "in-dev", "scouted", "raw", "shelved", "parked", "killed"];
+
+const COLUMNS = [
+  { key: "portfolio_visible", label: "", width: 20 },
+  { key: "title", label: "Idea", sortable: true },
+  { key: "status", label: "Status", sortable: true },
+  { key: "impact_pct", label: "Impact", sortable: true },
+  { key: "business_pct", label: "Business", sortable: true },
+  { key: "sustainability_pct", label: "Sust.", sortable: true },
+  { key: "verdict", label: "Verdict", sortable: true },
+  { key: "date_updated", label: "Updated", sortable: true },
 ];
 
-const STATUS_ORDER = ["deployed", "building", "in-dev", "scouted", "raw", "shipped", "parked", "killed"];
-
-function ScoreBar({ value, color, label }) {
-  if (value == null) return <span style={{ color: "#555", fontSize: 12 }}>—</span>;
+function ScoreBar({ value, color }) {
+  if (value == null) return <span style={{ color: "#555", fontSize: 12 }}>--</span>;
   const w = Math.max(value, 4);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 100 }}>
@@ -77,6 +82,11 @@ function StatusBadge({ status }) {
   );
 }
 
+function SortIndicator({ active, direction }) {
+  if (!active) return <span style={{ color: "#333", fontSize: 10, marginLeft: 3 }}>{"\u2195"}</span>;
+  return <span style={{ color: "#6ee06e", fontSize: 10, marginLeft: 3 }}>{direction === "asc" ? "\u2191" : "\u2193"}</span>;
+}
+
 export default function VaultDashboard() {
   const [vault, setVault] = useState(null);
   const [error, setError] = useState(null);
@@ -96,6 +106,16 @@ export default function VaultDashboard() {
       .catch((e) => setError(e.message));
   }, []);
 
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortKey(key);
+      // Default direction: dates and scores descending, text ascending
+      setSortAsc(key === "title" || key === "status" || key === "verdict");
+    }
+  };
+
   const statuses = useMemo(() => {
     if (!vault) return [];
     const s = new Set(vault.ideas.map((i) => i.status));
@@ -112,7 +132,8 @@ export default function VaultDashboard() {
         (i) =>
           i.title.toLowerCase().includes(q) ||
           i.one_liner.toLowerCase().includes(q) ||
-          (i.tags || []).some((t) => t.toLowerCase().includes(q))
+          (i.tags || []).some((t) => t.toLowerCase().includes(q)) ||
+          (i.verdict || "").toLowerCase().includes(q)
       );
     }
     return [...ideas].sort((a, b) => {
@@ -166,6 +187,9 @@ export default function VaultDashboard() {
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0d0d0d; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .sort-header { cursor: pointer; user-select: none; transition: color 0.15s; }
+        .sort-header:hover { color: #6ee06e !important; }
+        .row-hover:hover { background: #111 !important; }
       `}</style>
 
       {/* Header */}
@@ -185,7 +209,7 @@ export default function VaultDashboard() {
             onMouseOver={(e) => (e.target.style.color = "#6ee06e")}
             onMouseOut={(e) => (e.target.style.color = "#555")}
           >
-            ← BACK TO GROVE
+            {"\u2190"} BACK TO GROVE
           </a>
         </div>
       </header>
@@ -237,44 +261,6 @@ export default function VaultDashboard() {
             width: 160,
           }}
         />
-
-        {/* Sort */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ fontSize: 11, color: "#555" }}>sort:</span>
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value)}
-            style={{
-              padding: "4px 6px",
-              borderRadius: 4,
-              border: "1px solid #222",
-              background: "#111",
-              color: "#d4d4c8",
-              fontSize: 11,
-              fontFamily: "inherit",
-              cursor: "pointer",
-            }}
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.key} value={o.key}>{o.label}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => setSortAsc(!sortAsc)}
-            style={{
-              padding: "3px 6px",
-              borderRadius: 4,
-              border: "1px solid #222",
-              background: "#111",
-              color: "#888",
-              fontSize: 11,
-              fontFamily: "inherit",
-              cursor: "pointer",
-            }}
-          >
-            {sortAsc ? "↑" : "↓"}
-          </button>
-        </div>
       </div>
 
       {/* Table */}
@@ -282,21 +268,25 @@ export default function VaultDashboard() {
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #1a1a1a" }}>
-              {["", "Idea", "Status", "Impact", "Business", "Sust.", "Verdict", "Updated"].map((h, i) => (
+              {COLUMNS.map((col) => (
                 <th
-                  key={i}
+                  key={col.key}
+                  className={col.sortable ? "sort-header" : undefined}
+                  onClick={col.sortable ? () => handleSort(col.key) : undefined}
                   style={{
                     textAlign: "left",
                     padding: "8px 8px 8px 0",
                     fontSize: 10,
-                    fontWeight: 400,
-                    color: "#555",
+                    fontWeight: sortKey === col.key ? 600 : 400,
+                    color: sortKey === col.key ? "#6ee06e" : "#555",
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                     whiteSpace: "nowrap",
+                    width: col.width || undefined,
                   }}
                 >
-                  {h}
+                  {col.label}
+                  {col.sortable && <SortIndicator active={sortKey === col.key} direction={sortAsc ? "asc" : "desc"} />}
                 </th>
               ))}
             </tr>
@@ -307,18 +297,18 @@ export default function VaultDashboard() {
               return (
                 <tr
                   key={idea.title}
+                  className="row-hover"
                   onClick={() => setExpandedId(isExpanded ? null : idea.title)}
                   style={{
                     borderBottom: "1px solid #111",
                     cursor: "pointer",
                     animation: `fadeIn 0.2s ease ${idx * 0.03}s both`,
+                    background: "transparent",
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = "#111"; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >
                   <td style={{ padding: "10px 8px 10px 0", width: 20 }}>
                     {idea.portfolio_visible && (
-                      <span title="Portfolio visible" style={{ fontSize: 8, color: "#6ee06e" }}>●</span>
+                      <span title="Portfolio visible" style={{ fontSize: 8, color: "#6ee06e" }}>{"\u25CF"}</span>
                     )}
                   </td>
                   <td style={{ padding: "10px 12px 10px 0" }}>
@@ -334,7 +324,7 @@ export default function VaultDashboard() {
                           onClick={(e) => e.stopPropagation()}
                           style={{ fontSize: 10, color: "#6eb8e0", marginLeft: 8, textDecoration: "none" }}
                         >
-                          ↗ live
+                          {"\u2197"} live
                         </a>
                       )}
                     </div>
@@ -357,6 +347,11 @@ export default function VaultDashboard() {
                             ))}
                           </div>
                         )}
+                        {idea.platform && idea.platform !== "web" && idea.platform !== "undecided" && (
+                          <p style={{ fontSize: 10, color: "#555", marginTop: 6 }}>
+                            platform: {idea.platform}
+                          </p>
+                        )}
                         {idea.notes && (
                           <p style={{ fontSize: 11, color: "#666", marginTop: 6, lineHeight: 1.4, maxWidth: 500, fontStyle: "italic" }}>
                             {idea.notes}
@@ -369,13 +364,13 @@ export default function VaultDashboard() {
                     <StatusBadge status={idea.status} />
                   </td>
                   <td style={{ padding: "10px 8px 10px 0", verticalAlign: "top" }}>
-                    <ScoreBar value={idea.impact_pct} color="#e88ec0" label="impact" />
+                    <ScoreBar value={idea.impact_pct} color="#e88ec0" />
                   </td>
                   <td style={{ padding: "10px 8px 10px 0", verticalAlign: "top" }}>
-                    <ScoreBar value={idea.business_pct} color="#e0a86e" label="business" />
+                    <ScoreBar value={idea.business_pct} color="#e0a86e" />
                   </td>
                   <td style={{ padding: "10px 8px 10px 0", verticalAlign: "top" }}>
-                    <ScoreBar value={idea.sustainability_pct} color="#6ee0a0" label="sust" />
+                    <ScoreBar value={idea.sustainability_pct} color="#6ee0a0" />
                   </td>
                   <td style={{ padding: "10px 8px 10px 0", fontSize: 12, verticalAlign: "top", whiteSpace: "nowrap" }}>
                     {VERDICT_ICONS[idea.verdict] || ""} {idea.verdict}
@@ -403,6 +398,7 @@ export default function VaultDashboard() {
           { label: "Building", count: (counts.building || 0) + (counts["in-dev"] || 0) },
           { label: "Scouted", count: counts.scouted || 0 },
           { label: "Raw", count: counts.raw || 0 },
+          { label: "Shelved", count: counts.shelved || 0 },
           { label: "Killed/Parked", count: (counts.killed || 0) + (counts.parked || 0) },
         ].map((s) => (
           <div key={s.label} style={{ fontSize: 11, color: "#555" }}>
