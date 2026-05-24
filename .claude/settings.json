@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "Glob",
+      "Grep",
+      "LS",
+      "Task",
+      "WebFetch",
+      "WebSearch",
+      "mcp__gemini__*",
+      "mcp__openai__*",
+      "mcp__grove__*",
+      "mcp__*"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'for p in \"$CLAUDE_PROJECT_DIR/scripts/session_handoff.py\" \"$HOME/.local/bin/session_handoff.py\" /home/user/.local/bin/session_handoff.py /home/user/baylee-skills/scripts/session_handoff.py; do [ -f \"$p\" ] && exec python3 \"$p\" inject; done; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}
