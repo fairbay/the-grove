@@ -21,7 +21,7 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 
 ## Project Documentation
 
-- **Skills** live in `fairbay/baylee-skills` (source of truth). Three-layer doc architecture: SPEC.md → PLAN.md → HANDOFF.md.
+- **Skills** live in `fairbay/baylee-skills` (source of truth) and are synced to `.claude/skills/` in every repo via `code-extensions/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it. Three-layer doc architecture: SPEC.md → PLAN.md → HANDOFF.md.
 - **Before editing any skill file**, stop and load skill-creator-b first.
 - **Before working on a named project**, load its HANDOFF.md and read `next:` first — don't start cold.
 - **Read PLAN.md before executing work** in any repo that has one. PLAN prescribes technical approach; SPEC prescribes requirements. "Build" tasks reference PLAN only. "Test," "debug," or "fix" tasks reference both PLAN and SPEC.
