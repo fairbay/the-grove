@@ -5,13 +5,10 @@ description: >
   "elevator pitch". Not for plain emails (→ email-craft), slide decks,
   building (→ build), or scoring (→ idea-scout).
 metadata:
-  version: "2026-05-24-01"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/pitch-crafter/SKILL.md` via git-ops before
-doing anything else. If behind, warn once and continue. If fetch fails, skip
-silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # pitch-crafter — turn a validated idea into persuasive written communication
 
@@ -125,19 +122,15 @@ how it works (3 steps), social proof, CTA.
    - Technical readers → precision, specifics
    - Non-technical readers → analogies, plain language
 5. **Deliver by format:**
-   - **One-Pager / Product Brief / Landing Page** → markdown or HTML to
-     `/mnt/user-data/outputs/`, then `present_files`. File naming:
+   - **One-Pager / Product Brief / Landing Page** → markdown or HTML.
+     Chat: write to `/mnt/user-data/outputs/`, then `present_files`.
+     Code: write to CWD or `docs/`. File naming:
      `pitch-<format>-<idea-slug>.<ext>`. **If the document embeds a generated
-     image** (landing-page hero, one-pager visual), store it first and embed
-     the permanent `publicUrl` — never a raw HF temp URL, which 404s within
-     minutes. Flow + endpoint: `build/references/image-store.md`.
-   - **Cold Email** → use `message_compose_v1` with `kind: "email"`. Generate
-     **2-3 goal-oriented variants** (e.g. "Direct ask", "Curious opener",
-     "Warm intro via mutual"), each with its own subject line. Label
-     variants by *strategy*, not *tone* — gives the user a choose-your-own
-     opener rather than a take-it-or-leave-it draft.
-   - **Elevator Pitch** → inline in chat. No file, no compose tool. Prose
-     response.
+     image**, store it first (see `build/references/image-store.md`).
+   - **Cold Email** → Chat: use `message_compose_v1` with `kind: "email"`,
+     2-3 goal-oriented variants with separate subject lines.
+     Code: output inline as formatted text with variants labeled.
+   - **Elevator Pitch** → inline in prose. No file, no compose tool.
 
 ## Anti-patterns
 

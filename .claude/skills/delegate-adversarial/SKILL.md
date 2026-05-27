@@ -5,13 +5,10 @@ description: >
   "tear this apart", architecture critique. Not for standard review
   (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-05-10-02"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/delegate-adversarial/SKILL.md` via git-ops
-before doing anything else. If behind, warn once and continue. If fetch fails,
-skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # delegate-adversarial — opus sub-agent for flaw-finding and deep scrutiny
 

@@ -5,13 +5,10 @@ description: >
   Not project features (→ add-to-do), building (→ architect), saving
   (→ idea-vault), batch (→ brainstorm-engine).
 metadata:
-  version: "2026-05-24-01"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/idea-scout/SKILL.md` via git-ops before
-doing anything else. If behind, warn once and continue. If fetch fails, skip
-silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # idea-scout — honest evaluation of a raw idea
 
@@ -366,7 +363,11 @@ build this, where to post the concept, what format the writeup should take.
 
 ### Phase 8: Deliverable
 
-Single markdown report saved to `/mnt/user-data/outputs/`. Structure:
+Single markdown report. **Output path:**
+- **Chat:** save to `/mnt/user-data/outputs/`, then `present_files`.
+- **Code:** save to CWD, then commit to repo if appropriate.
+
+Structure:
 
 1. Executive summary (1 paragraph)
 2. Score tables — all three lenses for original idea (with justifications per
@@ -390,7 +391,8 @@ stated? Next step included in initial response (not just report)? Verdict
 matches the 8-cell matrix correctly?
 
 **Constraints:** under 2,500 words. Direct, first-person style. File naming:
-`idea-scout-[short-slug].md`.
+`idea-scout-[short-slug].md`. Deliver via `present_files` (chat) or inline
+report (Code).
 
 ### Phase 9: Auto-Grove add
 

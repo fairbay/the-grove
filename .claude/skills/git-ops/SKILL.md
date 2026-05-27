@@ -5,9 +5,9 @@ description: >
   live site", "what's in fairbay/X". Not for new-host setup (→ ship-it) or
   prototyping (→ build).
 metadata:
-  version: "2026-05-24-01"
+  version: "2026-05-27-02"
 ---
-**Version gate:** Compare this skill's `metadata.version` against `fairbay/baylee-skills/.claude/skills/git-ops/SKILL.md` via git-ops before doing anything else. If behind, warn once and continue. If fetch fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # git-ops — push, read, list, create, delete on GitHub
 

@@ -5,9 +5,9 @@ description: >
   "Claude Code handoff". Not for fixes to live sites (→ git-ops), prototyping
   (→ build), or planning (→ architect).
 metadata:
-  version: "2026-05-27-01"
+  version: "2026-05-27-02"
 ---
-**Version gate:** Compare this skill's `metadata.version` against `fairbay/baylee-skills/.claude/skills/ship-it/SKILL.md` via git-ops before doing anything else. If behind, warn once and continue. If fetch fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # ship-it — deploy or hand off
 
@@ -63,8 +63,14 @@ Tailor it, number it, make it copy-pasteable.
 3. **Push to Git** — follow git-ops's push protocol (`git-ops/references/push-protocol.md`: test → present → push → verify). Repo must exist with `auto_init: true`.
 4. **Connect host** — Vercel project created and linked; build command, output dir, env vars set. The Vercel MCP can list projects and fetch deploy status — see git-ops `references/vercel-mcp.md`.
 5. **Supabase keep-alive** (if project uses Supabase free tier) — push `.github/workflows/supabase-keep-alive.yml` (template in `CONVENTIONS.md § Infrastructure Patterns`) and add three GitHub Actions secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_PING_TABLE` (any table in the public schema). Trigger manually once to verify. Without this, free-tier projects pause after 7 days of no database activity.
-6. **Custom domain** (optional) — DNS, SSL auto-provisions.
-7. **Verify** — test live URL on mobile and desktop, confirm core functionality works, check the version number shown in the UI.
+6. **Claude infrastructure setup** (for repos that will use Claude Code or
+   have skills synced). Create `.claude/global.md` (copy from
+   `fairbay/code-extensions/global-CLAUDE.md`), ensure root `CLAUDE.md`
+   starts with `@.claude/global.md`, and create `.claude/settings.json`
+   with the SessionStart hook (template in CONVENTIONS.md § Session-
+   continuity gates). Next `sync-skills.py` run auto-discovers the repo.
+7. **Custom domain** (optional) — DNS, SSL auto-provisions.
+8. **Verify** — test live URL on mobile and desktop, confirm core functionality works, check the version number shown in the UI.
 
 ### Hard-won lessons
 
@@ -222,7 +228,11 @@ Let's start with [specific first task].
 
 ### Phase 4 — Deliver
 
-`present_files` for the whole package. Brief commentary:
+Deliver the package:
+- **Chat:** `present_files` for all files. Baylee downloads and unzips.
+- **Code:** files are already in the repo CWD. No download needed.
+
+Brief commentary:
 - "Here's your handoff package for &lt;project&gt;."
 - What's inside.
 - First step: "Download these, unzip, run `setup.sh`, then `claude`."

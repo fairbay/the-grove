@@ -5,9 +5,9 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-05-24-01"
+  version: "2026-05-27-02"
 ---
-**Version gate:** Compare this skill's `metadata.version` against `fairbay/baylee-skills/.claude/skills/build/SKILL.md` via git-ops before doing anything else. If behind, warn once and continue. If fetch fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # build — take an idea and build a working prototype
 
@@ -68,7 +68,9 @@ Internally reframe the core requirement as "How Might We..." to expand the solut
 
 ### Phase 4: Form factor decision
 
-Pick ONE. **Default to React artifact.**
+Pick ONE. **Default depends on surface:**
+- **Chat:** React artifact (.jsx) — renders inline in claude.ai.
+- **Code:** Vite + React project files in the repo — no artifact sandbox.
 
 **Zero-cost check:** If the idea has `metadata.zero_cost`, default to its
 recommended `arch` pattern. Prefer Cloudflare Pages over Vercel for static
@@ -84,7 +86,12 @@ from the zero-cost architecture is fine but requires a stated reason.
 | Document generator or formatter | Use appropriate skill (docx, pptx, xlsx) |
 | Game or highly visual interactive | React or HTML with Canvas |
 
-**Sandbox check before committing to artifact:** If the build needs to call external APIs (Gemini, OpenAI, Stripe, any non-Anthropic domain) or use `localStorage`/filesystem, the artifact sandbox will fail with "Load Failed" — unfixable. Skip artifact, go straight to Vite project + Vercel. Anthropic API (`api.anthropic.com`) is the exception: whitelisted in artifacts. See *Artifact sandbox limitations* at the bottom.
+**Sandbox check (chat artifacts only):** If the build needs to call external
+APIs (Gemini, OpenAI, Stripe, any non-Anthropic domain) or use
+`localStorage`/filesystem, the artifact sandbox will fail with "Load
+Failed" — unfixable. Skip artifact, go straight to Vite project + Vercel.
+Anthropic API (`api.anthropic.com`) is the exception. In Code, there is no
+artifact sandbox — build directly as project files.
 
 ### Phase 5: Build
 
@@ -114,9 +121,14 @@ Fix everything you find. Do not proceed to review with known bugs.
 Run adversarial review as a standard build step — not optional, not on-request.
 
 1. **Boundary tests.** Write 5-10 pure-logic tests covering: default state, empty inputs, edge values, toggle/state logic, data shape validation.
-2. **AI review.** Two paths based on what was built:
-   - **Computational/artifact with testable logic (Claude.ai surface only):** Use `window.claude.complete(prompt)` in a review harness artifact (see review-panel Path 1). Keep prompts concise (~500 chars). Not available in Claude Code or Routines — use the delegate-adversarial path on those surfaces.
-   - **Code, config, or non-artifact deliverables (any surface):** Route to **delegate-adversarial** for independent flaw-finding. The reviewer gets the code + criteria but none of your build reasoning — true independence.
+2. **AI review.** Route by surface and deliverable type:
+   - **Chat artifact with testable logic:** Use `window.claude.complete(prompt)`
+     in a review harness artifact (see review-panel Path 1). Keep prompts
+     concise (~500 chars).
+   - **Code / Routines (any deliverable):** Route to **delegate-adversarial**
+     for independent flaw-finding. The reviewer gets the code + criteria but
+     none of your build reasoning — true independence.
+   - **Chat, non-artifact deliverable:** Also delegate-adversarial.
    Fix CRITICAL and MODERATE findings. Document MINOR as known.
 3. **Visual check.** If the artifact is deployed or previewable, use Claude in Chrome to screenshot at 375px and review layout, overflow, and hierarchy. If not available, self-audit the CSS for mobile issues.
 4. **Validate fixes.** After applying review fixes, re-run boundary tests to confirm no regressions.
@@ -133,7 +145,13 @@ Only after systematic-test reports bash-verified do you move to Phase 9.
 
 ### Phase 9: Deliver
 
-Present the working artifact. Minimal commentary — the prototype speaks for itself.
+**Surface branching:**
+- **Chat:** present the artifact via `present_files` from
+  `/mnt/user-data/outputs/`. The prototype renders inline.
+- **Code:** files are in the repo. Commit and push via git-ops. Report the
+  diff URL.
+
+Minimal commentary — the prototype speaks for itself.
 
 Include:
 - What it does (1 sentence)
@@ -156,15 +174,23 @@ Parse scout report for: MVP statement, build scope, target user, key insight, us
 
 **Encode learnings.** If a build reveals a technical gotcha, update the relevant skill or memory edit before moving on. Describing without storing = not learning.
 
-## Artifact sandbox limitations
+## Artifact sandbox limitations (chat only)
 
-**Works:** React, Tailwind, CDN packages, `window.claude.storage` (artifact-provided persistence API), `fetch` to `api.anthropic.com`.
+These constraints apply to claude.ai chat artifacts. In Claude Code, there
+is no artifact sandbox — build as standard project files with no restrictions.
 
-**Does NOT work:** browser `localStorage` / `sessionStorage` (use `window.claude.storage` instead), `fetch` to external APIs (Gemini, OpenAI, Stripe, arbitrary domains), filesystem access.
+**Works in chat artifacts:** React, Tailwind, CDN packages,
+`window.claude.storage` (artifact persistence API), `fetch` to
+`api.anthropic.com`.
 
-**Rule:** If external API calls needed, skip artifact — go straight to Vite project via PushCraft → Vercel. Sandbox "Load Failed" errors are unfixable.
+**Does NOT work in chat artifacts:** browser `localStorage` /
+`sessionStorage` (use `window.claude.storage` instead), `fetch` to external
+APIs (Gemini, OpenAI, Stripe, arbitrary domains), filesystem access.
 
-**Exception:** Anthropic API (`api.anthropic.com`) is whitelisted in artifacts.
+**Rule (chat):** If external API calls needed, skip artifact — go straight to
+Vite project + Vercel. Sandbox "Load Failed" errors are unfixable.
+
+**Exception:** Anthropic API (`api.anthropic.com`) is whitelisted.
 
 ## Integration
 

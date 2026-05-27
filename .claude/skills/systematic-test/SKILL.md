@@ -4,9 +4,9 @@ description: >
   Verify built code works — "test this", "QA this", "does this work". Auto-fires
   after build. Not for bugs (→ systematic-debug) or code review (→ review-panel).
 metadata:
-  version: "2026-05-11-01"
+  version: "2026-05-27-02"
 ---
-**Version gate:** Compare this skill's `metadata.version` against `fairbay/baylee-skills/.claude/skills/systematic-test/SKILL.md` via git-ops before doing anything else. If behind, warn once and continue. If fetch fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # systematic-test — verify before declaring done
 

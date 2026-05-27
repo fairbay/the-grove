@@ -5,27 +5,26 @@ description: >
   "sync skills", "isn't triggering", "add that to [skill]." Fires on ANY skill
   file edit. Not for using skills or memory edits.
 metadata:
-  version: "2026-05-18-03"
+  version: "2026-05-27-02"
 ---
 
 # skill-creator — build and maintain skills for Baylee's system
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/skill-creator-b/SKILL.md` via git-ops
-before doing anything else. If behind, warn once and continue. If fetch fails,
-skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 Skills source of truth: `fairbay/baylee-skills` (`.claude/skills/<name>/SKILL.md`).
 Read `CONVENTIONS.md` from that repo via git-ops before any skill work.
 
 **CRITICAL — stale snapshot interrupt.** If you are about to copy, read, or
-edit a skill file from `/mnt/skills/user/`, stop. That is a read-only snapshot
-frozen at session start — other sessions may have updated the skill since then.
-Always read the current version from `fairbay/baylee-skills` via git-ops before
-making any modifications. This applies everywhere: inside this skill's workflow,
-inside other skills' workflows (chat-archive encoding gate, build, etc.), and
-in ad-hoc edits. The local snapshot is for *reading/triggering* skills during a
-session, never for *editing* them.
+edit a skill file from a stale source, stop.
+- **Chat:** `/mnt/skills/user/` is a read-only snapshot frozen at session
+  start. Always read from `fairbay/baylee-skills` via git-ops instead.
+- **Code:** `.claude/skills/` in the repo is the synced copy. Read from it
+  directly — it's current as of the last sync. For the authoritative
+  version, read from `fairbay/baylee-skills` via git-ops.
+
+This applies everywhere: inside this skill's workflow, inside other skills'
+workflows (chat-archive encoding gate, build, etc.), and in ad-hoc edits.
 
 Before writing or reviewing a skill body, read `references/patterns.md` for the
 full pattern library — 16 patterns covering discovery, context economy,
@@ -186,9 +185,11 @@ Decide how much the skill asks vs. acts:
 Default to action for reversible decisions. "If ambiguous, make a reasonable
 assumption and proceed. State the assumption."
 
-### Claude.ai-specific guidance
+### Surface-specific guidance
 
-Baylee's system runs in Claude.ai, not Claude Code. When writing skills:
+Baylee's system runs across Claude.ai chat, Claude Code, and Routines. When
+writing skills, keep instructions surface-neutral where possible. Known
+surface-specific capabilities (see CONVENTIONS.md § Surface-Awareness):
 
 - **No subagents → use delegate-* skills.** Can't spawn parallel runners.
   Instead: `delegate-adversarial` for skill body review (independent flaw-
@@ -294,17 +295,25 @@ failures.
 ## Phase 5 — Push and install
 
 1. Write SKILL.md (and any supporting files) to `/home/claude/`.
-2. `present_files` so Baylee can review the raw SKILL.md.
-3. Push to `fairbay/baylee-skills` via `git-ops`.
-4. Package via `bash_tool` (Claude executes this, not Baylee). Replace
-   `<skill-name>` with the actual directory name:
-   ```bash
-   cd /home/claude && zip -r <skill-name>.skill <skill-name>/
-   cp <skill-name>.skill /mnt/user-data/outputs/
-   ```
-   Include supporting files (references/, scripts/) in the zip.
-5. `present_files` the `.skill` file. Only `.skill` gets the install button
-   in Claude's UI. Baylee taps to install — this is the human action step.
+2. Push to `fairbay/baylee-skills` via `git-ops`.
+3. **Deliver per surface:**
+
+   **Chat:**
+   1. `present_files` so Baylee can review the raw SKILL.md.
+   2. Package via `bash_tool`:
+      ```bash
+      cd /home/claude && zip -r <skill-name>.skill <skill-name>/
+      cp <skill-name>.skill /mnt/user-data/outputs/
+      ```
+      Include supporting files (references/, scripts/) in the zip.
+   3. `present_files` the `.skill` file. Only `.skill` gets the install
+      button in Claude's UI. Baylee taps to install.
+
+   **Code / Routines:**
+   Git push IS delivery — skills are auto-discovered from `.claude/skills/`
+   in the repo. No zip packaging or manual install needed. If the skill
+   needs to reach other repos, run `sync-skills.py` (see CONVENTIONS.md
+   § Skill sync).
 
 ---
 
@@ -340,7 +349,7 @@ steps through this workflow, then return to the broader plan.
 3. **Bump `metadata.version`.**
 4. **Check description.** Does the modification change when the skill should
    fire? If so, update and re-test (Phase 4).
-5. **Push, zip, present** per Phase 5.
+5. **Push and deliver** per Phase 5 (chat: zip + present; Code: push only).
 
 ---
 
@@ -395,8 +404,9 @@ When modifying 3+ skills in one session:
    each other; bodies don't.
 3. Run collision zone analysis across the affected skill family.
 4. Write/modify bodies.
-5. Push all to git in one commit, then package each as a separate .skill zip.
-6. Present all .skill files together for batch install.
+5. Push all to git in one commit.
+6. **Chat:** package each as a separate .skill zip, present all together.
+   **Code:** push is delivery — no packaging needed.
 
 ---
 

@@ -5,13 +5,10 @@ description: >
   I build next". Not for scouting (→ idea-scout), capture (→ grove), or
   calibration (→ review-panel).
 metadata:
-  version: "2026-05-16-01"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/idea-vault/SKILL.md` via git-ops before
-doing anything else. If behind, warn once and continue. If fetch fails, skip
-silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # idea-vault — query and curate the stored idea catalog
 
@@ -157,7 +154,9 @@ calibrate inside this skill.
 
 ## Rendering (browse mode)
 
-When the user wants to see the vault visually, produce a **React artifact**:
+When the user wants to see the vault visually:
+
+**Chat:** produce a **React artifact**:
 
 - Filterable/sortable table — cards on mobile, table on desktop
 - Status badges: green=shipped, blue=in_dev, yellow=scouted, gray=raw,
@@ -169,6 +168,9 @@ When the user wants to see the vault visually, produce a **React artifact**:
 Use React state for data — load from `grove_list_ideas` and pass as props.
 Do NOT use `localStorage` / `sessionStorage` (artifact sandbox doesn't support
 them; use `window.claude.storage` if persistence is needed).
+
+**Code / Routines:** present as a formatted table in terminal output or prose.
+No artifact rendering available.
 
 ## Style
 

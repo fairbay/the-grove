@@ -5,13 +5,10 @@ description: >
   handoff doc. Loads handoff + PLAN. Not for mid-session (→ chat-status) or
   archiving (→ chat-archive).
 metadata:
-  version: "2026-05-24-01"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/session-start/SKILL.md` via git-ops
-before doing anything else. If behind, warn once and continue. If fetch
-fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # session-start — orient a new session from handoff state
 
@@ -40,10 +37,11 @@ Does NOT fire for:
 ## Phase 1 — Resolve project → repo
 
 Map the project name to a GitHub repo under the `fairbay` user account.
-Resolution order:
+Resolution order depends on surface:
 
-1. **Memory.** Known project↔repo mappings from userMemories (e.g. "Listing Lens"
-   → `fairbay/listing-lens-api`, "Grove" → `fairbay/grove`).
+1. **Memory (chat) / CWD repo (Code).** In chat, use known project↔repo
+   mappings from userMemories. In Code, the CWD repo IS the project — skip
+   to Phase 2.
 2. **Grove ideas.** Search Grove ideas via MCP (`grove_list_ideas`) for the name.
    Ideas with `repo` or `github` fields resolve directly.
 3. **Repo name match.** Try `fairbay/<kebab-case-project-name>` via git-ops
@@ -82,10 +80,11 @@ Note this briefly and proceed.
 A handoff from days ago can be overridden by a more recent chat. Always check.
 
 1. Read `meta.generated` from the handoff YAML.
-2. Call `recent_chats(after=<generated_timestamp>, n=5)`.
-3. If any returned chat titles or snippets mention the same project, flag before
-   proceeding: "There's a more recent chat on [project] — want me to pull
-   context from there first?"
+2. Check for newer sessions:
+   - **Chat:** call `recent_chats(after=<generated_timestamp>, n=5)`.
+   - **Code:** check `git log --since=<timestamp>` for newer commits in the
+     repo, or check operating-manual/handoffs/ for newer session handoffs.
+3. If anything newer mentions the same project, flag before proceeding.
 4. If nothing newer, proceed.
 
 ## Phase 4 — Load PLAN.md and CLAUDE.md
@@ -142,6 +141,9 @@ confirmation.
 
 - **Skipping the stale check.** A 3-day-old handoff may be overridden by
   yesterday's work. Always run Phase 3.
+- **Running this skill in Code when the SessionStart hook already injected
+  handoffs.** In Code, the hook handles Phase 2 automatically. This skill
+  adds Phase 4-5 (PLAN.md loading + orientation) on top.
 - **Dumping the entire PLAN.md.** Load it into context; don't narrate it.
   Downstream skills extract the step they need.
 - **Re-deriving the plan.** If PLAN.md exists, the approach is settled. Don't

@@ -26,7 +26,11 @@ Use whichever form is shorter:
 
 Before adding or modifying any memory edit:
 
-1. **View current edits** (`memory_user_edits command=view`).
+1. **View current edits.**
+   - **Chat:** `memory_user_edits command=view`.
+   - **Code:** memory edits are not available. Route behavioral findings to
+     CLAUDE.md (project-level) or create a Grove task for the next chat
+     session to apply as a memory edit.
 2. **Classify.**
    - **Behavioral override** = catches a failure mode or enforces a principle.
      Use directive or interrupt — whichever is shorter.
@@ -45,9 +49,11 @@ Before adding or modifying any memory edit:
 
 ## Duplicate check
 
-Before adding any new edit, run `conversation_search` with 1-3 content
-keywords. If a prior session already encoded the same finding, don't
-duplicate.
+Before adding a new edit, check for existing coverage:
+- **Chat:** run `conversation_search` with 1-3 content keywords.
+- **Code:** check CLAUDE.md and recent handoffs in operating-manual/handoffs/.
+
+If a prior session already encoded the same finding, don't duplicate.
 
 ## Skill update conventions
 

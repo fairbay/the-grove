@@ -5,13 +5,10 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-05-12-04"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/chat-archive/SKILL.md` via git-ops
-before doing anything else. If behind, warn once and continue. If fetch
-fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # chat-archive — close out a session with verified state
 
@@ -30,6 +27,12 @@ References used by this skill (one hop):
 - `references/handoff-schema.md` — YAML schema, build vs session, delivery
 - `references/encoding-gate.md` — memory edit principles, finding routing
 
+**Surface-specific steps in this skill:**
+- Step 1: skill install check + confirmation batch differ by surface
+- Step 3b′/3c: encoding gate routes to memory edits (chat) or CLAUDE.md (Code)
+- Step 4: "view memory edits" is chat-only
+- Step 10: rename chat is chat-only
+
 ---
 
 ## Steps 1–10 — Full archive
@@ -43,33 +46,32 @@ Gather every action item given to Baylee during the session (push links, env
 var setup, testing, sign-ups, repo configuration, etc.).
 
 **Skill installation check.** If any `.claude/skills/` files were created or
-modified this session, verify each was packaged as `.skill` (zip) and
-presented via `present_files`. Git push alone is NOT delivery for skills —
-Baylee must install them manually in Claude settings. If any were missed,
-package and present them now before continuing.
+modified this session, verify delivery per surface:
+- **Chat:** each skill must be packaged as `.skill` (zip) and presented via
+  `present_files`. Git push alone is NOT delivery — Baylee must install
+  manually in Claude settings. If any were missed, package and present now.
+- **Code:** skills are auto-discovered from the repo. Git push IS delivery.
+  No zip packaging or manual install needed. Run `sync-skills.py` if the
+  skill needs to reach other repos.
 
 For each item:
 
 1. **Try to verify completion independently.**
    - Deployed code → `web_fetch` the live URL, look for version-number bump
    - Grove state → check via Grove MCP tools
-   - Memory edits → `memory_user_edits` command=view
+   - Memory edits → `memory_user_edits` command=view (chat only; in Code,
+     check CLAUDE.md or project docs instead)
    - Baylee's later reports in conversation
    - In Claude.ai chat, `/mnt/skills/user` is a read-only snapshot from
      session start — check it but don't assume uninstalled if you can't
-     confirm. In Routines, skills load from the cloned repo.
+     confirm. In Code/Routines, check `.claude/skills/` in the repo.
 2. **Verifiable and done** → mark complete, don't ask.
 3. **Verifiable and NOT done** → note as outstanding.
 4. **Unverifiable** → add to confirmation batch.
 
-Present unverifiable items as a single batch via `ask_user_input_v0` (not
-prose questions):
-
-```
-questions: [
-  { question: "Did you set ANTHROPIC_API_KEY in Vercel?", options: ["Yes", "No", "Skip"] }
-]
-```
+Present unverifiable items as a batch:
+- **Chat:** use `ask_user_input_v0` with Yes/No/Skip options per item.
+- **Code:** ask in prose, one batch question listing all items.
 
 Wait for answers. Then proceed.
 
@@ -119,7 +121,8 @@ evaluated, quirks discovered, platform facts confirmed.
 Before proceeding to Step 4, verify each finding from 3a and 3b has a
 routing decision. See `references/encoding-gate.md` for the routing tree.
 
-- **Memory edit** → apply now
+- **Memory edit** → apply now (chat: `memory_user_edits`; Code: add to
+  CLAUDE.md or create a Grove task for the next chat session to apply)
 - **Skill update** → push now, or create a Grove task tagged
   `routine:skill-worker` with contractor-grade notes (file path, exact
   change, rationale)
@@ -131,9 +134,10 @@ Narrating a finding in the archive output is NOT encoding it.
 
 #### 3c. Apply
 
-Make tool calls. See `references/encoding-gate.md` for memory edit design
-principles, the duplicate-check via `conversation_search`, and skill update
-conventions.
+Make tool calls. See `references/encoding-gate.md` for the routing tree
+and skill update conventions. Duplicate-check before adding:
+- **Chat:** `conversation_search` with 1-3 content keywords.
+- **Code:** check CLAUDE.md and recent handoffs for the same finding.
 
 **Note quality gate.** Every Grove task or idea created here must stand alone —
 no chat context assumed. Include: why it exists, what "done" looks like, key
@@ -145,7 +149,8 @@ add-to-do and grove.
 
 **Gate: read back before summarizing.** Verify via tool calls what actually
 shipped this session — read pushed files, check deploy state, view memory
-edits. Do not summarize from memory of what you did. This prevents
+edits (chat: `memory_user_edits command=view`; Code: read CLAUDE.md).
+Do not summarize from memory of what you did. This prevents
 narration-as-completion at the most dangerous moment (wrap-up, when
 attention to process is lowest).
 
@@ -279,7 +284,9 @@ See `references/handoff-schema.md` for the build vs session decision, the
 full YAML schema, CLAUDE.md maintenance, delivery via git-ops, and the
 no-blurb resumption convention.
 
-### 10. Rename chat
+### 10. Rename chat (chat only)
+
+**Skip in Code / Routines** — no chat to rename.
 
 Format: `-----[keyword1] [keyword2] [keyword3] [keyword4]`
 

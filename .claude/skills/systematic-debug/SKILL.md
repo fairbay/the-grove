@@ -5,9 +5,9 @@ description: >
   "still failing", "why is X happening", deploy failures, build errors. Not for
   features (→ build) or architecture (→ architect).
 metadata:
-  version: "2026-05-16-01"
+  version: "2026-05-27-02"
 ---
-**Version gate:** Compare this skill's `metadata.version` against `fairbay/baylee-skills/.claude/skills/systematic-debug/SKILL.md` via git-ops before doing anything else. If behind, warn once and continue. If fetch fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # systematic-debug — root cause before patches
 

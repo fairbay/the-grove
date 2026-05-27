@@ -5,13 +5,10 @@ description: >
   for evaluating (→ idea-scout), building (→ build), browsing (→ idea-vault),
   or pitching (→ pitch-crafter).
 metadata:
-  version: "2026-05-12-03"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/brainstorm-engine/SKILL.md` via git-ops
-before doing anything else. If behind, warn once and continue. If fetch fails,
-skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # brainstorm-engine — structured idea generation
 
@@ -165,8 +162,10 @@ Sort into three tiers:
 
 ## Deliverable
 
-Single markdown file: `brainstorm-[domain-or-theme-slug].md` in
-`/mnt/user-data/outputs/`. Under 2,000 words. Direct, first-person style.
+Single markdown file: `brainstorm-[domain-or-theme-slug].md`. Under 2,000
+words. Direct, first-person style.
+- **Chat:** save to `/mnt/user-data/outputs/`, then `present_files`.
+- **Code:** save to CWD or present inline.
 
 ## Edge cases
 

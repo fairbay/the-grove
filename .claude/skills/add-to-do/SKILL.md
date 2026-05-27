@@ -5,13 +5,10 @@ description: >
   "done with X", "drop X". Also project feature ideas. Not standalone ideas
   (→ idea-scout) or scoring (→ idea-vault).
 metadata:
-  version: "2026-05-24-01"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/add-to-do/SKILL.md` via git-ops before
-doing anything else. If behind, warn once and continue. If fetch fails, skip
-silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # add-to-do — task-shaped capture and CRUD
 

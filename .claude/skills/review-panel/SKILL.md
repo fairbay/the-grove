@@ -5,13 +5,10 @@ description: >
   "calibrate scores", "audit my vault". Auto-runs build Phase 7.
   Not for isolated checks (→ delegate-analytical/adversarial).
 metadata:
-  version: "2026-05-12-02"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/review-panel/SKILL.md` via git-ops before
-doing anything else. If behind, warn once and continue. If fetch fails, skip
-silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # review-panel — multi-agent adversarial review
 

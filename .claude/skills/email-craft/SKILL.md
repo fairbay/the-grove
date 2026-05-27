@@ -5,13 +5,10 @@ description: >
   "respond to", or confirming Claude's suggestion to email. Not for pitch
   docs (→ pitch-crafter) or Slack.
 metadata:
-  version: "2026-05-12-03"
+  version: "2026-05-27-02"
 ---
 
-**Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/email-craft/SKILL.md` via git-ops before
-doing anything else. If behind, warn once and continue. If fetch fails, skip
-silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # email-craft — tone-calibrated email drafting
 

@@ -5,9 +5,9 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-05-16-01"
+  version: "2026-05-27-02"
 ---
-**Version gate:** Compare this skill's `metadata.version` against `fairbay/baylee-skills/.claude/skills/architect/SKILL.md` via git-ops before doing anything else. If behind, warn once and continue. If fetch fails, skip silently.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # architect — plan before code
 
@@ -15,7 +15,9 @@ Act like a senior engineer pairing on the whiteboard before anyone opens an edit
 
 Three artifacts live in this skill's scope:
 
-- **Build plan** (express mode) — short markdown naming stack, data model, build sequence, risks. Written to `/mnt/user-data/outputs/build-plan-<slug>.md`. Not pushed by default.
+- **Build plan** (express mode) — short markdown naming stack, data model,
+  build sequence, risks. Chat: written to `/mnt/user-data/outputs/build-plan-<slug>.md`
+  and presented. Code: written to CWD. Not pushed by default.
 - **Product spec (SPEC.md)** (interview mode) — functional requirements at the repo root. WHAT to build. Pushed via git-ops.
 - **Technical plan (PLAN.md)** (interview mode) — maps each spec step to a technical approach: APIs, data flows, validation, pass criteria. HOW to approach it. Does NOT prescribe executor tooling. Pushed alongside SPEC.md.
 
@@ -219,7 +221,10 @@ Propose rather than ask blind: after Phase 2 you should be able to *draft* FRs a
 
 `delegate-adversarial` is the default review path. Escalate to `review-panel` (multi-agent) only when the project is high-stakes (regulated, contract-bound, multi-month commitment) and Baylee asks for the panel by name. Adversarial single-reviewer catches most spec gaps at a fraction of the cost.
 
-Write full `SPEC.md` to `/home/claude/SPEC.md` using the template below. Surface unresolved items with `[NEEDS CLARIFICATION: ...]` markers inline. Present via `present_files`. If >3 markers, do another interview turn; if 0-3, ask Baylee to resolve inline.
+Write full `SPEC.md` to `/home/claude/SPEC.md` using the template below.
+Surface unresolved items with `[NEEDS CLARIFICATION: ...]` markers inline.
+- **Chat:** present via `present_files`.
+- **Code:** write to repo root; present inline summary. If >3 markers, do another interview turn; if 0-3, ask Baylee to resolve inline.
 
 ### Phase 6 — PLAN.md
 
@@ -379,7 +384,8 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 
 ## Interview style (both modes)
 
-- Batch questions 2-3 per turn. Mobile-first.
+- Batch questions 2-3 per turn. Mobile-first. In chat, use
+  `ask_user_input_v0` for multiple-choice questions where possible.
 - Pre-fill defaults from memory. Don't ask about stack; it's likely Vite+React+Tailwind+Vercel.
 - Propose rather than prompt blind. "Here's what I'd write — correct it" beats open-ended questions.
 - Say when you're inferring. "Assuming X based on [source]" beats a silent leap.
