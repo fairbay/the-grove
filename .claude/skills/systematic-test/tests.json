@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "systematic-test",
+    "description": "Verify built code works — \"test this\", \"QA this\", \"does this work\". Auto-fires after build. Not for bugs (→ systematic-debug) or code review (→ review-panel)."
+  },
+  "competing_skills": [
+    {
+      "name": "systematic-debug",
+      "description": "Fix bugs systematically — \"X is broken\", \"isn't working\", \"fix didn't work\", \"still failing\", \"why is X happening\". Not for features (→ build) or architecture (→ architect)."
+    },
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+    },
+    {
+      "name": "review-panel",
+      "description": "Multi-agent review — \"panel review\", \"Gemini review\", \"full review\", \"calibrate scores\", \"audit my vault\". Auto-runs as build Phase 7. Not solo (→ delegate-analytical/adversarial)."
+    },
+    {
+      "name": "architect",
+      "description": "Plan before coding — \"architect this\", \"tech spec\", \"PRD\", \"how would I build this\". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code (→ build), or deploy (→ ship-it)."
+    }
+  ],
+  "positive_cases": [
+    "Test the new vault filter feature I just built — make sure it actually works",
+    "QA the new prefill flow end to end before I show it to anyone",
+    "Does the bookmarklet correctly extract address, ZPID, and photo URLs on these 3 sample listings?",
+    "Verify /api/cache returns the right shape for both hit and miss paths"
+  ],
+  "negative_cases": [
+    "The cache endpoint is returning 500s on every third call — find the bug",
+    "Run a full panel review on my new skill before I push",
+    "Build a smoke test suite for this React app — pure-logic tests",
+    "Why does the prefill link work for some listings but not others?",
+    "Plan how I'd architect testing across a multi-page form flow"
+  ]
+}

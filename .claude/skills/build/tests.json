@@ -1,0 +1,41 @@
+{
+  "target_skill": {
+    "name": "build",
+    "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+  },
+  "competing_skills": [
+    {
+      "name": "architect",
+      "description": "Plan before coding — \"architect this\", \"tech spec\", \"PRD\", \"how would I build this\". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code (→ build), or deploy (→ ship-it)."
+    },
+    {
+      "name": "systematic-debug",
+      "description": "Fix bugs systematically — \"X is broken\", \"isn't working\", \"fix didn't work\", \"still failing\", \"why is X happening\". Not for features (→ build) or architecture (→ architect)."
+    },
+    {
+      "name": "systematic-test",
+      "description": "Verify built code works — \"test this\", \"QA this\", \"does this work\". Auto-fires after build. Not for bugs (→ systematic-debug) or code review (→ review-panel)."
+    },
+    {
+      "name": "ship-it",
+      "description": "Set up deployment — \"ship it\", \"deploy this\", \"host this\", \"App Store\", \"Claude Code handoff\". Not for fixes to live sites (→ git-ops), prototyping (→ build), or planning (→ architect)."
+    },
+    {
+      "name": "idea-scout",
+      "description": "Evaluate a raw idea with scoring — \"scout this\", \"what if we built\", \"is this viable\". Auto-fires on new ideas in fresh chats. Not for building (→ architect) or saving without eval (→ idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Build me a React artifact for tracking daily water intake with plus/minus buttons",
+    "Prototype a 2-player tic-tac-toe game in pure HTML, no dependencies",
+    "Make this real — a small script that archives Grove tasks stale for 30+ days",
+    "MVP this idea: a tool that diffs two listing-photo sets and flags the changes"
+  ],
+  "negative_cases": [
+    "Write a SPEC.md for the auth rewrite — I want to interview through the requirements",
+    "The /api/cache route returns 500 on every other call — find and fix it",
+    "Set up an iOS App Store listing for the grove-mobile app",
+    "What if we built a meal tracker that pulls from grocery receipts?",
+    "QA the new vault filter UI I just shipped — does it actually work?"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "systematic-debug",
+    "description": "Fix bugs systematically — \"X is broken\", \"isn't working\", \"fix didn't work\", \"still failing\", \"why is X happening\". Not for features (→ build) or architecture (→ architect)."
+  },
+  "competing_skills": [
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+    },
+    {
+      "name": "architect",
+      "description": "Plan before coding — \"architect this\", \"tech spec\", \"PRD\", \"how would I build this\". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code (→ build), or deploy (→ ship-it)."
+    },
+    {
+      "name": "systematic-test",
+      "description": "Verify built code works — \"test this\", \"QA this\", \"does this work\". Auto-fires after build. Not for bugs (→ systematic-debug) or code review (→ review-panel)."
+    },
+    {
+      "name": "review-panel",
+      "description": "Multi-agent review — \"panel review\", \"Gemini review\", \"full review\", \"calibrate scores\", \"audit my vault\". Auto-runs as build Phase 7. Not solo (→ delegate-analytical/adversarial)."
+    }
+  ],
+  "positive_cases": [
+    "The prefill link is broken again — same symptom as last week, photos missing",
+    "My v6.3 cap-bump fix didn't work, the cache is still empty on full listings",
+    "Why is the bookmarklet returning undefined for those 5 specific listings?",
+    "Still failing on the Orchard Dr listing after the latest patch — same error"
+  ],
+  "negative_cases": [
+    "Write a SPEC.md for the auth rewrite — interview me through the requirements",
+    "Build me a React dashboard for vault stats with weekly rollups",
+    "QA the new vault filter UI before I ship it",
+    "Run a panel review on my new artifact",
+    "Plan how I'd structure the data model for the grove-mobile app"
+  ]
+}

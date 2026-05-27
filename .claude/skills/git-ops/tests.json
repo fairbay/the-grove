@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "git-ops",
+    "description": "GitHub interface — \"push this\", \"commit this\", \"create a repo\", \"push fix to live site\", \"what's in fairbay/X\". Not for new-host setup (→ ship-it) or prototyping (→ build)."
+  },
+  "competing_skills": [
+    {
+      "name": "ship-it",
+      "description": "Set up deployment — \"ship it\", \"deploy this\", \"host this\", \"App Store\", \"Claude Code handoff\". Not for fixes to live sites (→ git-ops), prototyping (→ build), or planning (→ architect)."
+    },
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+    },
+    {
+      "name": "architect",
+      "description": "Plan before coding — \"architect this\", \"tech spec\", \"PRD\", \"how would I build this\". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code (→ build), or deploy (→ ship-it)."
+    },
+    {
+      "name": "grove",
+      "description": "Capture, browse, update Grove tasks/ideas — \"grove this\", \"what's in grove\", \"save this idea\", \"recent activity\". Not for iOS reminders (→ add-to-do) or scoring (→ idea-scout, idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Push the prefill fix to fairbay/listing-lens live site",
+    "Commit this and push to main with a clear message",
+    "What's in fairbay/grove-mobile? List the recent commits",
+    "Create a new fairbay/photo-diff repo for the new tool"
+  ],
+  "negative_cases": [
+    "Set up Vercel hosting for the new app — first deploy ever (expect ship-it)",
+    "Build me a React dashboard for vault stats with weekly rollups (expect build)",
+    "Architect the data model for grove v2 — write the SPEC.md (expect architect)",
+    "What's in grove this morning — any new tasks? (expect grove)",
+    "App Store submission setup for grove-mobile, fresh listing (expect ship-it)"
+  ]
+}

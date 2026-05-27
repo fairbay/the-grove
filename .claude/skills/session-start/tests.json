@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "session-start",
+    "description": "Session onboarding on first message — \"work on [project]\", \"continue [project]\". Loads handoff + PLAN. Not \"where are we\" (→ chat-status) or archiving (→ chat-archive)."
+  },
+  "competing_skills": [
+    {
+      "name": "chat-status",
+      "description": "Mid-session checkpoint — \"where are we\", \"status update\", \"what's next\", summaries, topic shifts. Use proactively. Not session start (→ session-start) or close (→ chat-archive)."
+    },
+    {
+      "name": "chat-archive",
+      "description": "Trigger at session end — \"archive this\", \"wrap up\", \"we're done\", \"start a new chat\", or natural stopping points (budget low, milestone hit). Fires even mid-build; do not casually summarize instead."
+    },
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+    },
+    {
+      "name": "idea-scout",
+      "description": "Evaluate a raw idea with scoring — \"scout this\", \"what if we built\", \"is this viable\". Auto-fires on new ideas in fresh chats. Not for building (→ architect) or saving without eval (→ idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Let's work on Listing Lens v7 today",
+    "Continue the grove-mobile project from yesterday",
+    "Pick up where we left off on baylee-skills",
+    "Work on the auth rewrite — pull the handoff"
+  ],
+  "negative_cases": [
+    "Where are we on the rebuild right now? (expect chat-status)",
+    "Wrap this chat up, we're done for the day (expect chat-archive)",
+    "Build me a tip-splitting React artifact with touch buttons (expect build)",
+    "Scout this idea: a Slack bot that summarizes new Grove tasks (expect idea-scout)",
+    "Quick status update on the Build Pipeline family (expect chat-status)"
+  ]
+}

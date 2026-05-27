@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "delegate-mechanical",
+    "description": "Haiku sub-agent for rote bulk work — summarize, extract, scaffold, compress, filter by tag/keyword, scan. Use proactively. Not for judgment (→ delegate-analytical) or async (→ fire-routine)."
+  },
+  "competing_skills": [
+    {
+      "name": "delegate-analytical",
+      "description": "Sonnet sub-agent for solo judgment — review, compare, rank, evaluate. Use proactively. Not for flaw-finding (→ delegate-adversarial), rote (→ delegate-mechanical), or panel (→ review-panel)."
+    },
+    {
+      "name": "delegate-adversarial",
+      "description": "Opus sub-agent for solo flaw-finding — adversarial review, security audit, \"tear this apart\", architecture critique. Not for standard review (→ delegate-analytical) or panel (→ review-panel)."
+    },
+    {
+      "name": "fire-routine",
+      "description": "Fire async Claude Code Routines — \"fire scout-r\", \"fire skill-worker-r\", \"drain the queue\", \"routine-fire X\". Not for inline scoring/scouting (→ idea-scout) or sync delegation (→ delegate-*)."
+    },
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+    }
+  ],
+  "positive_cases": [
+    "Extract every URL from this API response into a flat list",
+    "Summarize this 4-page transcript into one paragraph",
+    "Scan these files and pull out every TODO comment",
+    "Filter this idea dump down to just the ones tagged 'tools'"
+  ],
+  "negative_cases": [
+    "Compare these three architecture options and rank them (expect delegate-analytical)",
+    "Tear this skill design apart — every flaw, every failure mode (expect delegate-adversarial)",
+    "Fire scout-r on the new idea queue overnight (expect fire-routine)",
+    "Build me a React component to render this list (expect build)",
+    "Evaluate which of these three naming options reads best (expect delegate-analytical)"
+  ]
+}

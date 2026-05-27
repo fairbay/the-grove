@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "fire-routine",
+    "description": "Fire async Claude Code Routines — \"fire scout-r\", \"fire skill-worker-r\", \"drain the queue\", \"routine-fire X\". Not for inline scoring/scouting (→ idea-scout) or sync delegation (→ delegate-*)."
+  },
+  "competing_skills": [
+    {
+      "name": "delegate-mechanical",
+      "description": "Haiku sub-agent for rote bulk work — summarize, extract, scaffold, compress, filter by tag/keyword, scan. Use proactively. Not for judgment (→ delegate-analytical) or async (→ fire-routine)."
+    },
+    {
+      "name": "delegate-analytical",
+      "description": "Sonnet sub-agent for solo judgment — review, compare, rank, evaluate. Use proactively. Not for flaw-finding (→ delegate-adversarial), rote (→ delegate-mechanical), or panel (→ review-panel)."
+    },
+    {
+      "name": "idea-scout",
+      "description": "Evaluate a raw idea with scoring — \"scout this\", \"what if we built\", \"is this viable\". Auto-fires on new ideas in fresh chats. Not for building (→ architect) or saving without eval (→ idea-vault)."
+    },
+    {
+      "name": "grove",
+      "description": "Capture, browse, update Grove tasks/ideas — \"grove this\", \"what's in grove\", \"save this idea\", \"recent activity\". Not for iOS reminders (→ add-to-do) or scoring (→ idea-scout, idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Fire scout-r on the new idea queue overnight",
+    "Drain the routine queue before I head out",
+    "Routine-fire ll-data-r for the FEMA integration",
+    "Fire skill-worker-r on the delegation family rebuild"
+  ],
+  "negative_cases": [
+    "Scout this idea right now, inline — is it viable? (expect idea-scout)",
+    "Extract every URL from this API response (expect delegate-mechanical)",
+    "Compare these three architecture options and rank them (expect delegate-analytical)",
+    "What's in grove this morning — any new tasks? (expect grove)",
+    "Review this draft pitch for clarity (expect delegate-analytical)"
+  ]
+}

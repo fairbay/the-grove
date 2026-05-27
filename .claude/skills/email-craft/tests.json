@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "email-craft",
+    "description": "Draft emails Baylee will send — \"write an email to\", \"draft a message\", \"respond to\", or confirming Claude's suggestion to email. Not for pitch docs (→ pitch-crafter) or Slack."
+  },
+  "competing_skills": [
+    {
+      "name": "pitch-crafter",
+      "description": "Persuasive pitch docs — \"one-pager\", \"cold email pitch\", \"landing page\", \"elevator pitch\". Not for plain emails (→ email-craft), slide decks, building (→ build), or scoring (→ idea-scout)."
+    },
+    {
+      "name": "assign-work",
+      "description": "Generate action items for Baylee's hands — dashboard clicks, device actions, env setup, things Claude can't do directly. Not for tasks Claude can do or task tracking (→ add-to-do, grove)."
+    },
+    {
+      "name": "add-to-do",
+      "description": "Task capture and triage — \"add to do\", \"remind me to\", \"show my to-dos\", \"done with X\", \"drop X\". Not for idea capture (→ grove) or scoring (→ idea-scout, idea-vault)."
+    },
+    {
+      "name": "grove",
+      "description": "Grove operations — \"save this idea\", \"grove this idea\", \"what's in grove\", \"recent activity\", browse ideas. Not for to-do capture (→ add-to-do) or scoring (→ idea-scout, idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Write an email to my realtor asking about the Maple Ave listing's HOA fees",
+    "Draft a message to David — I need to push the standup to Thursday this week",
+    "Respond to that note from Mom about Thanksgiving dates",
+    "Yeah, draft that email to the vendor about the invoice mistake"
+  ],
+  "negative_cases": [
+    "Write a one-pager pitching Listing Lens to investors — full persuasive treatment",
+    "Remind me to email Sarah tomorrow about the contract",
+    "Slack David about the standup change — quick message in #team",
+    "Add to my to-do: send the wedding RSVP by Friday",
+    "Landing page copy for the Grove pitch — make it persuasive"
+  ]
+}

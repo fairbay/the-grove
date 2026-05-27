@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "chat-archive",
+    "description": "Trigger at session end — \"archive this\", \"wrap up\", \"we're done\", \"start a new chat\", or natural stopping points (budget low, milestone hit). Fires even mid-build; do not casually summarize instead."
+  },
+  "competing_skills": [
+    {
+      "name": "chat-status",
+      "description": "Mid-session checkpoint — \"where are we\", \"status update\", \"what's next\", summaries, topic shifts. Use proactively. Not session start (→ session-start) or close (→ chat-archive)."
+    },
+    {
+      "name": "session-start",
+      "description": "Session onboarding on first message — \"work on [project]\", \"continue [project]\". Loads handoff + PLAN. Not \"where are we\" (→ chat-status) or archiving (→ chat-archive)."
+    },
+    {
+      "name": "grove",
+      "description": "Capture, browse, update Grove tasks/ideas — \"grove this\", \"what's in grove\", \"save this idea\", \"recent activity\". Not for iOS reminders (→ add-to-do) or scoring (→ idea-scout, idea-vault)."
+    },
+    {
+      "name": "add-to-do",
+      "description": "Capture and surface tasks — \"add to do\", \"remind me to\", \"note to self\", \"show my to-dos\", \"done with X\". Routes to Grove. Not for new ideas (→ idea-scout) or vault ops (→ idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Let's wrap up this chat — we're done with the rebuild for now",
+    "Archive this conversation, I want to start a new chat",
+    "We're done for the night, log the handoff before I close",
+    "Context is at 80% — wrap before we crash"
+  ],
+  "negative_cases": [
+    "Where are we on the Build Pipeline rebuild? (expect chat-status)",
+    "Let's continue work on Listing Lens v7 today (expect session-start)",
+    "Remind me to push the photo-diff fix tomorrow morning (expect add-to-do)",
+    "What's in grove right now — any new tasks since yesterday? (expect grove)",
+    "Quick status check on the rebuild before I head to dinner (expect chat-status)"
+  ]
+}

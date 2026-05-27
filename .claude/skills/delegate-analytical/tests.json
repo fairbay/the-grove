@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "delegate-analytical",
+    "description": "Sonnet sub-agent for solo judgment — review, compare, rank, evaluate. Use proactively. Not for flaw-finding (→ delegate-adversarial), rote (→ delegate-mechanical), or panel (→ review-panel)."
+  },
+  "competing_skills": [
+    {
+      "name": "delegate-mechanical",
+      "description": "Haiku sub-agent for rote bulk work — summarize, extract, scaffold, compress, filter by tag/keyword, scan. Use proactively. Not for judgment (→ delegate-analytical) or async (→ fire-routine)."
+    },
+    {
+      "name": "delegate-adversarial",
+      "description": "Opus sub-agent for solo flaw-finding — adversarial review, security audit, \"tear this apart\", architecture critique. Not for standard review (→ delegate-analytical) or panel (→ review-panel)."
+    },
+    {
+      "name": "review-panel",
+      "description": "Multi-agent review — \"panel review\", \"Gemini review\", \"full review\", \"calibrate scores\", \"audit my vault\". Auto-runs as build Phase 7. Not solo (→ delegate-analytical/adversarial)."
+    },
+    {
+      "name": "idea-scout",
+      "description": "Evaluate a raw idea with scoring — \"scout this\", \"what if we built\", \"is this viable\". Auto-fires on new ideas in fresh chats. Not for building (→ architect) or saving without eval (→ idea-vault)."
+    }
+  ],
+  "positive_cases": [
+    "Review this draft pitch for clarity and impact",
+    "Compare these three architecture options and rank them",
+    "Evaluate which of these naming options reads best",
+    "Rank these four refactor approaches by trade-off"
+  ],
+  "negative_cases": [
+    "Extract every URL from this API response (expect delegate-mechanical)",
+    "Tear this architecture apart — every flaw, every failure mode (expect delegate-adversarial)",
+    "Run a full panel review on the new skill before I push (expect review-panel)",
+    "Scout this raw idea: a Slack bot for Grove digests — is it viable? (expect idea-scout)",
+    "Summarize this 4-page transcript into one paragraph (expect delegate-mechanical)"
+  ]
+}

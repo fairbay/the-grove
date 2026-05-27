@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "chat-status",
+    "description": "Mid-session checkpoint — \"where are we\", \"status update\", \"what's next\", summaries, topic shifts. Use proactively. Not session start (→ session-start) or close (→ chat-archive)."
+  },
+  "competing_skills": [
+    {
+      "name": "chat-archive",
+      "description": "Trigger at session end — \"archive this\", \"wrap up\", \"we're done\", \"start a new chat\", or natural stopping points (budget low, milestone hit). Fires even mid-build; do not casually summarize instead."
+    },
+    {
+      "name": "session-start",
+      "description": "Session onboarding on first message — \"work on [project]\", \"continue [project]\". Loads handoff + PLAN. Not \"where are we\" (→ chat-status) or archiving (→ chat-archive)."
+    },
+    {
+      "name": "grove",
+      "description": "Capture, browse, update Grove tasks/ideas — \"grove this\", \"what's in grove\", \"save this idea\", \"recent activity\". Not for iOS reminders (→ add-to-do) or scoring (→ idea-scout, idea-vault)."
+    },
+    {
+      "name": "idea-vault",
+      "description": "Browse and update stored ideas — \"show my ideas\", \"vault\", \"compare ideas\", \"what should I build next\", named vault refs. Not for scouting (→ idea-scout) or calibrating scores (→ review-panel)."
+    }
+  ],
+  "positive_cases": [
+    "Where are we on the Build Pipeline rebuild?",
+    "Quick status update — what's left before I can ship?",
+    "What's next on the punch list for this session?",
+    "Summarize what we've done so far in this chat"
+  ],
+  "negative_cases": [
+    "Archive this chat and start a new one (expect chat-archive)",
+    "Continue work on grove-mobile from yesterday (expect session-start)",
+    "What's in grove this morning — any new tasks? (expect grove)",
+    "Show me my vault, ranked by traction (expect idea-vault)",
+    "We're done, wrap it up and log the handoff (expect chat-archive)"
+  ]
+}

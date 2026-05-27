@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "ship-it",
+    "description": "Set up deployment — \"ship it\", \"deploy this\", \"host this\", \"App Store\", \"Claude Code handoff\". Not for fixes to live sites (→ git-ops), prototyping (→ build), or planning (→ architect)."
+  },
+  "competing_skills": [
+    {
+      "name": "git-ops",
+      "description": "GitHub interface — \"push this\", \"commit this\", \"create a repo\", \"push fix to live site\", \"what's in fairbay/X\". Not for new-host setup (→ ship-it) or prototyping (→ build)."
+    },
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\", \"make it real\". Not for planning (→ architect), bugs (→ systematic-debug), or deploy (→ ship-it)."
+    },
+    {
+      "name": "architect",
+      "description": "Plan before coding — \"architect this\", \"tech spec\", \"PRD\", \"how would I build this\". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code (→ build), or deploy (→ ship-it)."
+    },
+    {
+      "name": "session-start",
+      "description": "Session onboarding on first message — \"work on [project]\", \"continue [project]\". Loads handoff + PLAN. Not \"where are we\" (→ chat-status) or archiving (→ chat-archive)."
+    }
+  ],
+  "positive_cases": [
+    "Ship this to Vercel — first deploy for the photo-diff repo",
+    "Host the listing-lens app, fresh Vercel project setup",
+    "App Store submission for grove-mobile — walk me through it",
+    "Set up the Claude Code handoff for fairbay/photo-diff"
+  ],
+  "negative_cases": [
+    "Push the typo fix to fairbay/listing-lens live site (expect git-ops)",
+    "Build me a tip-splitting React artifact with touch buttons (expect build)",
+    "Architect the auth rewrite — write the SPEC.md before I code (expect architect)",
+    "Commit this and push to main (expect git-ops)",
+    "Let's continue work on Listing Lens v7 today (expect session-start)"
+  ]
+}

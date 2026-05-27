@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "brainstorm-engine",
+    "description": "Generate NEW concepts — \"brainstorm\", \"what could I build\", \"crazy 8s\". Not for evaluating (→ idea-scout), building (→ build), browsing (→ idea-vault), or pitching (→ pitch-crafter)."
+  },
+  "competing_skills": [
+    {
+      "name": "idea-scout",
+      "description": "Score a raw idea — \"scout this\", \"is this viable\". Auto-fires on new ideas. Not for building (→ architect), saving without eval (→ idea-vault), or batch ideation (→ brainstorm-engine)."
+    },
+    {
+      "name": "build",
+      "description": "Write working code — \"build this\", \"prototype this\", \"MVP this\". Not for planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or testing (→ systematic-test)."
+    },
+    {
+      "name": "idea-vault",
+      "description": "Browse stored ideas — \"show my ideas\", \"vault\", \"compare ideas\", \"what should I build next\". Not for scouting (→ idea-scout), capture (→ grove), or calibration (→ review-panel)."
+    },
+    {
+      "name": "pitch-crafter",
+      "description": "Persuasive pitch docs — \"one-pager\", \"cold email pitch\", \"landing page\", \"elevator pitch\". Not for plain emails (→ email-craft), slide decks, building (→ build), or scoring (→ idea-scout)."
+    }
+  ],
+  "positive_cases": [
+    "Brainstorm 10 ideas for a side project I could ship in a weekend",
+    "What could I build with the Notion API that doesn't already exist?",
+    "Crazy 8s for ways to monetize my newsletter — give me eight quick directions",
+    "Rapid fire ideas for solo-founder tools — I want a lot, not a few good ones"
+  ],
+  "negative_cases": [
+    "Is the eBay scorer Chrome extension viable? Score it for me.",
+    "Build me a working prototype of a kitchen timer with touch-friendly buttons",
+    "What should I build next from my vault? Compare my top three ideas.",
+    "Write a one-pager pitching the Slack summarizer to angel investors",
+    "I had an idea last night: AI-powered grocery list. Scout it."
+  ]
+}

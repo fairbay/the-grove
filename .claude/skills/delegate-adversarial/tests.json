@@ -1,0 +1,37 @@
+{
+  "target_skill": {
+    "name": "delegate-adversarial",
+    "description": "Opus sub-agent for solo flaw-finding — adversarial review, security audit, \"tear this apart\", architecture critique. Not for standard review (→ delegate-analytical) or panel (→ review-panel)."
+  },
+  "competing_skills": [
+    {
+      "name": "delegate-analytical",
+      "description": "Sonnet sub-agent for solo judgment — review, compare, rank, evaluate. Use proactively. Not for flaw-finding (→ delegate-adversarial), rote (→ delegate-mechanical), or panel (→ review-panel)."
+    },
+    {
+      "name": "delegate-mechanical",
+      "description": "Haiku sub-agent for rote bulk work — summarize, extract, scaffold, compress, filter by tag/keyword, scan. Use proactively. Not for judgment (→ delegate-analytical) or async (→ fire-routine)."
+    },
+    {
+      "name": "review-panel",
+      "description": "Multi-agent review — \"panel review\", \"Gemini review\", \"full review\", \"calibrate scores\", \"audit my vault\". Auto-runs as build Phase 7. Not solo (→ delegate-analytical/adversarial)."
+    },
+    {
+      "name": "systematic-debug",
+      "description": "Fix bugs systematically — \"X is broken\", \"isn't working\", \"fix didn't work\", \"still failing\", \"why is X happening\". Not for features (→ build) or architecture (→ architect)."
+    }
+  ],
+  "positive_cases": [
+    "Tear this architecture apart — I want every flaw, every failure mode",
+    "Adversarial review of the auth flow before I ship",
+    "Security audit this serverless function end to end",
+    "Critique this skill design — where would it break under load?"
+  ],
+  "negative_cases": [
+    "Compare these three drafts and rank them by clarity (expect delegate-analytical)",
+    "Run a full panel review on the new build before push (expect review-panel)",
+    "The /api/cache endpoint is returning 500s on every other call — fix it (expect systematic-debug)",
+    "Extract every URL from this API response (expect delegate-mechanical)",
+    "Review this draft pitch for clarity and impact (expect delegate-analytical)"
+  ]
+}
