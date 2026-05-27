@@ -1,21 +1,3 @@
-<!-- 
-  DESIGN RATIONALE: This file is the single source of truth for cross-project
-  preferences. It is copied to .claude/global.md in every active repo and
-  imported by each repo's root CLAUDE.md via @.claude/global.md.
-  
-  WHY NOT ~/.claude/CLAUDE.md ONLY: Cloud Claude Code (web) runs each session
-  in an ephemeral VM cloned from GitHub. ~/.claude/ does not persist between
-  web sessions. Repo-committed files are the only reliable persistence layer.
-  
-  WHY IMPORT INSTEAD OF INLINE: Previous approach duplicated a <!-- SHARED -->
-  block in every repo's CLAUDE.md, causing sync drift. The @import pattern
-  keeps one file (this one) as source of truth in fairbay/code-extensions,
-  synced to repos via the sync-global-r Routine.
-  
-  ALSO PLACE AT ~/.claude/CLAUDE.md on local machines for Desktop/CLI/VS Code
-  sessions and repos that don't yet have a CLAUDE.md.
--->
-
 # Fairbay — Global Preferences
 
 ## Identity & Workflow
@@ -103,3 +85,11 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 ## Cost Assumptions
 
 - Apple Developer Program ($99/yr) is a sunk cost. Never penalize scores, viability, or cost analysis for requiring it. Treat as $0.
+
+## About This File
+
+**This is the single source of truth for cross-project preferences.** It lives in `fairbay/code-extensions/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md`.
+
+**To update cross-project preferences:** Edit this file in code-extensions, then run `scripts/sync-global.py` to push to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
+
+**Why repo-committed, not just `~/.claude/CLAUDE.md`:** Cloud Claude Code web sessions run in ephemeral VMs cloned from GitHub. `~/.claude/` does not persist between web sessions. The repo-committed file is the only reliable persistence layer. `~/.claude/CLAUDE.md` is placed additionally on local machines for Desktop/CLI/VS Code coverage.
