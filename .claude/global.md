@@ -55,6 +55,30 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 - Strip accumulated waste from context (large rendered content in message history).
 - Compact prompts — terse instruction language, no filler.
 
+## Agent Delegation & Token Efficiency
+
+In multi-agent jobs, the cost lever is the *model tier*, not delegation itself.
+
+- **Tier sub-agent models to task difficulty — pass `model:` explicitly on every Agent call.**
+  Mechanical work (apply/run a reviewed file, verify, hygiene/lint, format, simple search) → **haiku**.
+  Structured transformation (extraction, text→code/SQL, reconciliation) → **sonnet**.
+  Reserve **opus** for the orchestrator and genuinely hard reasoning. Delegating to an *opus*
+  sub-agent protects the orchestrator's context window but does NOT reduce spend — an opus
+  sub-agent doing trivial work is the most common waste.
+- **Text-first, not visual.** Prefer extracted text (`pdftotext -layout`, HTML/text scrapes) over
+  rendering PDFs/pages/screenshots as images. Visual inputs are the single largest token multiplier;
+  use them only when text genuinely fails, and only for the specific page.
+- **Keep the orchestrator thin.** Never read large files (big SQL, PDFs, transcripts) into the main
+  thread — delegate review/apply to a cheap sub-agent and keep only the summary. Avoid repeated
+  status polls and per-step narration.
+- **Batch trivial operations into one cheap agent** rather than one agent per item (per-agent startup
+  + retry overhead compounds, especially when infra is flaky).
+- **Make delegated work resumable & idempotent.** Persist artifacts (commit generated files) so an
+  infra/usage-limit failure costs a cheap retry, not a full re-spend. Decouple expensive generation
+  from cheap application.
+- **Pilot before fan-out.** Validate the approach on one representative item before mass-spawning;
+  settle methodology first to avoid throwaway work.
+
 ## MCP Configuration
 
 MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add`). Permissions use the `permissions.allow` schema (not the legacy `allowedTools` format). Master copies of both `.mcp.json` and permissions configs live in `fairbay/code-extensions`.
