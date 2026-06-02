@@ -5,7 +5,7 @@ description: >
   "Claude Code handoff". Not for fixes to live sites (→ git-ops), prototyping
   (→ build), or planning (→ architect).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-02-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -68,7 +68,11 @@ Tailor it, number it, make it copy-pasteable.
    `fairbay/code-extensions/global-CLAUDE.md`), ensure root `CLAUDE.md`
    starts with `@.claude/global.md`, and create `.claude/settings.json`
    with the SessionStart hook (template in CONVENTIONS.md § Session-
-   continuity gates). Next `sync-skills.py` run auto-discovers the repo.
+   continuity gates). **Then sync skills immediately** — read all files
+   from `fairbay/baylee-skills/.claude/skills/` via git-ops and push them
+   to the new repo's `.claude/skills/` in the same commit (or the next).
+   Do not defer to a future `sync-skills.py` run; the repo needs skills
+   before its first Claude Code session.
 7. **Custom domain** (optional) — DNS, SSL auto-provisions.
 8. **Verify** — test live URL on mobile and desktop, confirm core functionality works, check the version number shown in the UI.
 

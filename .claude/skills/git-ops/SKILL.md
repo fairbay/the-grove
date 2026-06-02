@@ -5,7 +5,7 @@ description: >
   live site", "what's in fairbay/X". Not for new-host setup (→ ship-it) or
   prototyping (→ build).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-02-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -110,6 +110,14 @@ code, body = api("POST", "/user/repos", {
 ```
 
 `fairbay` is a GitHub User account, not an Org. Use `/user/repos`, not `/orgs/fairbay/repos`. The `/orgs/...` path returns 404.
+
+**After creation — Claude infrastructure.** When a new repo will be used
+with Claude Code, push the `.claude/` infrastructure in the same session:
+`.claude/global.md` (from `fairbay/code-extensions/global-CLAUDE.md`),
+`.claude/settings.json` (SessionStart hook template in CONVENTIONS.md), and
+all skills from `fairbay/baylee-skills/.claude/skills/`. Skills must land
+before the first Claude Code session — don't defer to `sync-skills.py`.
+Same procedure as ship-it Phase 3 step 6.
 
 ### Delete a repo (Tier 3 — destructive)
 
