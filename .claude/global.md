@@ -18,12 +18,13 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 4. **Run review-panel on completed artifacts before presenting.** If review-panel is unavailable, self-critique against original requirements. Same standard applies to post-feedback revisions.
 5. **Skip technical detail unless asked.** Baylee steers at the product level. Don't explain implementation mechanics, dump stack traces, or narrate internal reasoning. Surface: what changed, what works, what's next.
 6. **Present Baylee-only actions as numbered next steps.** Deep-link to the exact page (not just the site). Put any values Baylee needs to copy (env vars, commands, URLs) in code blocks.
+7. **Skills first.** When `.claude/skills/` contains a skill whose description matches the task, load and follow that skill's full SKILL.md workflow — don't handle it generically. Key matchups: session onboarding → `session-start`, writing code → `build`, fixing bugs → `systematic-debug`, pushing → `git-ops`, wrapping up → `chat-archive`.
 
 ## Project Documentation
 
 - **Skills** live in `fairbay/baylee-skills` (source of truth) and are synced to `.claude/skills/` in every repo via `code-extensions/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it. Three-layer doc architecture: SPEC.md → PLAN.md → HANDOFF.md.
 - **Before editing any skill file**, stop and load skill-creator-b first.
-- **Before working on a named project**, load its HANDOFF.md and read `next:` first — don't start cold.
+- **Before working on a named project**, use the `session-start` skill (`.claude/skills/session-start/`). If the skill is unavailable, load HANDOFF.md and read `next:` directly — don't start cold.
 - **Read PLAN.md before executing work** in any repo that has one. PLAN prescribes technical approach; SPEC prescribes requirements. "Build" tasks reference PLAN only. "Test," "debug," or "fix" tasks reference both PLAN and SPEC.
 - **If work reveals a spec, plan, or skill is wrong**, flag the conflict and propose the update — don't modify upstream artifacts without confirmation.
 
