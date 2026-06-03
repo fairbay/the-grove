@@ -31,6 +31,14 @@ import urllib.request
 import urllib.error
 
 # ---------------------------------------------------------------------------
+# Git identity — hardcoded to match GitHub account + Vercel team membership.
+# Without this, Claude Code sessions invent plausible-looking emails that
+# don't match any real account, causing Vercel seat-block on production.
+# ---------------------------------------------------------------------------
+GIT_AUTHOR_NAME = "Baylee Miller"
+GIT_AUTHOR_EMAIL = "baylee.miller@gmail.com"
+
+# ---------------------------------------------------------------------------
 # Environment detection
 # ---------------------------------------------------------------------------
 
@@ -105,6 +113,17 @@ def _push_via_cli(clone_path, branch, message, files):
     )
     if status.returncode == 0:
         raise RuntimeError("No changes to commit — files may already match HEAD")
+
+    # Set identity before committing — prevents sessions from using
+    # whatever stale or invented email happens to be in git config
+    subprocess.run(
+        ["git", "config", "user.name", GIT_AUTHOR_NAME],
+        cwd=clone_path, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.email", GIT_AUTHOR_EMAIL],
+        cwd=clone_path, capture_output=True,
+    )
 
     _run(["git", "commit", "-m", message])
     _run(["git", "push", "origin", branch])
@@ -241,7 +260,9 @@ def _push_via_api(owner_repo, branch, message, files):
 
     # 5. Create commit
     code, commit = api("POST", f"/repos/{owner_repo}/git/commits",
-                       {"message": message, "tree": tree["sha"], "parents": [parent_sha]})
+                       {"message": message, "tree": tree["sha"], "parents": [parent_sha],
+                        "author": {"name": GIT_AUTHOR_NAME, "email": GIT_AUTHOR_EMAIL},
+                        "committer": {"name": GIT_AUTHOR_NAME, "email": GIT_AUTHOR_EMAIL}})
     if code >= 300:
         raise RuntimeError(f"create commit failed: {code} {commit}")
 
@@ -308,3 +329,4 @@ if __name__ == "__main__":
     sha, url = push_files(repo, branch, msg, files)
     print(f"pushed: {sha}")
     print(f"diff:   {url}")
+
