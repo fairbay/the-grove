@@ -9,7 +9,7 @@ metadata:
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
-`metadata.version` against `fairbay/baylee-skills` via git-ops. If behind,
+`metadata.version` against `fairbay/ops` via git-ops. If behind,
 warn once and continue. If fetch fails, skip silently. In Claude Code /
 Routines, skip — skills are synced from source.
 
@@ -269,7 +269,7 @@ Context cache storage: $1/M tokens/hour. Default TTL: 30 min.
 ### First-time setup (Baylee action)
 
 1. Get API key at [aistudio.google.com](https://aistudio.google.com).
-2. Create `secrets/gemini.env` in `fairbay/baylee-skills`:
+2. Create `secrets/gemini.env` in `fairbay/ops`:
    ```
    GOOGLE_AI_KEY=AIza...
    ```
@@ -279,7 +279,7 @@ Context cache storage: $1/M tokens/hour. Default TTL: 30 min.
 
 ### How the key is loaded
 
-`scripts/gemini.py` reads `secrets/gemini.env` from `fairbay/baylee-skills`
+`scripts/gemini.py` reads `secrets/gemini.env` from `fairbay/ops`
 via git-ops on every call. Same pattern as other API key storage.
 If the key is missing or invalid, `GeminiError` surfaces a clear message.
 

@@ -18,7 +18,7 @@ Usage:
       max_tokens=2048,
   )
 
-Reads ANTHROPIC_API_KEY from secrets/delegate.env in fairbay/baylee-skills.
+Reads ANTHROPIC_API_KEY from secrets/delegate.env in fairbay/ops.
 Surfaces a clear error if the file or key is missing rather than retrying or
 falling back silently — Baylee needs to know to set it up or rotate the token.
 """
@@ -37,10 +37,10 @@ class DelegateError(RuntimeError):
 
 def _load_api_key() -> str:
     try:
-        env = read_file('fairbay/baylee-skills', 'secrets/delegate.env')
+        env = read_file('fairbay/ops', 'secrets/delegate.env')
     except Exception as e:
         raise DelegateError(
-            "secrets/delegate.env not found in fairbay/baylee-skills. "
+            "secrets/delegate.env not found in fairbay/ops. "
             "First-time setup: create the file with "
             "ANTHROPIC_API_KEY=sk-ant-... from console.anthropic.com."
         ) from e

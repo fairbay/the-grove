@@ -8,7 +8,7 @@ metadata:
   version: "2026-05-27-02"
 ---
 
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # chat-status — lightweight mid-session checkpoint
 
@@ -47,7 +47,7 @@ is always present.
 ---
 
 **Done**
-- Built and pushed chat-status skill to fairbay/baylee-skills
+- Built and pushed chat-status skill to fairbay/ops
 - Prototyped React artifact v1–v3
 
 **Parked**

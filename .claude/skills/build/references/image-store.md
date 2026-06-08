@@ -46,7 +46,7 @@ Body: { "base64": "<...>", "format": "webp", "name": "slug",
 
 ## Key handling
 
-`IMAGE_STORE_KEY` lives in `fairbay/baylee-skills/secrets/image-store.env` (tier-2
+`IMAGE_STORE_KEY` lives in `fairbay/ops/secrets/image-store.env` (tier-2
 committed secret — read it via the GitHub API the same way `grove.py` reads `grove.env`).
 **Never hardcode the literal key value in a skill file, page, or commit.**
 

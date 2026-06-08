@@ -8,7 +8,7 @@ metadata:
   version: "2026-06-08-01"
 ---
 
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # session-start — orient a new session from handoff state
 
@@ -75,7 +75,7 @@ Resolution order — use the first that resolves:
    a pasted handoff from 5 days ago should be flagged just like a repo
    handoff would be.
 2. **Build handoff:** `HANDOFF.yaml` in the repo root via git-ops.
-3. **Session handoff:** list `fairbay/operating-manual/handoffs/` via git-ops,
+3. **Session handoff:** list `fairbay/ops/handoffs/` via git-ops,
    filter filenames containing the project slug, read the most recent by date
    prefix.
 4. **Grove idea notes.** If Phase 1 found a Grove idea (pre-repo or otherwise)
@@ -100,7 +100,7 @@ A handoff from days ago can be overridden by a more recent chat. Always check.
 2. Check for newer sessions:
    - **Chat:** call `recent_chats(after=<generated_timestamp>, n=5)`.
    - **Code:** check `git log --since=<timestamp>` for newer commits in the
-     repo, or check operating-manual/handoffs/ for newer session handoffs.
+     repo, or check ops/handoffs/ for newer session handoffs.
 3. If anything newer mentions the same project, flag before proceeding.
 4. If nothing newer, proceed.
 
@@ -223,7 +223,7 @@ confirmation.
 - **↔ Claude Code:** On the Claude Code surface the entry gate is a SessionStart
   hook (`scripts/session_handoff.py inject`) that injects the same handoffs as
   `additionalContext` before the first turn. Handoffs flow either direction;
-  `meta.surface` records origin. See `operating-manual/docs/session-continuity-SPEC.md` §11.
+  `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
 - **→ build / systematic-test / systematic-debug:** Hands off the loaded PLAN.md
   context so they don't refetch.
 - **→ chat-status:** Mid-session checkpoints once work begins.

@@ -10,18 +10,18 @@ metadata:
 
 # skill-creator — build and maintain skills for Baylee's system
 
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
-Skills source of truth: `fairbay/baylee-skills` (`.claude/skills/<name>/SKILL.md`).
+Skills source of truth: `fairbay/ops` (`.claude/skills/<name>/SKILL.md`).
 Read `CONVENTIONS.md` from that repo via git-ops before any skill work.
 
 **CRITICAL — stale snapshot interrupt.** If you are about to copy, read, or
 edit a skill file from a stale source, stop.
 - **Chat:** `/mnt/skills/user/` is a read-only snapshot frozen at session
-  start. Always read from `fairbay/baylee-skills` via git-ops instead.
+  start. Always read from `fairbay/ops` via git-ops instead.
 - **Code:** `.claude/skills/` in the repo is the synced copy. Read from it
   directly — it's current as of the last sync. For the authoritative
-  version, read from `fairbay/baylee-skills` via git-ops.
+  version, read from `fairbay/ops` via git-ops.
 
 This applies everywhere: inside this skill's workflow, inside other skills'
 workflows (chat-archive encoding gate, build, etc.), and in ad-hoc edits.
@@ -134,7 +134,7 @@ metadata:
 # skill-name — one-line purpose
 
 **Version gate:** Compare this skill's `metadata.version` against
-`fairbay/baylee-skills/.claude/skills/<name>/SKILL.md` via git-ops
+`fairbay/ops/.claude/skills/<name>/SKILL.md` via git-ops
 before doing anything else. If behind, warn once and continue.
 If fetch fails, skip silently.
 
@@ -295,7 +295,7 @@ failures.
 ## Phase 5 — Push and install
 
 1. Write SKILL.md (and any supporting files) to `/home/claude/`.
-2. Push to `fairbay/baylee-skills` via `git-ops`.
+2. Push to `fairbay/ops` via `git-ops`.
 3. **Deliver per surface:**
 
    **Chat:**
@@ -339,7 +339,7 @@ workflow, stop.** Skill files have an installation ceremony (Phase 5: zip +
 present .skill) that generic file pushes skip. Route the skill-modification
 steps through this workflow, then return to the broader plan.
 
-1. **Read current skill** from `fairbay/baylee-skills` via git-ops. **NEVER**
+1. **Read current skill** from `fairbay/ops` via git-ops. **NEVER**
    from the session snapshot at `/mnt/skills/user/` — it may be stale and you
    will silently overwrite changes from other sessions. This is the #1 skill
    modification footgun.
@@ -416,4 +416,4 @@ When this skill creates or modifies a skill that replaces a memory edit:
 - Remove the memory edit in the same session.
 - Memory edits are behavioral overrides or essential reference data. Nothing else.
 - Target: 9-12 edits. Count before adding.
-- Full conventions: read CONVENTIONS.md from fairbay/baylee-skills.
+- Full conventions: read CONVENTIONS.md from fairbay/ops.

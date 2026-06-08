@@ -7,7 +7,7 @@ description: >
 metadata:
   version: "2026-06-02-01"
 ---
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # git-ops — push, read, list, create, delete on GitHub
 
@@ -113,9 +113,9 @@ code, body = api("POST", "/user/repos", {
 
 **After creation — Claude infrastructure.** When a new repo will be used
 with Claude Code, push the `.claude/` infrastructure in the same session:
-`.claude/global.md` (from `fairbay/code-extensions/global-CLAUDE.md`),
+`.claude/global.md` (from `fairbay/ops/global-CLAUDE.md`),
 `.claude/settings.json` (SessionStart hook template in CONVENTIONS.md), and
-all skills from `fairbay/baylee-skills/.claude/skills/`. Skills must land
+all skills from `fairbay/ops/.claude/skills/`. Skills must land
 before the first Claude Code session — don't defer to `sync-skills.py`.
 Same procedure as ship-it Phase 3 step 6.
 

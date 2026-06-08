@@ -8,7 +8,7 @@ metadata:
   version: "2026-05-27-02"
 ---
 
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # fire-routine — fire async Claude Code Routines from chat
 
@@ -95,7 +95,7 @@ sys.path.insert(0, '/mnt/skills/user/git-ops/scripts')
 from git_push import read_file
 
 env_file = 'secrets/scout-r.env'  # or 'secrets/skill-worker-r.env'
-env_content = read_file('fairbay/baylee-skills', env_file)
+env_content = read_file('fairbay/ops', env_file)
 
 creds = {}
 for line in env_content.strip().split('\n'):

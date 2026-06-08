@@ -37,7 +37,7 @@ Usage:
   out2, _ = call_cached(cache_name, user='Audit data quality...')
   delete_cache(cache_name)
 
-Reads GOOGLE_AI_KEY from secrets/gemini.env in fairbay/baylee-skills.
+Reads GOOGLE_AI_KEY from secrets/gemini.env in fairbay/ops.
 """
 import json
 import urllib.error
@@ -63,10 +63,10 @@ class GeminiError(RuntimeError):
 
 def _load_api_key() -> str:
     try:
-        env = read_file('fairbay/baylee-skills', 'secrets/gemini.env')
+        env = read_file('fairbay/ops', 'secrets/gemini.env')
     except Exception as e:
         raise GeminiError(
-            "secrets/gemini.env not found in fairbay/baylee-skills. "
+            "secrets/gemini.env not found in fairbay/ops. "
             "Create the file with GOOGLE_AI_KEY=<key> from aistudio.google.com."
         ) from e
 

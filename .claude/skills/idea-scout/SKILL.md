@@ -8,7 +8,7 @@ metadata:
   version: "2026-05-28-01"
 ---
 
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # idea-scout — honest evaluation of a raw idea
 
@@ -33,7 +33,7 @@ full market. Example: "Listing Lens idea: add a map" → add-to-do with
 
 ## Trigger routing (when to fire, when not to)
 
-Per `fairbay/operating-manual/CAPTURE.md`, new ideas have one right home based
+Per `fairbay/ops/CAPTURE.md`, new ideas have one right home based
 on timing:
 
 - **Fresh chat, new idea, no active task** → **Auto-scout. No asking.** The

@@ -51,7 +51,7 @@ Before adding or modifying any memory edit:
 
 Before adding a new edit, check for existing coverage:
 - **Chat:** run `conversation_search` with 1-3 content keywords.
-- **Code:** check CLAUDE.md and recent handoffs in operating-manual/handoffs/.
+- **Code:** check CLAUDE.md and recent handoffs in ops/handoffs/.
 
 If a prior session already encoded the same finding, don't duplicate.
 

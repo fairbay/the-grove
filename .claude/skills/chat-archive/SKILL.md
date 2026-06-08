@@ -8,7 +8,7 @@ metadata:
   version: "2026-06-08-01"
 ---
 
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # chat-archive — close out a session with verified state
 
@@ -255,7 +255,7 @@ push response — read it back.
 
 ### 7. Telemetry
 
-Append a session entry to `fairbay/operating-manual/telemetry/skill-usage.yaml`
+Append a session entry to `fairbay/ops/telemetry/skill-usage.yaml`
 via git-ops. Mechanical logging only — no analysis, evaluation, or
 editorialization. Push in the same commit as other archive artifacts.
 
@@ -277,7 +277,7 @@ Record:
 
 ### 8. Watchlist
 
-Read `fairbay/operating-manual/watchlist.md` via git-ops. For each item
+Read `fairbay/ops/watchlist.md` via git-ops. For each item
 whose `condition` occurred this session, answer the `check` question and
 append a one-line log entry: `YYYY-MM-DD: yes/no [brief detail]`.
 

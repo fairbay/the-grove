@@ -17,7 +17,7 @@ carries the semantic intent rather than a generic `task.updated`.
 
 Auth: opaque Bearer token seeded into public.token. Token resolution:
 1. $GROVE_TOKEN env var (set from Claude memory edit in chat)
-2. baylee-skills/secrets/grove.env (for Routines / Claude Code)
+2. ops/secrets/grove.env (for Routines / Claude Code)
 3. SECRET.txt next to this script (legacy fallback)
 The API hashes the value and looks it up;
 owner_id is resolved server-side.
@@ -72,10 +72,10 @@ def _load_config() -> tuple[str, str]:
     if env_token:
         return env_token.strip(), (env_base or DEFAULT_BASE_URL).strip()
 
-    # Routine/Claude Code fallback: check cloned baylee-skills repo
+    # Routine/Claude Code fallback: check cloned ops repo
     for candidate in [
-        Path.home() / "baylee-skills" / "secrets" / "grove.env",
-        Path("/home/user/baylee-skills/secrets/grove.env"),
+        Path.home() / "ops" / "secrets" / "grove.env",
+        Path("/home/user/ops/secrets/grove.env"),
     ]:
         if candidate.is_file():
             token, base_url = _parse_env_file(candidate)
@@ -95,7 +95,7 @@ def _load_config() -> tuple[str, str]:
 
     raise RuntimeError(
         "Grove token not found. In chat: set GROVE_TOKEN env var from memory. "
-        "In Routines: ensure secrets/grove.env exists in baylee-skills repo."
+        "In Routines: ensure secrets/grove.env exists in ops repo."
     )
 
 

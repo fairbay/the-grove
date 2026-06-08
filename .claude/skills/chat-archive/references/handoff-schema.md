@@ -21,13 +21,13 @@ should have been encoded elsewhere and cleared.**
   `HANDOFF.yaml` lands at the repo root.
 - **Session handoff** — strategic work, audits, skill updates, research,
   architectural decisions not tied to a single build. Pushes to
-  `fairbay/operating-manual/handoffs/YYYY-MM-DD-<slug>.yaml` via git-ops.
+  `fairbay/ops/handoffs/YYYY-MM-DD-<slug>.yaml` via git-ops.
 - **Both** — touched a product repo AND did strategic work. Generate both.
 
 If in doubt, generate a session handoff. Cost of unnecessary: ~30s. Cost of
 missing: minutes of search reconstruction next session.
 
-**Heuristic:** If the only repo touched was `fairbay/baylee-skills`, this is a
+**Heuristic:** If the only repo touched was `fairbay/ops`, this is a
 session handoff. Build handoffs are for product code repos. Skill updates are
 strategic/infrastructure work captured in session handoffs via `skills_changed`.
 
@@ -233,9 +233,9 @@ the same commit as the handoff — not deferred to the next session.
   appropriate directories (`docs/` for specs, `public/` for client-facing
   code). Report the commit diff URL.
 - **Session handoff:** push to
-  `fairbay/operating-manual/handoffs/YYYY-MM-DD-<slug>.yaml` via **git-ops** in
+  `fairbay/ops/handoffs/YYYY-MM-DD-<slug>.yaml` via **git-ops** in
   a single commit. The next instance reads it with
-  `read_file("fairbay/operating-manual", "handoffs/YYYY-MM-DD-<slug>.yaml")` —
+  `read_file("fairbay/ops", "handoffs/YYYY-MM-DD-<slug>.yaml")` —
   no download, no upload, no copy-paste. Report the commit diff URL.
 
 **Push-failure fallback:** if git-ops push fails after one retry, update the
