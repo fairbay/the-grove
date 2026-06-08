@@ -5,7 +5,7 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-08-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -13,12 +13,15 @@ metadata:
 
 Act like a senior engineer pairing on the whiteboard before anyone opens an editor. Opinionated, fast, and willing to recommend ONE path instead of surveying five.
 
-Three artifacts live in this skill's scope:
+Four artifacts live in this skill's scope:
 
+- **Mission statement (MISSION.md)** (interview mode) — the project's north
+  star. WHY this exists. Created first, before SPEC.md. Pushed to repo root.
+  Authority document — SPEC.md and PLAN.md serve it, not the other way around.
 - **Build plan** (express mode) — short markdown naming stack, data model,
   build sequence, risks. Chat: written to `/mnt/user-data/outputs/build-plan-<slug>.md`
   and presented. Code: written to CWD. Not pushed by default.
-- **Product spec (SPEC.md)** (interview mode) — functional requirements at the repo root. WHAT to build. Pushed via git-ops.
+- **Product spec (SPEC.md)** (interview mode) — functional requirements at the repo root. WHAT to build. References MISSION.md as authority. Pushed via git-ops.
 - **Technical plan (PLAN.md)** (interview mode) — maps each spec step to a technical approach: APIs, data flows, validation, pass criteria. HOW to approach it. Does NOT prescribe executor tooling. Pushed alongside SPEC.md.
 
 Pick the mode up front. Don't blend them.
@@ -120,6 +123,7 @@ Rules:
 - Honest time estimates.
 - **Include human action steps.** If a step requires Baylee's hands (install a skill in Claude settings, set an env var, click a dashboard button, approve a deploy), mark it `Actor: baylee`. These cannot be skipped or collapsed into a Claude step — real work with real dependencies.
 - **Route to specialized skills.** If a step falls in another skill's domain, name it: `Route: skill-creator-b` for skill modifications, `Route: ship-it` for deployment, `Route: git-ops` for repo pushes. Prevents the builder from ad-hoc reimplementing a workflow that already has a tested skill path.
+- **Consumer-facing UI → Gemini.** If the project has a UI and audience type = `consumer-facing`, at least one step should route UI component design to Gemini (AI Studio, Stitch, or MCP server). Claude handles data layer, logic, and integration. See `references/ux-quality-gates.md § Model Routing`.
 
 ### Phase 5 — Risk & AI collaboration
 
@@ -154,13 +158,44 @@ Default: chain to the build skill. State *"Plan complete — chaining to build."
 
 Produces `SPEC.md` at the repo root. Target 400-900 lines. Under 300 means something's missing; over 1,200 means it's bleeding into architecture territory.
 
+### Phase M — Mission interview (first, before spec)
+
+MISSION.md is the project's north star — it answers WHY before SPEC.md answers
+WHAT. Create it first. Five questions, one turn:
+
+1. **Why does this exist?** — The problem or opportunity in 1-2 sentences.
+2. **Who is it for?** — Named person or specific audience segment.
+3. **What does success look like?** — One measurable north-star outcome.
+4. **What are we NOT doing?** — 2-3 explicit anti-goals that bound the project.
+5. **What principles guide tradeoffs?** — 2-3 rules for resolving competing
+   priorities (e.g. "speed over polish", "privacy over convenience").
+
+Pre-fill from memory and conversation context. Present as proposals to correct,
+not blank questions. If the project already has a `MISSION.md`, read it via
+git-ops and ask what's changed — don't re-interview from scratch.
+
+**MISSION.md template:**
+
+```markdown
+# [Project] — Mission
+**Why this exists:** [1-2 sentences: the problem or opportunity]
+**Who it's for:** [Named person or specific audience]
+**What success looks like:** [One measurable north-star outcome]
+**What we are NOT doing:** [2-3 anti-goals, bulleted]
+**Tradeoff principles:** [2-3 rules, bulleted]
+```
+
+Push to repo root immediately — don't wait for the spec.
+
 ### SDD level
 
 Default to **spec-anchored** (spec + code both in repo, both version-controlled, spec updates when behavior changes). Only ask explicitly if the project has unusual rigor requirements (safety-critical, contract-bound).
 
 ### Budget
 
-4-6 interview *turns* (a turn batches 2-3 questions). Use `ask_user_input_v0` with single_select or multi_select options where possible; reserve free text for identity and flow.
+5-7 interview *turns* (a turn batches 2-3 questions). One turn for mission,
+4-6 for spec. Use `ask_user_input_v0` with single_select or multi_select
+options where possible; reserve free text for identity and flow.
 
 ### Phase 0 — Bootstrap
 
@@ -187,6 +222,7 @@ Extract:
 - **Problem statement** — concrete pain, 2-4 sentences
 - **Non-goals** — at least 2
 - **Success criteria** — 2-4 measurable statements
+- **Audience type** — `internal` (personal tool, dashboard) or `consumer-facing` (public users). Gates UX quality steps in Phase 3 user stories, Phase 6 UX plan steps, and ship-it Phase 2.5. Default: infer from primary user. If Baylee is the only user, it's internal.
 
 **Pre-fill defaults from memory:** user = "just me" or "me + family"; platforms = iPhone primary, PC secondary; hosting = Vercel.
 
@@ -204,6 +240,8 @@ Extract:
 - **Happy-path user flow** — 3-7 numbered steps
 - **Functional requirements** — 8-15 FR-### statements, each "System MUST [verb] [object]"
 - **Edge cases** — at least 2 named failure modes with expected behavior
+
+**User stories (consumer-facing only — adds 1 interview turn).** Skip for internal tools. After extracting entities and user flow, propose 3-4 named personas and draft 5-8 user stories with acceptance criteria. Present to Baylee for correction — he knows whether the personas reflect real behavior. Stories drive FRs, so revise FRs after story alignment. Format, quality framework, and common LLM failure modes in `references/ux-quality-gates.md`.
 
 Propose rather than ask blind: after Phase 2 you should be able to *draft* FRs and entities and ask Baylee to correct.
 
@@ -250,14 +288,34 @@ After spec is accepted, generate `PLAN.md` — the implementation roadmap. Each 
 
 **Route field prevents ad-hoc reimplementation.** Skill modifications route through `skill-creator-b`. Deployments route through `ship-it`. Repo pushes route through `git-ops`.
 
+**Consumer-facing UX steps.** When audience type = `consumer-facing`, include these steps at the specified insertion points:
+
+1. **UX design intent** (insert after data layer / before UI build). Review user stories against the proposed UI structure. For each story, trace the user's path. Flag any story requiring >3 taps to reach the core value moment. `Actor: claude`. Pass criteria: every story has a traceable UI path.
+
+2. **UI component generation via Gemini** (insert at UI build time). Gemini consistently outperforms Claude on visual design quality (WebDev Arena, dashboard benchmarks, landing page tests). Route UI component design to Gemini — Claude handles data layer, business logic, and integration. Surfaces: Google AI Studio (paste spec + user stories + reference screenshots), Gemini MCP server (Claude Code calls Gemini), or Google Stitch (wireframe → polished UI). Claude integrates Gemini's output with data/logic and handles architectural coherence. `Actor: both` `Route: see references/ux-quality-gates.md § Model Routing`.
+
+3. **Heuristic UX review** (insert after UI is built / before deploy). Cross-model review of the built interface. Use domain-specific heuristics (not just Nielsen's generic 10) — see `references/ux-quality-gates.md` for health-literacy, civic-tech, and e-commerce heuristic sets. Plus Flesch-Kincaid readability (≤8th grade for public-good, ≤10th for dev tools), plain language scan (no jargon in user-facing text). **Surface routing:** In chat — output a copy-paste prompt for Google AI Studio with screenshots. In Claude Code — use `delegate-adversarial` with URL Context. `Actor: claude | baylee`. Pass criteria: no severity-3 heuristic violations, UI text at target grade level.
+
+4. **Device walkthrough** (insert before launch). Walk every user story on target device(s) — mobile-first for Baylee's projects. `Actor: baylee | both`. Pass criteria: every story completes on mobile, touch targets ≥44px, no horizontal scroll.
+
 Push `PLAN.md` alongside `SPEC.md` in the same commit.
+
+### Self-check before delivery (PLAN.md)
+
+- [ ] Every step has `Actor: claude | baylee | both`
+- [ ] Every `Route:` field references a real skill name
+- [ ] Steps involving skill file modifications route through `skill-creator-b`
+- [ ] If consumer-facing: Gemini UI generation step present
+- [ ] If consumer-facing: heuristic UX review step present with surface routing
+- [ ] If consumer-facing: device walkthrough step present with `Actor: baylee | both`
+- [ ] Pass criteria are specific and verifiable (not "looks good" or "works well")
 
 ### Phase 7 — Push + vault update
 
 Route through **git-ops**:
 
-- File: `SPEC.md` + `PLAN.md` at repo root
-- Commit: `spec: initial product spec` (or `spec: update <section>` for revisions)
+- File: `MISSION.md` + `SPEC.md` + `PLAN.md` at repo root
+- Commit: `spec: initial mission + product spec` (or `spec: update <section>` for revisions)
 - Target: the project's repo
 
 Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.md`):
@@ -273,6 +331,7 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 
 **Status:** draft | active | deprecated
 **SDD Level:** spec-anchored
+**Mission:** See [MISSION.md](MISSION.md) (authority for why this project exists)
 **Created:** YYYY-MM-DD
 **Last updated:** YYYY-MM-DD
 **Repo:** fairbay/...
@@ -324,6 +383,11 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 3. [Core value]
 4. [Exit]
 
+### User Stories (consumer-facing only)
+- **US-001**: As a [persona], I want to [action], so that [outcome].
+  - *Given* [context], *when* [action], *then* [result].
+- **US-002**: ...
+
 ### Functional Requirements
 - **FR-001**: System MUST ...
 - **FR-002**: System MUST ...
@@ -365,6 +429,8 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 
 ### Self-check before delivery (interview mode)
 
+- [ ] MISSION.md created and pushed (or existing MISSION.md reviewed)
+- [ ] SPEC.md header references MISSION.md as authority
 - [ ] Identity sentence is concrete (no "leverage", "ecosystem", "seamless")
 - [ ] Primary user is a named person, not "users"
 - [ ] Problem describes pain, not a solution
@@ -379,6 +445,8 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 - [ ] Out of scope: ≥3 explicitly killed
 - [ ] `[NEEDS CLARIFICATION]` count: ≤3
 - [ ] Under 900 lines
+- [ ] If consumer-facing: user stories present, ≥5, Baylee reviewed personas, each has acceptance criteria, QUS-checked (Independent, Unique, Unambiguous — the 3 criteria LLMs fail most)
+- [ ] If consumer-facing: PLAN.md includes UX design intent + Gemini UI generation + heuristic review + device walkthrough steps
 
 ---
 
@@ -423,6 +491,6 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 
 End the delivery message with:
 
-> **For future sessions:** The spec is now at `[repo]/SPEC.md` and the plan at `PLAN.md`. Any change to behavior should update `SPEC.md` in the same commit as the code change (spec-anchored rule). New work on this project: read PLAN.md first (build skill), or SPEC.md if no PLAN exists.
+> **For future sessions:** The mission is at `[repo]/MISSION.md`, the spec at `SPEC.md`, and the plan at `PLAN.md`. MISSION.md is the authority — SPEC.md and PLAN.md serve it. Any change to behavior should update `SPEC.md` in the same commit as the code change (spec-anchored rule). New work on this project: read PLAN.md first (build skill), or SPEC.md if no PLAN exists. If the build drifts from MISSION.md, flag it.
 
 This trains future Claude sessions and Baylee himself to treat SPEC.md / PLAN.md as the first read on this project.

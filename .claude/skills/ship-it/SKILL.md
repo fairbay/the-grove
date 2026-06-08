@@ -5,7 +5,7 @@ description: >
   "Claude Code handoff". Not for fixes to live sites (→ git-ops), prototyping
   (→ build), or planning (→ architect).
 metadata:
-  version: "2026-06-02-01"
+  version: "2026-06-03-02"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -53,6 +53,49 @@ Default for Baylee: **Vercel** (his stack lives there; auto-deploy on push to `m
 | PWA (offline, home-screen) | Vercel | — |
 
 For broader comparison, see `references/deployment-options.md`.
+
+### Phase 2.5 — Launch readiness (public-facing projects only)
+
+Skip for personal tools, internal dashboards, or projects Baylee labels
+"just deploy." Run for anything aimed at real external users.
+
+Check each item. Fix what Claude can fix directly; list what needs Baylee.
+
+1. **License.** Does the repo have a LICENSE file or a license declared in
+   README/package.json? Public-good projects need one. Recommend MIT for code,
+   CC BY 4.0 for data, unless Baylee specifies otherwise.
+2. **README freshness.** Do key numbers in README (benefit counts, state
+   counts, feature lists) match reality? If stale, update in the same commit
+   as the deploy prep.
+3. **Error handling.** For React SPAs: is there an error boundary wrapping the
+   app root? A single crash in any component should not white-screen the user.
+   For other stacks: equivalent top-level error handling.
+4. **Accessibility baseline.** Interactive elements have ARIA labels, focus is
+   managed between views, skip-nav exists, keyboard navigation works. This is
+   a scan, not a full audit — flag obvious gaps.
+5. **Analytics.** Any usage visibility at all? Even Vercel Analytics (zero-
+   config) or a privacy-respecting alternative. Without this, there's no
+   signal on whether anyone uses the product.
+6. **Meta tags / SEO.** OG title + description, favicon, viewport. For public-
+   good tools: does the meta description say what the tool does in terms a
+   search user would type?
+7. **Design heuristic check.** Run domain-specific heuristics (not just
+   Nielsen's 10) against the live site — see
+   `architect/references/ux-quality-gates.md` for health-literacy, civic-tech,
+   and e-commerce sets. **Surface routing:** In chat — output a copy-paste
+   prompt for Google AI Studio with screenshots. In Claude Code — use
+   `delegate-adversarial` with URL Context. Present findings in the same
+   table format as items 1-6.
+8. **Plain language / readability.** Scan all user-facing text for jargon and
+   reading level. Target: ≤8th grade Flesch-Kincaid for public-good tools,
+   ≤10th grade for developer tools. Flag domain terms that appear in UI
+   labels or instructions (e.g. "MCO", "VAS", acronyms without expansion).
+9. **User story walkthrough.** If the project has user stories (SPEC.md or
+   PLAN.md), walk each on the live site. Verify the happy path completes.
+   Note any story that can't be completed or takes more steps than expected.
+
+Present findings as a short table: item | status | action needed. Fix what's
+fixable, then proceed to Phase 3.
 
 ### Phase 3 — Deploy checklist
 

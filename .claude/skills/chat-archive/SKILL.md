@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-08-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -83,6 +83,19 @@ presented, fixes not implemented. TODOs live in Grove, not in Claude's
 context — this is a conversation scan only.
 
 If anything is open: resolve it before continuing.
+
+#### 2a. Doc-drift check
+
+If this session changed data or metrics that external-facing docs reference
+(README benefit counts, state counts, category counts, API column lists,
+schema descriptions), read those docs and check whether they're still
+accurate. Common drift targets: `README.md` key numbers, `docs/API.md`
+column references, any "Key Numbers" or "Data Scope" section. If stale,
+update in the same commit as other session artifacts.
+
+This is not a full audit — just the docs that reference quantities or facts
+this session changed. Skip if the session was planning-only with no data or
+code changes.
 
 ### 3. Gather and apply learnings
 
@@ -166,7 +179,7 @@ Concise, scannable:
 - **What changed** — vault updates, memory edits (list by number), skill
   modifications
 - **Key decisions** — architectural choices, ideas shelved/killed, strategy
-  shifts
+  shifts. These feed `decisions_made:` in the handoff (Step 9).
 - **What didn't work** — failed approaches worth remembering
 
 **Retro format (when applicable):** If the session surfaced a process lesson,
@@ -284,6 +297,31 @@ See `references/handoff-schema.md` for the build vs session decision, the
 full YAML schema, CLAUDE.md maintenance, delivery via git-ops, and the
 no-blurb resumption convention.
 
+#### 9a. Populate `decisions_made:`
+
+Scan the session for every Rung 3 autonomous decision — architectural choices,
+scope calls, library picks, tradeoff resolutions made without Baylee's explicit
+input. For each, record: `decision`, `rationale`, `alternatives`, `confidence`
+(high/medium/low), `reversible` (true/false). Skip trivial implementation
+details. session-start surfaces these in the next session's briefing, flagging
+low-confidence and irreversible decisions for review.
+
+**Push-failure fallback.** If the git-ops push fails (network error, timeout,
+auth issue):
+
+1. **Report the error explicitly.** Never write "skipped" without stating the
+   actual error. "No repo access" without a stack trace is not acceptable.
+2. **Retry once** with a fresh API call.
+3. **If still failing,** update the project's Grove idea or task notes with the
+   handoff YAML content via Grove MCP. Grove is always accessible. Prefix with
+   `## Session Handoff (YYYY-MM-DD)` so session-start can find it.
+4. **Tell Baylee** the handoff landed in Grove instead of operating-manual, so
+   the next session knows where to look.
+
+The handoff must reach persistent storage. Local filesystem
+(`/mnt/user-data/outputs/`) resets between sessions — a file only there is
+gone next session.
+
 ### 10. Rename chat (chat only)
 
 **Skip in Code / Routines** — no chat to rename.
@@ -312,7 +350,8 @@ fails, say so explicitly.
 - [ ] Meta-analysis pass done (3a)?
 - [ ] Encoding gate cleared — every finding has a routing decision?
 - [ ] Memory edits applied — folds attempted first, count under 12?
-- [ ] Handoff generated and pushed (build, session, or both)?
+- [ ] `decisions_made:` populated with all Rung 3 decisions from session?
+- [ ] Handoff generated and pushed (build, session, or both)? If push failed, fallback to Grove?
 - [ ] CLAUDE.md updated (if architecture/stack/structure changed)?
 - [ ] Summary written from verified read-backs, not memory?
 - [ ] **"Next step:" line in response body?** (mandatory, even if nothing)

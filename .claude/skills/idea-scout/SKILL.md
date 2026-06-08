@@ -5,7 +5,7 @@ description: >
   Not project features (→ add-to-do), building (→ architect), saving
   (→ idea-vault), batch (→ brainstorm-engine).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-05-28-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -111,6 +111,12 @@ landscape quality — never sacrifice a search to stay under a total-call target
 If you feel time or context pressure, cut overhead or report length, never
 research.
 
+**Gemini budget:** up to 3 cross-model calls per scout (~$0.05-0.08 total):
+Phase 0b demand pre-check (Flash, ~$0.01), Phase 2c supplemental research
+(Flash, conditional, ~$0.01), Phase 4b score audit (Pro, ~$0.03). The score
+audit is mandatory; 0b and 2c are conditional per their trigger rules. Gemini
+calls are overhead — they do not count against the web search budget.
+
 ---
 
 ## Workflow
@@ -135,6 +141,38 @@ If the problem reframes, note it — the reframed version may point to a
 different (better) solution, a different competitive landscape, or different
 search terms for Phase 2. Proceed to Phase 1 with the clearest problem
 statement and the list of problem-class instances.
+
+### Phase 0b: Cross-model demand pre-check (1 Gemini call)
+
+Before investing 8-12 searches, get an independent demand signal from Gemini
+with search grounding. This uses a different search index and ranking algorithm
+than Claude's web search — it surfaces demand evidence Claude may miss.
+
+```python
+import sys
+sys.path.insert(0, '/mnt/skills/user/delegate-adversarial/scripts')
+from gemini import research, GeminiError
+
+try:
+    output, usage = research(
+        query=f'Is there real demand for a tool that solves: {problem_statement}? '
+              f'Look for: forum complaints, Reddit threads, workarounds people use, '
+              f'willingness-to-pay signals. Focus on evidence, not speculation.',
+        format_hint='Return JSON: {"demand_signals": [{"source": "...", "signal": "...", '
+                    '"strength": "strong|moderate|weak"}], "red_flags": ["..."]}',
+        model='gemini-2.5-flash',  # flash is fine for demand checks
+    )
+except GeminiError as e:
+    # Non-blocking — log and continue. Demand pre-check is supplemental.
+    print(f"Gemini demand check failed: {e}")
+```
+
+**This is supplemental, not blocking.** If the call fails, note it and proceed.
+If it returns strong signals, carry them into Phase 2 as search leads. If it
+returns red flags (e.g. "this problem was solved by X in 2024"), investigate
+immediately — it may reframe the entire scout.
+
+Report as one line in the deliverable: "Gemini demand pre-check: [summary]."
 
 ### Phase 1: Sanity check
 
@@ -218,6 +256,34 @@ not self-assessed. List what you actually did:
    gap claim? If you're about to enter Phase 3 asserting "nobody does X,"
    did you try hard to prove yourself wrong?
 
+### Phase 2c: Gemini supplemental research (conditional)
+
+**Trigger:** run this when Phase 2 solution searches found fewer than 3
+competitors AND the Phase 0b demand pre-check surfaced signals. A thin
+competitive landscape with real demand is exactly when a second search index
+matters most — you may be missing competitors that Google surfaces differently.
+
+```python
+from gemini import research
+
+output, usage = research(
+    query=f'What products, tools, startups, or open-source projects solve: '
+          f'{problem_statement}? Include failed or shut-down attempts.',
+    format_hint='Return JSON: {"competitors": [{"name": "...", "url": "...", '
+                '"status": "active|dead|acquired", "relevance": "direct|adjacent"}], '
+                '"failed_attempts": ["..."]}',
+    model='gemini-2.5-flash',
+)
+```
+
+Merge findings into Phase 2 landscape. If Gemini surfaces competitors Claude
+missed, add them to the solution search results and adjust the gap analysis
+accordingly. If Gemini confirms the gap, note it as independent corroboration.
+
+**Skip when:** Phase 2 already found 3+ direct competitors (landscape is well-
+mapped), or Phase 0b returned no demand signals (thin research on a low-demand
+idea isn't worth the call).
+
 ### Phase 3: Gap & Opportunity Analysis
 
 Before scoring, synthesize what the research revealed. Score quality is a
@@ -278,6 +344,80 @@ Quick reminder of the three lenses:
   specifically build and maintain it?
 
 Each lens reports as a percentage. ≥56% = High; <56% = Low.
+
+### Phase 4b: Cross-model score audit (automatic)
+
+**Not optional.** After scoring, delegate the scores + evidence summary to
+Gemini Pro for independent audit. Same-model scoring has correlated errors —
+systematic inflation, sycophantic agreement with the proposer, circular
+reasoning where the score justification restates the score. Cross-family
+audit catches these.
+
+```python
+from gemini import call, GeminiError
+
+# Build the audit payload from Phase 3 synthesis + Phase 4 scores
+audit_payload = f"""You are an independent auditor reviewing scores generated
+by another AI model (Claude). The model scored a startup idea and may have:
+- Inflated scores to be encouraging (sycophancy)
+- Used circular reasoning (justification restates the score)
+- Awarded high Gap scores without sufficient competitive evidence
+- Ignored structural barriers that explain why the gap exists
+- Scored Need/Depth high based on the proposer's conviction rather than evidence
+
+IDEA: {idea_title}
+PROBLEM: {problem_statement}
+
+SCORES:
+Impact: {impact_pct}% ({impact_details})
+Business: {business_pct}% ({business_details})
+Sustainability: {sustainability_pct}% ({sustainability_details})
+
+EVIDENCE SUMMARY:
+{phase3_synthesis}
+
+RESEARCH: {search_count} web searches, {competitor_count} competitors found.
+
+Audit each lens. Return ONLY a JSON object:
+{{
+  "issues": [{{"lens": "impact|business|sustainability",
+               "dimension": "...", "severity": "CRITICAL|MODERATE|MINOR",
+               "issue": "...", "suggested_adjustment": "+N or -N points"}}],
+  "verdict_check": "agree|disagree",
+  "verdict_note": "..."
+}}"""
+
+try:
+    output, usage = call(
+        system='You are a score auditor. Find inflation, circular reasoning, '
+               'and unsupported claims. Do not validate — challenge.',
+        user=audit_payload,
+    )
+except GeminiError as e:
+    # Non-blocking — log and continue with original scores
+    print(f"Score audit failed: {e}")
+    output = None
+```
+
+**Processing audit results:**
+
+- **CRITICAL issues:** adjust the score. If Gemini identifies a dimension
+  scored 7+ with insufficient evidence, cap it per the evidence-to-claim
+  proportionality rule. Note the adjustment: "Gemini audit: [dimension]
+  reduced from X to Y — [reason]."
+- **MODERATE issues:** note in the report but don't auto-adjust. Present to
+  Baylee as a flag.
+- **Verdict disagreement:** if Gemini disagrees with the verdict mapping
+  (e.g. audit says Business should be Low when Claude scored it High), flag
+  prominently. This is the highest-signal finding — it means the verdict
+  cell may be wrong.
+
+Report as a section in the deliverable: "**Cross-model audit:** Gemini Pro
+reviewed scores — [N] issues ([critical] critical). [Summary of adjustments]."
+
+**If the audit changes the verdict:** recalculate the verdict from adjusted
+scores and note both: "Original verdict: [X]. Post-audit verdict: [Y]."
+The post-audit verdict is authoritative.
 
 ### Phase 5: Verdict + track
 
@@ -373,6 +513,9 @@ Structure:
 2. Score tables — all three lenses for original idea (with justifications per
    dimension)
 3. Verdict + track assignment
+3b. **Cross-model audit** — Gemini Pro findings: issues found, score
+    adjustments made, verdict agreement/disagreement. If post-audit verdict
+    differs from original, both are shown.
 4. Pivot comparison table (all three lenses per pivot)
 5. Pivot descriptions (2-3 sentences each)
 6. Landscape (organized by category)
@@ -388,7 +531,8 @@ dimension scores visible? Floor rules checked? Calibration warnings applied
 (Need, Depth, Defensibility)? All pivots scored through all three lenses?
 User voice section present? Build scope under 300 words? Track assignment
 stated? Next step included in initial response (not just report)? Verdict
-matches the 8-cell matrix correctly?
+matches the 8-cell matrix correctly? **Phase 4b score audit completed and
+results reflected in scores/verdict?**
 
 **Constraints:** under 2,500 words. Direct, first-person style. File naming:
 `idea-scout-[short-slug].md`. Deliver via `present_files` (chat) or inline
@@ -492,3 +636,6 @@ have my scouts been?"
 - **→ pitch-crafter:** Mirage seed plan often hands off here for the writeup.
 - **→ review-panel:** calibration review at 10+ scouted ideas.
 - **→ delegate-mechanical:** offload heavy reads during Phase 2 research.
+- **→ delegate-adversarial (Gemini):** Phase 0b demand pre-check, Phase 2c
+  supplemental research, Phase 4b score audit. Cross-family independence is
+  the primary defense against systematic scoring bias.

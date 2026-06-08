@@ -5,7 +5,7 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-08-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -13,13 +13,16 @@ metadata:
 
 Not a plan. Not a report. A thing you can use.
 
-## Phase 0: Read the plan (if one exists)
+## Phase 0: Read the plan and mission (if they exist)
 
-Before any other work, check for a plan in this order:
+Before any other work, check for planning artifacts in this order:
 
-1. **In-context plan from architect express mode** — if the previous turn produced a `build-plan-<slug>.md`, that's the plan. Use it directly. Do not re-read from disk.
-2. **`PLAN.md` in the repo** — if the repo is known, read `PLAN.md` via git-ops. This is the interview-mode artifact, pushed alongside SPEC.md.
-3. **Neither exists** — fall back to SPEC.md (if present), or reason from conversation context. Valid for unplanned projects.
+1. **`MISSION.md` in the repo** — if the repo is known, read `MISSION.md` via
+   git-ops. This is the authority document — the "why" that all build work
+   serves. Keep it in context for alignment checkpoints.
+2. **In-context plan from architect express mode** — if the previous turn produced a `build-plan-<slug>.md`, that's the plan. Use it directly. Do not re-read from disk.
+3. **`PLAN.md` in the repo** — if the repo is known, read `PLAN.md` via git-ops. This is the interview-mode artifact, pushed alongside SPEC.md.
+4. **Neither plan exists** — fall back to SPEC.md (if present), or reason from conversation context. Valid for unplanned projects.
 
 If a plan exists (either form): it prescribes the technical approach for each step — which APIs, data flows, validation methods. **Follow the plan's approach.** Do not re-derive from the spec.
 
@@ -44,6 +47,27 @@ If a plan exists (either form): it prescribes the technical approach for each st
 - **Route pushes through git-ops's push protocol** (`git-ops/references/push-protocol.md`). Don't improvise push mechanics.
 - **Durable images: generate → store → embed.** HF image tools return temp URLs that 404 within minutes. Generate freely for preview, but any image destined for a persisted artifact, page, or doc must be stored via the image-store endpoint first — embed the permanent `publicUrl`, never a raw HF temp URL. Flow + endpoint + key: `references/image-store.md`.
 - **Quality tier awareness.** Most prototypes are T1 (state limits, sanity check). Quantitative or public-facing → escalate to T2+. Disclose the tier.
+
+## Alignment checkpoints
+
+**If you are about to move from one phase to the next, pause and check
+alignment.** Re-read MISSION.md (if it exists) and the current step's pass
+criteria from PLAN.md or SPEC.md. Ask:
+
+1. **Does what I just built still serve the mission?** If the build is solving
+   a different problem than MISSION.md states, flag the drift before proceeding.
+2. **Am I still within spec scope?** If I added capabilities not in SPEC.md or
+   dropped requirements that are in it, name the deviation.
+3. **Is the next phase still the right move?** Build context sometimes reveals
+   that a later phase should come first, or that a phase is now unnecessary.
+
+If drift is detected: state what drifted, whether the mission/spec should be
+updated or the build corrected, and proceed with Baylee's confirmation for
+non-trivial deviations. Trivial deviations (implementation detail, same outcome
+via different approach) — note and continue.
+
+Checkpoints apply between: Phase 3→4, Phase 5→6, Phase 7→8, Phase 8→9.
+Skip for phases that are purely mechanical (lint, parse checks).
 
 ## Workflow
 
@@ -195,7 +219,7 @@ Vite project + Vercel. Sandbox "Load Failed" errors are unfixable.
 ## Integration
 
 - **← idea-scout:** Reuse scout's user voice data.
-- **← architect:** Read PLAN.md for approach guidance. The plan is the primary input, not the spec.
+- **← architect:** Read MISSION.md for north star, PLAN.md for approach guidance. The plan is the primary input, not the spec.
 - **← brainstorm-engine:** "Build that" → take over.
 - **→ systematic-test:** Phase 8 chain. Functional verification before declaring done.
 - **→ systematic-debug:** Bugs surfaced during build or test route here for root cause.
