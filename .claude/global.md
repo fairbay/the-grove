@@ -14,11 +14,33 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 
 1. **Aggressive asymmetric labor loading.** Every task defaults to Claude doing the work. Never design steps where Baylee runs commands, scripts, curl, or manual verification. If Claude has the tooling, Claude does it.
 2. **Do it first, mention after.** Never promise a future action — execute, then report the result.
-3. **Try to accomplish tasks directly before assigning to Baylee.** If truly impossible (requires physical device, App Store login, etc.), create a Grove task. All Grove task and idea notes must stand alone with full context — never assume chat history is available.
+3. **Exhaust the Decision Ladder before assigning to Baylee.** See the Decision Ladder section below. If a task truly requires Baylee (physical device, App Store login, real-world action), create a Grove task. All Grove task and idea notes must stand alone with full context — never assume chat history is available.
 4. **Run review-panel on completed artifacts before presenting.** If review-panel is unavailable, self-critique against original requirements. Same standard applies to post-feedback revisions.
 5. **Skip technical detail unless asked.** Baylee steers at the product level. Don't explain implementation mechanics, dump stack traces, or narrate internal reasoning. Surface: what changed, what works, what's next.
 6. **Present Baylee-only actions as numbered next steps.** Deep-link to the exact page (not just the site). Put any values Baylee needs to copy (env vars, commands, URLs) in code blocks.
 7. **Skills first.** When `.claude/skills/` contains a skill whose description matches the task, load and follow that skill's full SKILL.md workflow — don't handle it generically. Key matchups: session onboarding → `session-start`, writing code → `build`, fixing bugs → `systematic-debug`, pushing → `git-ops`, wrapping up → `chat-archive`.
+
+## Decision Ladder
+
+When you encounter a decision point during execution, follow this procedure in order. Do not skip rungs.
+
+1. **Consult project documentation** — SPEC.md, PLAN.md, MISSION.md, CLAUDE.md, HANDOFF decisions, and `docs/decisions/` if it exists. If in claude.ai, also read the Decision Ledger (persistent artifact storage).
+2. **Delegate to specialist** — Route the question to the appropriate lens before attempting to resolve it yourself or escalating. See Delegation Routing below.
+3. **Make the call and document it** — Record the decision in HANDOFF.yaml under `decisions_made:` with: the decision, rationale, alternatives considered, confidence (high/medium/low), and whether it's reversible. In claude.ai, also write it to the Decision Ledger. This is expected autonomous competence, not a failure.
+4. **Escalate to Baylee** — Only if truly unresolvable, irreversible, or mission-level. Present distilled: the decision needed, the context, and your recommendation.
+
+Rung 3 is the expected operating mode for most decisions. The ladder exists to ensure decisions are informed (Rung 1), considered from the right angle (Rung 2), and documented (Rung 3) — not to avoid making them.
+
+## Delegation Routing
+
+Before escalating any question to Baylee, determine if it can be routed to a specialist:
+
+- **UX / design judgment** → delegate-analytical (Sonnet)
+- **Risk, security, feasibility challenges** → delegate-adversarial (Gemini Pro)
+- **Fact-gathering, summarization, extraction** → delegate-mechanical (Haiku)
+- **Cross-model validation of important decisions** → delegate-independent (Gemini)
+
+Escalate to Baylee only for mission-level judgment, real-world actions he must perform, or decisions requiring his unique personal context. In claude.ai (where delegation skills aren't available as sub-agents), apply the same lens yourself: reason analytically for UX questions, adversarially for risk questions, mechanically for fact-gathering.
 
 ## Project Documentation
 
