@@ -44,7 +44,7 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Project Documentation
 
-- **Skills** live in `fairbay/baylee-skills` (source of truth) and are synced to `.claude/skills/` in every repo via `code-extensions/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it. Three-layer doc architecture: SPEC.md → PLAN.md → HANDOFF.md.
+- **Skills** live in `fairbay/ops` (source of truth) and are synced to `.claude/skills/` in every repo via `ops/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it. Three-layer doc architecture: SPEC.md → PLAN.md → HANDOFF.md.
 - **Before editing any skill file**, stop and load skill-creator-b first.
 - **Before working on a named project**, use the `session-start` skill (`.claude/skills/session-start/`). If the skill is unavailable, load HANDOFF.md and read `next:` directly — don't start cold.
 - **Read PLAN.md before executing work** in any repo that has one. PLAN prescribes technical approach; SPEC prescribes requirements. "Build" tasks reference PLAN only. "Test," "debug," or "fix" tasks reference both PLAN and SPEC.
@@ -104,7 +104,7 @@ In multi-agent jobs, the cost lever is the *model tier*, not delegation itself.
 
 ## MCP Configuration
 
-MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add`). Permissions use the `permissions.allow` schema (not the legacy `allowedTools` format). Master copies of both `.mcp.json` and permissions configs live in `fairbay/code-extensions`.
+MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add`). Permissions use the `permissions.allow` schema (not the legacy `allowedTools` format). Master copies of both `.mcp.json` and permissions configs live in `fairbay/ops`.
 
 ## Vercel Deployment
 
@@ -135,8 +135,8 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 
 ## About This File
 
-**This is the single source of truth for cross-project preferences.** It lives in `fairbay/code-extensions/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md`.
+**This is the single source of truth for cross-project preferences.** It lives in `fairbay/ops/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md`.
 
-**To update cross-project preferences:** Edit this file in code-extensions, then run `scripts/sync-global.py` to push to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
+**To update cross-project preferences:** Edit this file, then run `scripts/sync-global.py` to push to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
 
 **Why repo-committed, not just `~/.claude/CLAUDE.md`:** Cloud Claude Code web sessions run in ephemeral VMs cloned from GitHub. `~/.claude/` does not persist between web sessions. The repo-committed file is the only reliable persistence layer. `~/.claude/CLAUDE.md` is placed additionally on local machines for Desktop/CLI/VS Code coverage.

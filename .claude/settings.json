@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'P=\"$HOME/.local/bin/session_handoff.py\"; if [ ! -f \"$P\" ]; then mkdir -p \"$(dirname \"$P\")\" && curl -fsSL -H \"Authorization: Bearer $GITHUB_PAT\" https://raw.githubusercontent.com/fairbay/baylee-skills/main/scripts/session_handoff.py -o \"$P\" 2>/dev/null; fi; [ -f \"$P\" ] && exec python3 \"$P\" inject; exit 0'"
+            "command": "sh -c 'P=\"$HOME/.local/bin/session_handoff.py\"; if [ ! -f \"$P\" ]; then mkdir -p \"$(dirname \"$P\")\" && curl -fsSL -H \"Authorization: Bearer $GITHUB_PAT\" https://raw.githubusercontent.com/fairbay/ops/main/scripts/session_handoff.py -o \"$P\" 2>/dev/null; fi; [ -f \"$P\" ] && exec python3 \"$P\" inject; exit 0'"
           }
         ]
       }

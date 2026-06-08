@@ -7,7 +7,7 @@ description: >
 metadata:
   version: "2026-06-03-02"
 ---
-**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/baylee-skills` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
+**Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # ship-it — deploy or hand off
 
@@ -108,11 +108,11 @@ Tailor it, number it, make it copy-pasteable.
 5. **Supabase keep-alive** (if project uses Supabase free tier) — push `.github/workflows/supabase-keep-alive.yml` (template in `CONVENTIONS.md § Infrastructure Patterns`) and add three GitHub Actions secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_PING_TABLE` (any table in the public schema). Trigger manually once to verify. Without this, free-tier projects pause after 7 days of no database activity.
 6. **Claude infrastructure setup** (for repos that will use Claude Code or
    have skills synced). Create `.claude/global.md` (copy from
-   `fairbay/code-extensions/global-CLAUDE.md`), ensure root `CLAUDE.md`
+   `fairbay/ops/global-CLAUDE.md`), ensure root `CLAUDE.md`
    starts with `@.claude/global.md`, and create `.claude/settings.json`
    with the SessionStart hook (template in CONVENTIONS.md § Session-
    continuity gates). **Then sync skills immediately** — read all files
-   from `fairbay/baylee-skills/.claude/skills/` via git-ops and push them
+   from `fairbay/ops/.claude/skills/` via git-ops and push them
    to the new repo's `.claude/skills/` in the same commit (or the next).
    Do not defer to a future `sync-skills.py` run; the repo needs skills
    before its first Claude Code session.
