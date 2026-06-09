@@ -24,7 +24,7 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 
 When you encounter a decision point during execution, follow this procedure in order. Do not skip rungs.
 
-1. **Consult project documentation** — SPEC.md, PLAN.md, MISSION.md, CLAUDE.md, HANDOFF decisions, and `docs/decisions/` if it exists. If in claude.ai, also read the Decision Ledger (persistent artifact storage).
+1. **Consult project documentation** — MISSION.md, SPEC.md, PLAN.md, BRIEF.md, CLAUDE.md, HANDOFF decisions, and `docs/decisions/` if it exists. If in claude.ai, also read the Decision Ledger (persistent artifact storage).
 2. **Delegate to specialist** — Route the question to the appropriate lens before attempting to resolve it yourself or escalating. See Delegation Routing below.
 3. **Make the call and document it** — Record the decision in HANDOFF.yaml under `decisions_made:` with: the decision, rationale, alternatives considered, confidence (high/medium/low), and whether it's reversible. In claude.ai, also write it to the Decision Ledger. This is expected autonomous competence, not a failure.
 4. **Escalate to Baylee** — Only if truly unresolvable, irreversible, or mission-level. Present distilled: the decision needed, the context, and your recommendation.
@@ -44,10 +44,12 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Project Documentation
 
-- **Skills** live in `fairbay/ops` (source of truth) and are synced to `.claude/skills/` in every repo via `ops/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it. Three-layer doc architecture: SPEC.md → PLAN.md → HANDOFF.md.
+- **Skills** live in `fairbay/ops` (source of truth) and are synced to `.claude/skills/` in every repo via `ops/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it.
+- **Doc skeleton hierarchy:** MISSION.md (authority, WHY) → SPEC.md (requirements, WHAT) → PLAN.md (technical approach, HOW). BRIEF.md is the lightweight alternative — when no planning artifacts exist, the build skill generates one from 5 interview questions. Not every project needs all layers; BRIEF.md is valid on its own for small or early-stage work. HANDOFF.yaml is session state (who worked last, what's next), not part of the doc skeleton.
+- **Interview-mode engagement is the documentation trigger.** If a topic is worth interviewing about, the output becomes a durable artifact, not ephemeral chat context. Architect creates MISSION/SPEC/PLAN via interview; build creates BRIEF.md via quick interview; brainstorm-engine captures ideas durably.
 - **Before editing any skill file**, stop and load skill-creator-b first.
 - **Before working on a named project**, use the `session-start` skill (`.claude/skills/session-start/`). If the skill is unavailable, load HANDOFF.md and read `next:` directly — don't start cold.
-- **Read PLAN.md before executing work** in any repo that has one. PLAN prescribes technical approach; SPEC prescribes requirements. "Build" tasks reference PLAN only. "Test," "debug," or "fix" tasks reference both PLAN and SPEC.
+- **Read PLAN.md (or BRIEF.md) before executing work** in any repo that has one. PLAN prescribes technical approach; SPEC prescribes requirements; BRIEF.md covers both lightly for smaller projects. "Build" tasks reference PLAN (or BRIEF) only. "Test," "debug," or "fix" tasks reference both PLAN and SPEC (or BRIEF if no SPEC exists).
 - **If work reveals a spec, plan, or skill is wrong**, flag the conflict and propose the update — don't modify upstream artifacts without confirmation.
 
 ## Task & Idea Capture
