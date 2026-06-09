@@ -77,6 +77,8 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 - Prompt caching — use `cache_control: { type: "ephemeral" }` on stable system prompts.
 - Strip accumulated waste from context (large rendered content in message history).
 - Compact prompts — terse instruction language, no filler.
+- Extraction is classification, not generation — when extracting data from source documents, frame the task as selecting from source text (return verbatim quotes), not generating descriptions. Layer inference (normalization, categorization) as a separate stage. Training priors make models confidently extract plausible values that aren't in the source.
+- Provide source text in extraction prompts — include the actual source excerpt, not just a reference or URL. Single highest-impact lever for extraction accuracy.
 
 ## Agent Delegation & Token Efficiency
 
