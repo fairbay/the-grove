@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-06-08-01"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -78,8 +78,12 @@ Resolution order — use the first that resolves:
 3. **Session handoff:** list `fairbay/ops/handoffs/` via git-ops,
    filter filenames containing the project slug, read the most recent by date
    prefix.
-4. **Grove idea notes.** If Phase 1 found a Grove idea (pre-repo or otherwise)
-   and steps 1-3 found no handoff, read the idea via `grove_get`. If the
+4. **Project BRIEF.md:** If the repo has a `BRIEF.md` at root (created by the
+   build skill's lightweight interview), read it as planning context. BRIEF.md
+   is a valid standalone planning artifact for small or early-stage projects
+   that skipped architect.
+5. **Grove idea notes.** If Phase 1 found a Grove idea (pre-repo or otherwise)
+   and steps 1-4 found no handoff, read the idea via `grove_get`. If the
    idea's notes contain substantive context (architecture, build plan,
    decisions, scores), use them as the handoff-equivalent. Present in Phase 5
    as "picked up from Grove idea ([date])."
@@ -104,11 +108,14 @@ A handoff from days ago can be overridden by a more recent chat. Always check.
 3. If anything newer mentions the same project, flag before proceeding.
 4. If nothing newer, proceed.
 
-## Phase 4 — Load PLAN.md and CLAUDE.md
+## Phase 4 — Load PLAN.md (or BRIEF.md) and CLAUDE.md
 
 If the resolved repo has `PLAN.md`, read it via git-ops. This satisfies the
 "read PLAN.md before working on a repo" requirement so downstream skills (build,
 systematic-test, systematic-debug) don't refetch.
+
+If no PLAN.md exists but `BRIEF.md` does, read BRIEF.md instead — it serves as
+the lightweight planning artifact for projects that skipped architect.
 
 If PLAN.md is large (>3K tokens), note its presence and key section headings but
 don't dump full contents. Downstream skills delegate extraction for the specific
