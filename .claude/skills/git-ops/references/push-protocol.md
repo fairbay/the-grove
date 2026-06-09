@@ -67,6 +67,30 @@ CLAUDE.md push conventions — apply on every push from any skill:
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit. Without this, "is my new code live?" is guesswork.
 - **Regenerate `package-lock.json`** (`npm install`) if dependency sections changed, before committing — Vercel installs from the lockfile.
 
+### Claude Code web sessions (claude/* branch restriction)
+
+Claude Code web sessions are forced to push to `claude/*` branches — direct
+push to `main` is blocked. Use `push_and_merge()` as the default push path
+for these sessions:
+
+```python
+from git_push import push_and_merge
+
+sha, url = push_and_merge("fairbay/<repo>", "<message>", files)
+```
+
+This creates a temp branch, pushes, creates a PR, squash-merges, and deletes
+the branch — all in one call. The returned SHA and URL point to the merge
+commit on `main`. Vercel auto-deploys from the merge.
+
+**When to use:** Any push from a Claude Code web session to a repo where
+you want changes on `main`. The function auto-detects the need — if you're
+already on a `claude/*` branch, this is the right path.
+
+**Fallback:** If the merge fails (merge conflict, branch protection), the
+error message includes the PR URL. Report it to Baylee — the PR is open
+and can be manually merged.
+
 ## 6. Report the diff URL
 
 Always reply with the commit diff link. This is the primary review mechanism.

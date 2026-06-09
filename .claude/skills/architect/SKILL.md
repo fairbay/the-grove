@@ -5,7 +5,7 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-06-08-01"
+  version: "2026-06-09-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -43,7 +43,7 @@ Ask once, early, then commit:
 | "architect this", "how would I build this" | **express** | `build-plan-<slug>.md` |
 | "spec this", "write a SPEC.md", "PRD", "product spec" | **interview** | `SPEC.md` + `PLAN.md` pushed to repo |
 | Auto-chain from idea-scout (buildable verdict) | **express** by default | `build-plan-<slug>.md` |
-| User already has `SPEC.md`, wants implementation plan | **express** + read existing SPEC.md | `build-plan-<slug>.md` |
+| User already has `SPEC.md`, wants implementation plan | **plan-only** | `PLAN.md` pushed to repo |
 
 If ambiguous, propose: *"Quick architecture plan, or full spec interview? Express = 5 min, spec = 4-6 interview turns + pushed to repo."*
 
@@ -151,6 +151,28 @@ Rules:
 Default: chain to the build skill. State *"Plan complete — chaining to build."* unless the user said "just architect" or the plan flagged a blocking risk.
 
 **Hand-off mechanics:** Express mode produces `build-plan-<slug>.md` in `/mnt/user-data/outputs/`, NOT a repo-level `PLAN.md`. When auto-chaining, the plan content is in-context — pass it directly to build. Build's Phase 0 should use the in-context plan rather than reading PLAN.md via git-ops (which won't exist for express-mode projects). If the user asks to push the plan to the repo, route through git-ops as `PLAN.md` — but that's a user-initiated action, not the default.
+
+---
+
+## Mode A′: Plan-only (PLAN.md from existing SPEC.md)
+
+When the user already has a `SPEC.md` and wants an implementation plan without
+re-interviewing. Produces a proper `PLAN.md` pushed to the repo — not a
+temporary build-plan file.
+
+### Workflow
+
+1. **Read existing SPEC.md** from the repo via git-ops. Also read MISSION.md
+   if present.
+2. **Research before planning.** Run 1-2 web searches on current conventions
+   for the project's stack (same as express Phase 3).
+3. **Generate PLAN.md** using the interview-mode Phase 6 template and rules.
+   Every spec section maps to build steps with technical approaches. All Phase 6
+   rules apply: Actor fields mandatory, Route fields for specialized skills,
+   consumer-facing UX steps if applicable.
+4. **Self-check** using the Phase 6 PLAN.md checklist.
+5. **Push** `PLAN.md` to repo root via git-ops alongside SPEC.md.
+6. **Auto-chain to build** unless the user said "just plan."
 
 ---
 

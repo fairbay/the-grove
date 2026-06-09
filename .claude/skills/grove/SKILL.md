@@ -5,7 +5,7 @@ description: >
   "recent activity", browse ideas. Not for to-do capture (→ add-to-do) or
   scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -125,6 +125,18 @@ the most recent first. Useful for chat-status checkpoints and weekly review.
   `workhorse` / `fools_gold` / `lark` / `pass` (set by idea-scout)
 - `scores` — jsonb dict: `{"impact_pct": N, "business_pct": N, "sustainability_pct": N}`
 - `tags`, `notes`, `metadata` — optional
+
+## MCP failure handling
+
+If any Grove MCP call fails (timeout, connection error, server error):
+
+1. **Report the error explicitly.** Include the tool name and error message.
+2. **Retry once** with a fresh call.
+3. **If still failing,** surface the data that would have been written in the
+   response body so it's not lost. For ideas: title, notes, tags. For tasks:
+   title, list, notes, priority.
+4. **Never skip silently.** "Added to Grove" requires the MCP call to have
+   succeeded and returned an ID.
 
 ## Update and delete
 

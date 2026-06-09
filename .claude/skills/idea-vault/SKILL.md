@@ -5,7 +5,7 @@ description: >
   I build next". Not for scouting (→ idea-scout), capture (→ grove), or
   calibration (→ review-panel).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -151,6 +151,12 @@ calibrate inside this skill.
 
 `grove_update` with `status: "killed"`. **Requires a kill reason** written into
 `notes`. Don't delete — history is valuable.
+
+### Error handling for Grove writes
+
+If any `grove_update` or `grove_create_idea` call fails: retry once, then
+report the error explicitly with the data that would have been written.
+Never claim "updated" without a successful MCP response.
 
 ## Rendering (browse mode)
 

@@ -5,7 +5,7 @@ description: >
   security audit, score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-06-02-01"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -72,6 +72,14 @@ for a high-stakes scout, consider also delegating to Gemini.** Google Search
 grounding surfaces different results from different ranking algorithms. Not
 mandatory for every scout — but for Greenlight candidates, the incremental
 cost is justified.
+
+**If you are about to treat cross-model agreement as proof that extracted data
+is correct, stop.** Consensus is not a grounding mechanism. Models trained on
+overlapping internet data share spurious correlations — they become more
+confident AND more consistent while being wrong (arXiv 2511.07318). When
+verifying data extraction, require non-LLM mechanical grounding (substring
+match, schema validation, source-document lookup) as the gate. Cross-model
+agreement is a useful confidence signal layered on top, not a substitute.
 
 **If a review target includes a full database, large codebase, or multi-file
 project, stop.** Use the multi-pass project review workflow (below) instead

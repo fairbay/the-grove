@@ -5,7 +5,7 @@ description: >
   live site", "what's in fairbay/X". Not for new-host setup (→ ship-it) or
   prototyping (→ build).
 metadata:
-  version: "2026-06-02-01"
+  version: "2026-06-09-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 

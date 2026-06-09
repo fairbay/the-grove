@@ -275,6 +275,71 @@ def _push_via_api(owner_repo, branch, message, files):
     return commit["sha"], f"https://github.com/{owner_repo}/commit/{commit['sha']}"
 
 
+def push_and_merge(owner_repo, message, files, base_branch="main"):
+    """Push files via branch → PR → squash-merge → delete branch.
+
+    For Claude Code web sessions that are forced to push to claude/* branches.
+    Creates a temporary branch, pushes files, creates a PR, squash-merges it,
+    and deletes the branch — all in one call.
+
+    Returns (commit_sha, diff_url) of the merge commit on the base branch.
+    """
+    import time
+    import hashlib
+
+    slug = hashlib.md5(message.encode()).hexdigest()[:8]
+    temp_branch = f"claude/auto-{slug}-{int(time.time()) % 10000}"
+
+    # 1. Get base branch SHA
+    code, ref = api("GET", f"/repos/{owner_repo}/git/ref/heads/{base_branch}")
+    if code >= 300:
+        raise RuntimeError(f"get base ref failed: {code} {ref}")
+    base_sha = ref["object"]["sha"]
+
+    # 2. Create temp branch
+    code, new_ref = api("POST", f"/repos/{owner_repo}/git/refs", {
+        "ref": f"refs/heads/{temp_branch}",
+        "sha": base_sha,
+    })
+    if code >= 300:
+        raise RuntimeError(f"create branch failed: {code} {new_ref}")
+
+    # 3. Push files to temp branch (reuse existing API push logic)
+    push_sha, _ = _push_via_api(owner_repo, temp_branch, message, files)
+
+    # 4. Create PR
+    code, pr = api("POST", f"/repos/{owner_repo}/pulls", {
+        "title": message.split("\n")[0][:72],
+        "body": message,
+        "head": temp_branch,
+        "base": base_branch,
+    })
+    if code >= 300:
+        # Clean up branch on PR failure
+        api("DELETE", f"/repos/{owner_repo}/git/refs/heads/{temp_branch}")
+        raise RuntimeError(f"create PR failed: {code} {pr}")
+
+    pr_number = pr["number"]
+
+    # 5. Squash-merge
+    code, merge = api("PUT", f"/repos/{owner_repo}/pulls/{pr_number}/merge", {
+        "merge_method": "squash",
+        "commit_title": message.split("\n")[0][:72],
+    })
+    if code >= 300:
+        raise RuntimeError(
+            f"merge failed: {code} {merge} — PR #{pr_number} is open at "
+            f"https://github.com/{owner_repo}/pull/{pr_number}"
+        )
+
+    merge_sha = merge.get("sha", push_sha)
+
+    # 6. Delete temp branch
+    api("DELETE", f"/repos/{owner_repo}/git/refs/heads/{temp_branch}")
+
+    return merge_sha, f"https://github.com/{owner_repo}/commit/{merge_sha}"
+
+
 def read_file(owner_repo, remote_path, branch="main"):
     """Read a file from a GitHub repo. Uses local clone if available."""
     clone_path = _find_repo_clone(owner_repo)

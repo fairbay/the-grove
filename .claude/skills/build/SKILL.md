@@ -5,7 +5,7 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-06-08-01"
+  version: "2026-06-09-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -22,7 +22,29 @@ Before any other work, check for planning artifacts in this order:
    serves. Keep it in context for alignment checkpoints.
 2. **In-context plan from architect express mode** — if the previous turn produced a `build-plan-<slug>.md`, that's the plan. Use it directly. Do not re-read from disk.
 3. **`PLAN.md` in the repo** — if the repo is known, read `PLAN.md` via git-ops. This is the interview-mode artifact, pushed alongside SPEC.md.
-4. **Neither plan exists** — fall back to SPEC.md (if present), or reason from conversation context. Valid for unplanned projects.
+4. **Neither plan nor spec exists** — run the intake interview (Phase 0b) before building.
+
+### Phase 0b: Intake interview (when no SPEC/PLAN/MISSION exists)
+
+**If you are about to build without any planning artifact, stop.** Five
+questions, one turn. Answers become `BRIEF.md` pushed to the repo — not
+ephemeral chat context.
+
+1. **What problem does this solve?** One sentence.
+2. **Who uses it?** Named person or audience.
+3. **What does "done" look like?** The single thing that proves this works.
+4. **What's the tech stack?** Or "your call" to use defaults.
+5. **Any constraints?** Budget, platform, timeline, must-avoid.
+
+Pre-fill from memory and conversation context. Present as proposals to confirm,
+not blank questions. After answers:
+
+- Write `BRIEF.md` to repo root (or CWD in Code) with the Q&A.
+- Push via git-ops. The brief is the durable artifact — future sessions
+  can read it without chat history.
+- If no repo exists yet, hold the brief in context and push after repo creation.
+
+Then proceed to Phase 1.
 
 If a plan exists (either form): it prescribes the technical approach for each step — which APIs, data flows, validation methods. **Follow the plan's approach.** Do not re-derive from the spec.
 

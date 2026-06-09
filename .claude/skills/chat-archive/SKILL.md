@@ -315,8 +315,8 @@ auth issue):
 3. **If still failing,** update the project's Grove idea or task notes with the
    handoff YAML content via Grove MCP. Grove is always accessible. Prefix with
    `## Session Handoff (YYYY-MM-DD)` so session-start can find it.
-4. **Tell Baylee** the handoff landed in Grove instead of operating-manual, so
-   the next session knows where to look.
+4. **Tell Baylee** the handoff landed in Grove instead of the repo, so the
+   next session knows where to look.
 
 The handoff must reach persistent storage. Local filesystem
 (`/mnt/user-data/outputs/`) resets between sessions — a file only there is

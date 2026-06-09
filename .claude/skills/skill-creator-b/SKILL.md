@@ -5,7 +5,7 @@ description: >
   "sync skills", "isn't triggering", "add that to [skill]." Fires on ANY skill
   file edit. Not for using skills or memory edits.
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-09-01"
 ---
 
 # skill-creator — build and maintain skills for Baylee's system
@@ -55,6 +55,20 @@ use cases — words someone would say in a chat. These become the test cases lat
 Read the current installed skill list. Would updating an existing skill be
 better than creating a new one? If two skills could match the same input, the
 trigger descriptions must explicitly route between them.
+
+### 2b. Replace-vs-create check (family skills)
+
+When the new skill belongs to an existing family (delegate-*, idea-*, etc.),
+explicitly evaluate: should this REPLACE an existing family member rather than
+add alongside it? Signs it should replace:
+
+- The new skill's triggers are a superset of an existing sibling's.
+- The existing sibling has never fired (check telemetry/skill-usage.yaml).
+- Adding the skill would make the family >4 members (routing complexity).
+- The new skill does the same job better, not a different job.
+
+If replacing: rename or merge, don't leave both. Update all routing arrows in
+sibling descriptions that reference the old skill.
 
 ### 3. One skill, one job
 
@@ -322,7 +336,7 @@ failures.
 When syncing ("sync skills", "are my skills up to date?"):
 
 ```bash
-cd /home/claude/baylee-skills
+cd /home/claude/ops
 PYTHONPATH=".claude/skills/git-ops/scripts:$PYTHONPATH" python3 scripts/skill_sync.py check
 ```
 

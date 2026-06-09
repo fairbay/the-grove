@@ -5,7 +5,7 @@ description: >
   for evaluating (→ idea-scout), building (→ build), browsing (→ idea-vault),
   or pitching (→ pitch-crafter).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -163,9 +163,16 @@ Sort into three tiers:
 ## Deliverable
 
 Single markdown file: `brainstorm-[domain-or-theme-slug].md`. Under 2,000
-words. Direct, first-person style.
-- **Chat:** save to `/mnt/user-data/outputs/`, then `present_files`.
-- **Code:** save to CWD or present inline.
+words. Direct, first-person style. Include the framing inputs (problem space,
+constraints, interests) at the top — these are the interview output that
+makes the brainstorm reproducible and reviewable.
+
+- **Chat:** save to `/mnt/user-data/outputs/`, then `present_files`. Also
+  push to `fairbay/ops/docs/brainstorms/` via git-ops for durability —
+  `/mnt/user-data/outputs/` resets between sessions.
+- **Code:** save to `docs/brainstorms/` in the repo (or CWD if no repo
+  context), commit via git-ops. If the push fails, report the error and
+  keep the file in CWD — don't lose the brainstorm output.
 
 ## Edge cases
 

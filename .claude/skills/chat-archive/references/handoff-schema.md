@@ -249,7 +249,7 @@ Session-start's Phase 2 checks Grove idea notes as a fallback source.
 
 ## Resumption convention (no blurb needed)
 
-The handoff (HANDOFF.yaml or session-handoff in operating-manual) is the
+The handoff (HANDOFF.yaml in the project repo or session handoff in ops) is the
 single source of truth for resumption. **Do not generate a session-start
 blurb.** When Baylee says "work on [project]", `session-start` handles
 onboarding: resolves repo, loads handoff, reads PLAN.md, presents orientation.

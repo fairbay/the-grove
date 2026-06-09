@@ -249,6 +249,29 @@ codebases better, and is the stronger orchestrator/debugger.
 | Integration of UI with data/logic | Claude | Architectural coherence |
 | Deployment, DevOps | Claude | Existing skill infrastructure |
 
+### Prompting Gemini for UI work
+
+**Persona-driven prompts over CSS-level specs.** Describe the user, the vibe,
+and the feeling — not the exact pixels. Gemini excels at interpreting design
+intent ("feels like a calm health app for anxious first-time users") and
+produces better results than prescriptive CSS instructions ("use #4A90D2
+with 16px padding"). Let Gemini make the visual design decisions.
+
+**Iterate, don't perfect.** Gemini generates strong first drafts. If the
+output is 80% right, iterate on the specific elements that are off rather
+than rewriting the entire prompt. "Make the header less busy and increase
+contrast on the CTA button" beats re-specifying the whole layout.
+
+**Vibe and feel over tokens.** Short, evocative prompts outperform long
+technical specifications. "Clean, spacious, trustworthy — like a government
+service redesigned by a top design firm" communicates more design intent than
+500 words of layout specifications. Include: target emotion, reference
+products, audience context.
+
+**Include user stories, not wireframes.** Pass the spec's user stories and
+persona descriptions. Gemini designs better interfaces when it understands
+WHO is using the UI and WHY, not just WHAT elements to place.
+
 ### Practical surfaces for Gemini UI work
 
 **Google AI Studio** (manual, full capability):
@@ -322,9 +345,18 @@ Baylee pastes the prompt directly — no skill involved.
 
 | Surface | Approach |
 |---------|----------|
-| **Chat** | Claude generates spec + user stories. Output a handoff prompt for Google AI Studio or Stitch. Baylee brings components back. |
-| **Claude Code** | Gemini MCP server if available. Otherwise, Claude builds data/logic, outputs a handoff for Gemini UI generation. |
+| **Chat** | Claude generates spec + user stories. Output a handoff prompt for Google AI Studio or Stitch — use persona-driven prompts (see §5), not CSS specs. Baylee brings components back. |
+| **Claude Code** | Gemini MCP server if available. Otherwise, Claude builds data/logic, outputs a handoff for Gemini UI generation. Pass user stories and audience context, not wireframes. |
 | **Mixed** | Claude Code for data layer + Claude AI Studio for Gemini UI iteration. Combine in the repo. |
+
+**Handoff prompt pattern for Gemini UI generation:**
+
+When outputting a prompt for Baylee to paste into AI Studio, structure it as:
+1. Who the users are (personas from spec, including accessibility needs)
+2. What the app feels like (2-3 adjectives + 1-2 reference products)
+3. The user stories that drive the layout
+4. Hard constraints only (mobile-first, specific color if brand-required)
+5. "Generate React + Tailwind components" (not "generate CSS")
 
 ---
 

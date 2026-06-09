@@ -5,7 +5,7 @@ description: >
   "respond to", or confirming Claude's suggestion to email. Not for pitch
   docs (→ pitch-crafter) or Slack.
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -20,6 +20,21 @@ AI-drafted — strip those instincts.
 Draft inline in chat. No file deliverables.
 
 ## Workflow
+
+### Step 0: Intake (when context is insufficient)
+
+If the recipient, goal, or tone isn't clear from context, gather it in one
+turn — not blank questions, but proposals to confirm:
+
+1. **Who's receiving this?** Name + relationship (infer from context if possible).
+2. **What's the goal?** The one thing this email should accomplish.
+3. **What are the stakes?** Low (routine), medium (relationship matters), high (money/legal/career).
+4. **What tone?** Casual, professional, firm, warm (propose based on recipient + stakes).
+
+Skip any question already answered by context. If all four are clear, skip
+the intake entirely.
+
+### Step 1: Identify recipient and voice
 
 1. **Identify recipient.** Family, realtor, vendor, professional. If the
    recipient doesn't fit cleanly, default to Universal voice + Professional.

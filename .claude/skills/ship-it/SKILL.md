@@ -5,7 +5,7 @@ description: >
   "Claude Code handoff". Not for fixes to live sites (→ git-ops), prototyping
   (→ build), or planning (→ architect).
 metadata:
-  version: "2026-06-03-02"
+  version: "2026-06-09-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -106,16 +106,10 @@ Tailor it, number it, make it copy-pasteable.
 3. **Push to Git** — follow git-ops's push protocol (`git-ops/references/push-protocol.md`: test → present → push → verify). Repo must exist with `auto_init: true`.
 4. **Connect host** — Vercel project created and linked; build command, output dir, env vars set. The Vercel MCP can list projects and fetch deploy status — see git-ops `references/vercel-mcp.md`.
 5. **Supabase keep-alive** (if project uses Supabase free tier) — push `.github/workflows/supabase-keep-alive.yml` (template in `CONVENTIONS.md § Infrastructure Patterns`) and add three GitHub Actions secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_PING_TABLE` (any table in the public schema). Trigger manually once to verify. Without this, free-tier projects pause after 7 days of no database activity.
-6. **Claude infrastructure setup** (for repos that will use Claude Code or
-   have skills synced). Create `.claude/global.md` (copy from
-   `fairbay/ops/global-CLAUDE.md`), ensure root `CLAUDE.md`
-   starts with `@.claude/global.md`, and create `.claude/settings.json`
-   with the SessionStart hook (template in CONVENTIONS.md § Session-
-   continuity gates). **Then sync skills immediately** — read all files
-   from `fairbay/ops/.claude/skills/` via git-ops and push them
-   to the new repo's `.claude/skills/` in the same commit (or the next).
-   Do not defer to a future `sync-skills.py` run; the repo needs skills
-   before its first Claude Code session.
+6. **Claude infrastructure setup.** Check for `.claude/global.md` in the
+   repo. If missing, route to **init-repo** — it handles global.md,
+   settings.json, CLAUDE.md, and full skill sync in one atomic commit.
+   If `.claude/` already exists, skip this step.
 7. **Custom domain** (optional) — DNS, SSL auto-provisions.
 8. **Verify** — test live URL on mobile and desktop, confirm core functionality works, check the version number shown in the UI.
 

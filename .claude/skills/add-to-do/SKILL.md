@@ -5,7 +5,7 @@ description: >
   "done with X", "drop X". Also project feature ideas. Not standalone ideas
   (→ idea-scout) or scoring (→ idea-vault).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -136,7 +136,9 @@ When archiving (see `chat-archive`):
 - **No TODOs in memory edits.** Memory is for behavioral overrides and
   reference data, not task data. Task state lives in Grove.
 - **"Added to Grove" requires the MCP call to have succeeded.** Don't claim
-  capture until the tool returned an ID.
+  capture until the tool returned an ID. If the call fails: retry once, then
+  report the error explicitly with the task data in the response body so it's
+  not lost. Never skip silently.
 - **Project tasks need both `list` and `project_ref`.** The `list` is the slug
   shown in the UI; `project_ref` is what git-ops and chat-archive cross-reference.
 

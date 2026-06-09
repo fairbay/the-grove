@@ -5,7 +5,7 @@ description: >
   Not project features (→ add-to-do), building (→ architect), saving
   (→ idea-vault), batch (→ brainstorm-engine).
 metadata:
-  version: "2026-05-28-01"
+  version: "2026-06-09-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -563,6 +563,14 @@ If the idea exists, update scores/verdict/status in place.
 **Legacy verdict mapping:** `Unicorn` → `greenlight`. Otherwise use the enum
 values listed above (`fools_gold`, `public_good`, etc. — drop apostrophes,
 spaces become underscores).
+
+**Write-failure fallback.** If the Grove MCP call fails:
+
+1. Retry once with a fresh call.
+2. If still failing, report the error explicitly — never skip silently.
+3. Include the full idea data (title, verdict, scores, notes) in the response
+   body so Baylee can manually add it or the next session can retry.
+4. Create a Grove task noting the failed write so it doesn't get lost.
 
 Confirm the Grove write succeeded before proceeding to Phase 10.
 
