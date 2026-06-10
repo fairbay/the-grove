@@ -1,26 +1,28 @@
 ---
 name: grove
 description: >
-  Grove operations — "save this idea", "grove this idea", "what's in grove",
-  "recent activity", browse ideas. Not for to-do capture (→ add-to-do) or
-  scoring (→ idea-scout, idea-vault).
+  Grove ops — "save this idea", "what's in grove", "log this decision",
+  "what did we decide", "project status", recent activity. Not for to-dos
+  (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-06-10-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # grove — Grove backend reference and idea-side capture
 
-Grove is Baylee's unified task/idea backend (Supabase + Vercel API at
-`vault.bayleemiller.org`). Everything Baylee tracks lives here: dev tasks,
-errands, family items, project work, raw ideas, scout verdicts. No secondary
-capture system exists.
+Grove is Baylee's memory store (Supabase + Vercel API at
+`vault.bayleemiller.org`). Everything that needs to be remembered lives here:
+dev tasks, errands, family items, raw ideas, scout verdicts, durable
+decisions, and project state for code AND non-code projects. No secondary
+capture system exists. Code lives in git; memory lives in Grove.
 
-This skill owns: idea capture, full-system browse, event/history queries, and
-the MCP/field reference used by every Grove-touching skill. Task user-voice
-("add to do", "remind me to") routes through **add-to-do**, which calls the
-same MCP tools but with task-specific routing logic.
+This skill owns: idea capture, decision logging/recall, project-state
+browse, full-system browse, event/history queries, and the MCP/field
+reference used by every Grove-touching skill. Task user-voice ("add to do",
+"remind me to") routes through **add-to-do**, which calls the same MCP tools
+but with task-specific routing logic.
 
 ## Collision zone with add-to-do
 
@@ -41,7 +43,7 @@ user voice → add-to-do.** Both call the same MCP tools.
 ## MCP tools
 
 Grove MCP is at `vault.bayleemiller.org/api/mcp` as a custom Claude connector.
-When active, 9 tools are available natively — no code execution needed.
+When active, 13 tools are available natively — no code execution needed.
 
 | Tool | Use when |
 |---|---|
@@ -49,11 +51,15 @@ When active, 9 tools are available natively — no code execution needed.
 | `grove_create_idea` | New concept, project idea, "what if" |
 | `grove_list_tasks` | "Show my tasks", "what's open for X" |
 | `grove_list_ideas` | "Show my ideas", "raw ideas", "what got greenlit" |
-| `grove_get` | Fetch a single item by ID |
-| `grove_update` | Change fields on an existing task or idea |
+| `grove_log_decision` | Rung-3 call made, "log this decision"; `supersedes` to correct |
+| `grove_list_decisions` | "What did we decide about X", session-start Rung-1 read |
+| `grove_create_project` | New project (code or non-code; omit `repo` for non-code) |
+| `grove_list_projects` | "Project status", briefing reads, slug lookup |
+| `grove_get` | Fetch a single item by ID (task, idea, project, decision) |
+| `grove_update` | Change fields on a task, idea, or project (NOT decisions) |
 | `grove_complete_task` | "Done with X", mark complete |
 | `grove_drop_task` | "Drop X", "never mind about X" |
-| `grove_events` | "What happened recently", audit history |
+| `grove_events` | "What happened recently", audit history, Session Chronicle |
 
 MCP is the only interface. The Python script (`scripts/grove.py`) is the fallback
 for Routines that lack MCP access — same operations, same auth flow.
@@ -84,6 +90,31 @@ Same standard applies in add-to-do and chat-archive.
 
 Status progression (set by other skills, documented here for reference):
 `raw → scouted → in_dev → shipped` (or `shelved` / `gifted` / `killed`).
+
+## Decisions and project state
+
+### "Log this decision" / Rung-3 calls
+
+`grove_log_decision` with: `decision` (the call), `project_ref`
+(`fairbay/<repo>`, a project slug, or `cross-project`), `alternatives`,
+`confidence`, `reversible`, `context`, `rung` (usually 3). Decisions are
+**append-only** — to correct one, log a new decision with `supersedes` set to
+the old ID. Never try `grove_update` on a decision.
+
+### "What did we decide about X"
+
+`grove_list_decisions(project_ref=..., current_only=true)`. Default excludes
+superseded decisions; pass `current_only=false` for full history. This is
+the Rung-1 read at session start (see session-start skill).
+
+### "Project status" / project rows
+
+`grove_list_projects` (slug for exact lookup, `q` for search). Project rows
+carry `phase`, `blockers`, `next_actions`, `last_session`, `docs` status, and
+`notes` (the planning-doc body for non-code projects). Create with
+`grove_create_project` — omit `repo` for non-code projects; update with
+`grove_update(entity_type="project", ...)`. chat-archive refreshes the row at
+session end; session-start's briefing reads it.
 
 ## Browse and events
 
@@ -126,6 +157,24 @@ the most recent first. Useful for chat-status checkpoints and weekly review.
 - `scores` — jsonb dict: `{"impact_pct": N, "business_pct": N, "sustainability_pct": N}`
 - `tags`, `notes`, `metadata` — optional
 
+### Decision fields
+- `decision` — required, 1–2000 chars (the call that was made)
+- `project_ref` — `fairbay/<repo>`, a project slug, or `cross-project`
+- `alternatives` — what was considered and rejected
+- `confidence` — `high` / `medium` / `low` (default `medium`)
+- `reversible` — `yes` / `no` / `partial` (default `yes`)
+- `context` — one sentence on why it mattered
+- `rung` — Decision Ladder rung 1–4 (usually 3)
+- `superseded_by` — set via `supersedes` on a newer decision; append-only
+
+### Project fields
+- `name` — required; `slug` — required, unique kebab-case
+- `repo` — `fairbay/<repo>` for code projects; **null = non-code project**
+- `phase` — `planning` / `building` / `testing` / `shipping` / `maintaining` / `parked`
+- `docs` — jsonb `{mission, spec, plan, brief}` booleans
+- `blockers`, `next_actions` — text arrays
+- `last_session` — date; `notes` — planning-doc body for non-code projects
+
 ## MCP failure handling
 
 If any Grove MCP call fails (timeout, connection error, server error):
@@ -140,9 +189,11 @@ If any Grove MCP call fails (timeout, connection error, server error):
 
 ## Update and delete
 
-`grove_update` patches any field. Use sparingly — most mutations are
-status transitions (raw → scouted, open → done) handled by purpose-specific
-tools (`grove_complete_task`, `grove_drop_task`, scout writing a verdict).
+`grove_update` patches any field on tasks, ideas, and projects. Use
+sparingly — most mutations are status transitions (raw → scouted, open →
+done) handled by purpose-specific tools (`grove_complete_task`,
+`grove_drop_task`, scout writing a verdict). Decisions cannot be updated —
+append-only; supersede instead.
 
 There is no delete. Drop a task with `grove_drop_task`; shelve an idea by
 setting `status: shelved`. The audit log retains everything.
@@ -166,6 +217,8 @@ migrate to Grove:
 
 - **← idea-scout:** Writes verdicts and scores onto ideas via `grove_update`.
 - **← add-to-do:** Task-shaped capture flows through the same MCP tools.
-- **← chat-archive:** Pulls open tasks for touched projects during session wrap.
+- **← chat-archive:** Pulls open tasks for touched projects during session
+  wrap; writes the project row + Rung-3 decisions (Step 9b).
+- **→ session-start:** Project rows + decisions are the briefing's data source.
 - **→ idea-vault:** Reads idea state from Grove for browsing and comparison.
 - **→ idea-scout:** Newly raw ideas chain to scoring in a fresh chat.

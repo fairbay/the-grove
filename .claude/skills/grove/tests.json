@@ -1,0 +1,44 @@
+{
+  "target_skill": {
+    "name": "grove",
+    "description": "Grove ops — \"save this idea\", \"what's in grove\", \"log this decision\", \"what did we decide\", \"project status\", recent activity. Not for to-dos (→ add-to-do) or scoring (→ idea-scout, idea-vault)."
+  },
+  "competing_skills": [
+    {
+      "name": "add-to-do",
+      "description": "Task capture and triage — \"add to do\", \"remind me to\", \"show my to-dos\", \"done with X\", \"drop X\". Also project feature ideas. Not standalone ideas (→ idea-scout) or scoring (→ idea-vault)."
+    },
+    {
+      "name": "idea-vault",
+      "description": "Browse stored ideas — \"show my ideas\", \"vault\", \"compare ideas\", \"what should I build next\". Not for scouting (→ idea-scout), capture (→ grove), or calibration (→ review-panel)."
+    },
+    {
+      "name": "idea-scout",
+      "description": "Score raw standalone ideas — \"scout this\", \"is this viable\". Auto-fires. Not project features (→ add-to-do), building (→ architect), saving (→ idea-vault), batch (→ brainstorm-engine)."
+    },
+    {
+      "name": "chat-status",
+      "description": "Mid-session checkpoint — \"where are we\", \"status update\", \"what's next\", summaries, topic shifts. Use proactively. Not session start (→ session-start) or close (→ chat-archive)."
+    },
+    {
+      "name": "session-start",
+      "description": "Session onboarding — \"work on [project]\", \"continue [project]\", \"keep working on X\", or pasting a handoff. Loads handoff + PLAN. Not for mid-session (→ chat-status) or archive (→ chat-archive)."
+    }
+  ],
+  "positive_cases": [
+    "Grove this idea — a CLI that turns my screenshots folder into a searchable archive, ran into it twice this week",
+    "What did we decide about the supabase keepalive thing? I remember we went back and forth on it",
+    "Log this decision: we're sticking with Vercel hobby tier and consolidating routes instead of upgrading",
+    "what's in grove right now? feel like I've been dumping stuff in there all month",
+    "Give me a project status rundown — which of my projects are actually moving"
+  ],
+  "negative_cases": [
+    "remind me to renew the apple developer membership before July",
+    "add to do: swap the og-image on the medicaid site",
+    "show my ideas — which ones got greenlit?",
+    "is this viable: a paid newsletter that summarizes county zoning meetings",
+    "where are we on the earmark build? feels like we covered a lot today",
+    "work on grove",
+    "compare my top three ideas and tell me what to build next"
+  ]
+}

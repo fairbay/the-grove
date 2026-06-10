@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-06-08-01"
+  version: "2026-06-10-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -259,6 +259,12 @@ Append a session entry to `fairbay/ops/telemetry/skill-usage.yaml`
 via git-ops. Mechanical logging only — no analysis, evaluation, or
 editorialization. Push in the same commit as other archive artifacts.
 
+**Canonical indentation — match it exactly or the file stops parsing:**
+list items 2 spaces under `sessions:` (`  - date:`), child keys at 4 spaces,
+nested list items at 6. Validate with `yaml.safe_load` before pushing; a
+misindented append breaks every future read (happened 2026-05→06, repaired
+2026-06-10).
+
 Record:
 
 1. **date** — today's date.
@@ -322,6 +328,27 @@ The handoff must reach persistent storage. Local filesystem
 (`/mnt/user-data/outputs/`) resets between sessions — a file only there is
 gone next session.
 
+#### 9b. Grove memory write-back
+
+The handoff YAML is Claude-to-Claude continuity; Grove is the queryable
+record. After the handoff is written, mirror the session state to Grove:
+
+1. **Project row.** `grove_list_projects(slug=<project slug>)`. If a row
+   exists, `grove_update(entity_type="project", id, patch={phase, blockers,
+   next_actions, last_session: <today>})` — patch only what changed. If no
+   row exists and the session did substantive work on a named project,
+   `grove_create_project` (slug, repo for code projects or omit for
+   non-code, phase, next_actions; notes = planning context for non-code).
+2. **Decisions.** For each Rung-3 entry in `decisions_made:` (Step 9a),
+   `grove_log_decision(decision, project_ref=<'fairbay/<repo>' or slug>,
+   alternatives, confidence, reversible, context, rung=3)`. Decisions are
+   append-only — to correct an earlier one, pass `supersedes` with its ID
+   instead of editing.
+
+Skip only if the session touched no project (pure Q&A). If Grove MCP fails,
+report the error, retry once, and note the gap in the handoff — never
+silently skip.
+
 ### 10. Rename chat (chat only)
 
 **Skip in Code / Routines** — no chat to rename.
@@ -352,6 +379,7 @@ fails, say so explicitly.
 - [ ] Memory edits applied — folds attempted first, count under 12?
 - [ ] `decisions_made:` populated with all Rung 3 decisions from session?
 - [ ] Handoff generated and pushed (build, session, or both)? If push failed, fallback to Grove?
+- [ ] Grove write-back done (9b) — project row refreshed, Rung-3 decisions logged via grove_log_decision?
 - [ ] CLAUDE.md updated (if architecture/stack/structure changed)?
 - [ ] Summary written from verified read-backs, not memory?
 - [ ] **"Next step:" line in response body?** (mandatory, even if nothing)
@@ -373,4 +401,5 @@ fails, say so explicitly.
   blurb" if the handoff itself is inline.
 - **→ skill-creator-b:** Route any skill creates/edits through that skill's
   install ceremony.
-- **→ grove:** Park anything that won't ship this session.
+- **→ grove:** Park anything that won't ship this session. Step 9b writes the
+  project row + Rung-3 decisions that session-start's briefing reads next time.

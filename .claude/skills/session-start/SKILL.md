@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-06-10-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -14,9 +14,9 @@ metadata:
 
 Fires on the first message of a session when Baylee references prior work —
 whether it's a named project, a Grove idea, or any topic with continuation
-intent. Loads the handoff, checks freshness, reads PLAN.md, and presents
-what's next — so the session starts ready to work, not reconstructing context
-turn by turn.
+intent. Loads the Grove project state, the handoff, checks freshness, reads
+PLAN.md and prior Grove decisions, and renders the briefing — so the session
+starts ready to work, not reconstructing context turn by turn.
 
 **If you are about to start answering Baylee's question before loading the
 handoff, stop.** Run Phase 1 first. The instinct to jump into problem-solving
@@ -39,27 +39,31 @@ Does NOT fire for:
 - A fresh idea with no prior work → idea-scout
 - Generic greetings without a project reference → respond normally
 
-## Phase 1 — Resolve project → repo (or Grove idea)
+## Phase 1 — Resolve project (Grove first)
 
-Map the project name to a GitHub repo or Grove idea. Not all work has a repo —
-pre-repo ideas, research, and early-stage projects resolve to Grove ideas
-instead.
+Grove's `project` table is the universal project index — code and non-code
+projects alike. Resolve against it first; a repo is a code-specific detail
+the project row carries, not the identity.
 
-Resolution order depends on surface:
+Resolution order:
 
-1. **Memory (chat) / CWD repo (Code).** In chat, use known project↔repo
-   mappings from userMemories. In Code, the CWD repo IS the project — skip
-   to Phase 2.
-2. **Grove ideas.** Search Grove ideas via MCP (`grove_list_ideas`) for the name.
+1. **Grove project.** `grove_list_projects(slug=<kebab-case name>)`, falling
+   back to `grove_list_projects(q=<name>)`. A hit gives the slug, `repo` (null
+   for non-code projects), phase, blockers, and next_actions — keep the row,
+   it feeds the Phase 5 briefing. If `repo` is set, that's the repo.
+2. **CWD repo (Code only).** In Code, the CWD repo IS the project — but still
+   run step 1 with the repo name to fetch the project row if one exists.
+3. **Grove ideas.** Search Grove ideas via MCP (`grove_list_ideas`) for the name.
    Ideas with `repo` or `github` fields resolve to a repo directly. Ideas
    without a repo field are pre-repo — note the idea ID and proceed. The
    idea's notes may serve as context in Phase 2.
-3. **Repo name match.** Try `fairbay/<kebab-case-project-name>` via git-ops
+4. **Repo name match.** Try `fairbay/<kebab-case-project-name>` via git-ops
    `list_files`. If it exists, use it.
-4. **Proceed or ask.** If the work likely has a repo (established product, prior
+5. **Proceed or ask.** If the work likely has a repo (established product, prior
    builds), ask Baylee one direct question: "Which repo is this in?" If the
-   work is pre-repo (new idea, research, early exploration), note this and
-   proceed to Phase 2 — no repo is needed.
+   work has no repo (new idea, research, early exploration), note this and
+   proceed to Phase 2 — no repo is needed. Grove is the home for non-code
+   projects; never suggest creating a repo for one.
 
 If a project name maps to multiple repos (e.g. "Grove" → `grove`, `grove-web`,
 `grove-api`), pick the one with the most recent HANDOFF.yaml. If still
@@ -82,8 +86,13 @@ Resolution order — use the first that resolves:
    build skill's lightweight interview), read it as planning context. BRIEF.md
    is a valid standalone planning artifact for small or early-stage projects
    that skipped architect.
-5. **Grove idea notes.** If Phase 1 found a Grove idea (pre-repo or otherwise)
-   and steps 1-4 found no handoff, read the idea via `grove_get`. If the
+5. **Grove project row.** If Phase 1 found a Grove project and steps 1-4
+   found no handoff, the row itself is the handoff-equivalent: `phase`,
+   `blockers`, `next_actions`, `last_session`, and `notes` (the planning-doc
+   body for non-code projects). Present in Phase 5 as "picked up from Grove
+   project ([last_session date])."
+6. **Grove idea notes.** If Phase 1 found a Grove idea (pre-repo or otherwise)
+   and steps 1-5 found no handoff, read the idea via `grove_get`. If the
    idea's notes contain substantive context (architecture, build plan,
    decisions, scores), use them as the handoff-equivalent. Present in Phase 5
    as "picked up from Grove idea ([date])."
@@ -108,7 +117,15 @@ A handoff from days ago can be overridden by a more recent chat. Always check.
 3. If anything newer mentions the same project, flag before proceeding.
 4. If nothing newer, proceed.
 
-## Phase 4 — Load PLAN.md (or BRIEF.md) and CLAUDE.md
+## Phase 4 — Load Grove memory, PLAN.md (or BRIEF.md), and CLAUDE.md
+
+**Grove decisions (Rung-1 input).** Call
+`grove_list_decisions(project_ref=<'fairbay/<repo>' or slug>, current_only=true,
+limit=10)`. These are the standing calls already made on this project — they
+carry rationale, alternatives, confidence, and reversibility, and they feed the
+Phase 5 briefing. For non-code projects, also skim recent `grove_events`
+(filtered by entity if useful) when the project row alone doesn't explain
+recent movement.
 
 If the resolved repo has `PLAN.md`, read it via git-ops. This satisfies the
 "read PLAN.md before working on a repo" requirement so downstream skills (build,
@@ -147,33 +164,46 @@ design (see architect skill), and projects that grow past prototype scope
 need the quality contract (acceptance criteria, success metrics, out-of-scope
 list) that only interview mode produces.
 
-## Phase 5 — Orient (read-back gate)
+## Phase 5 — Render the briefing (read-back gate)
 
-Present a brief orientation — and treat it as a **read-back**: explicitly name
-the handoff you loaded and its `next:` items before any work begins. This is the
-entry gate (the I-PASS "synthesis" step from the session-continuity spec): the
-receiving session confirms it caught the baton before acting on it. Not a wall
-of text — a quick status that gets Baylee into the work.
+Render the briefing inline in chat from what Phases 1-4 loaded — the Grove
+project row, current Grove decisions, and the handoff. This is the inline
+briefing: Grove is the store, the chat message is the window. It renders
+identically on mobile and desktop; no artifact layer. Treat it as a
+**read-back**: explicitly name the sources you loaded and the `next:` items
+before any work begins. This is the entry gate (the I-PASS "synthesis" step
+from the session-continuity spec): the receiving session confirms it caught
+the baton before acting on it. Not a wall of text — a quick status that gets
+Baylee into the work.
 
 ```
-**[Project Name]** — picked up from [handoff type] ([date])
+**[Project Name]** — [phase, from Grove project row] — picked up from
+[source: handoff / Grove project / Grove idea] ([date])
 
 **Where we left off:**
-[1-3 lines from handoff `done:` — most recent only]
+[1-3 lines from handoff `done:` — most recent only. If no handoff, the
+project row's last_session + most recent grove_events entries.]
 
 **Decisions to review:**
-[From `decisions_made:` — see below. Omit if empty.]
+[Merged from Grove decisions + handoff `decisions_made:` — see below.
+Omit if empty.]
 
 **Next up:**
-[Items from handoff `next:`, numbered]
+[Handoff `next:` items if present, else project row `next_actions`, numbered]
 
-**Blockers:** [from `blocking_on:`, or "None"]
+**Blockers:** [handoff `blocking_on:` merged with project row `blockers`,
+or "None"]
 ```
 
-#### Surfacing `decisions_made:`
+If the handoff and the Grove project row disagree (e.g. different next
+actions), prefer the newer source by timestamp and note the discrepancy in
+one line.
 
-If the handoff contains `decisions_made:` entries, surface them in the
-orientation between "where we left off" and "next up." Priority ordering:
+#### Surfacing decisions
+
+Merge `grove_list_decisions` results with the handoff's `decisions_made:`
+(dedupe by content — a Rung-3 decision is usually in both). Surface them in
+the briefing between "where we left off" and "next up." Priority ordering:
 
 1. **Low-confidence + irreversible** — flag prominently: "⚠️ Needs review:"
 2. **Low-confidence + reversible** — note for awareness: "FYI, can be changed:"
@@ -185,10 +215,10 @@ Baylee can redirect without researching from scratch. Wait for Baylee to
 acknowledge or override before proceeding with work that depends on these
 decisions.
 
-If no handoff was found:
+If no handoff AND no Grove project row was found:
 
 ```
-**[Project Name]** — no handoff found
+**[Project Name]** — no handoff or Grove project found
 
 Ready to work. What's the focus?
 ```
@@ -225,8 +255,10 @@ confirmation.
 
 ## Integration
 
-- **← chat-archive:** Reads the handoff that chat-archive pushed at last
-  session's end.
+- **← chat-archive:** Reads the handoff that chat-archive pushed and the Grove
+  project row + decisions it wrote at last session's end.
+- **← grove:** `grove_list_projects`, `grove_list_decisions`, `grove_events`
+  are the briefing's data source — the store of record for project memory.
 - **↔ Claude Code:** On the Claude Code surface the entry gate is a SessionStart
   hook (`scripts/session_handoff.py inject`) that injects the same handoffs as
   `additionalContext` before the first turn. Handoffs flow either direction;
