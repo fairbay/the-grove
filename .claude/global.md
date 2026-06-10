@@ -24,9 +24,9 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 
 When you encounter a decision point during execution, follow this procedure in order. Do not skip rungs.
 
-1. **Consult project documentation** — MISSION.md, SPEC.md, PLAN.md, BRIEF.md, CLAUDE.md, HANDOFF decisions, and `docs/decisions/` if it exists. If in claude.ai, also read the Decision Ledger (persistent artifact storage).
+1. **Consult project documentation** — MISSION.md, SPEC.md, PLAN.md, BRIEF.md, CLAUDE.md, HANDOFF decisions, and `docs/decisions/` if it exists. Also read prior Grove decisions via `grove_list_decisions(project_ref=<repo or slug>, current_only=true)` — works on every surface.
 2. **Delegate to specialist** — Route the question to the appropriate lens before attempting to resolve it yourself or escalating. See Delegation Routing below.
-3. **Make the call and document it** — Record the decision in HANDOFF.yaml under `decisions_made:` with: the decision, rationale, alternatives considered, confidence (high/medium/low), and whether it's reversible. In claude.ai, also write it to the Decision Ledger. This is expected autonomous competence, not a failure.
+3. **Make the call and document it** — Record the decision in HANDOFF.yaml under `decisions_made:` with: the decision, rationale, alternatives considered, confidence (high/medium/low), and whether it's reversible. Also log it to Grove via `grove_log_decision` — Grove is the cross-surface queryable record; the handoff carries it to the next session. This is expected autonomous competence, not a failure.
 4. **Escalate to Baylee** — Only if truly unresolvable, irreversible, or mission-level. Present distilled: the decision needed, the context, and your recommendation.
 
 Rung 3 is the expected operating mode for most decisions. The ladder exists to ensure decisions are informed (Rung 1), considered from the right angle (Rung 2), and documented (Rung 3) — not to avoid making them.
@@ -44,6 +44,7 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Project Documentation
 
+- **Code lives in git; memory lives in Grove.** Repos are for source files. Decisions, project state, tasks, ideas, and session history live in Grove. Non-code projects (research threads, design work, workflow projects) are first-class Grove `project` rows — `repo` null, planning docs in `notes` — NOT GitHub repos. A project gets a repo when and because it has source files to version. Artifacts are windows, not stores: disposable projections over Grove, regenerated on demand.
 - **Skills** live in `fairbay/ops` (source of truth) and are synced to `.claude/skills/` in every repo via `ops/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it.
 - **Doc skeleton hierarchy:** MISSION.md (authority, WHY) → SPEC.md (requirements, WHAT) → PLAN.md (technical approach, HOW). BRIEF.md is the lightweight alternative — when no planning artifacts exist, the build skill generates one from 5 interview questions. Not every project needs all layers; BRIEF.md is valid on its own for small or early-stage work. HANDOFF.yaml is session state (who worked last, what's next), not part of the doc skeleton.
 - **Interview-mode engagement is the documentation trigger.** If a topic is worth interviewing about, the output becomes a durable artifact, not ephemeral chat context. Architect creates MISSION/SPEC/PLAN via interview; build creates BRIEF.md via quick interview; brainstorm-engine captures ideas durably.
@@ -54,7 +55,7 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Task & Idea Capture
 
-**Grove** is the central system (Supabase + Vercel API). MCP at `vault.bayleemiller.org/api/mcp`. ALL tasks and ideas go here — no iOS Reminders, no per-repo TODO.md.
+**Grove** is the central system (Supabase + Vercel API). MCP at `vault.bayleemiller.org/api/mcp`. ALL tasks, ideas, decisions, and project state go here — no iOS Reminders, no per-repo TODO.md, no artifact-storage ledgers.
 
 ## Git Workflow
 
