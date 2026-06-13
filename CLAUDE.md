@@ -12,7 +12,7 @@ Nature-themed walking portfolio where each idea grows from seed to fruit-bearing
 - **Garden** (`src/App.jsx`) — Walking perspective with SVG plants, perspective projection, click-to-modal details.
 - **Vault Dashboard** (`/vault`) — Table view of all ideas with filters, sort, search.
 - **Router** (`src/GroveRouter.jsx`) — Routes between garden and vault, fetches data, maps vault fields to garden props.
-- **Data** (`public/vault.json`) — Single source of truth. Only `portfolio_visible: true` entries appear in the garden.
+- **Data** (`public/vault.json`) — Only `portfolio_visible: true` entries appear in the garden. ⚠️ **Stale / v3 pending (2026-06-12):** the deployed code actually fetches a legacy Google Apps Script endpoint (Sheets-era), and `public/vault.json` is vestigial (last updated March). Both are two migrations behind Grove. Decision `fc99d106` replaces this data path wholesale in grove-site v3 with the anonymous Grove public-read API (`fairbay/grove` `docs/PLATFORM-SPEC.md` §8.2). No interim fix — the live site renders frozen data until v3 lands.
 
 ## Plant growth stages
 
@@ -31,10 +31,9 @@ Pink flowers = impact score. Red fruit = business score. Counts relative to the 
 
 ## Updating the portfolio
 
-1. Update `public/vault.json` (add ideas, change statuses, toggle `portfolio_visible`)
-2. Commit and push
+⚠️ **Editing `public/vault.json` no longer affects the live site** — the deployed build fetches a legacy Apps Script endpoint, and v3 will replace the data path entirely. Until grove-site v3 ships, treat content updates as blocked-by-v3.
 
-Future: vault.json will be replaced by a live Grove API read (Phase C2) so the portfolio updates automatically when ideas change status in Grove.
+**v3 (planned, decision `fc99d106`):** the portfolio becomes data-driven from Grove's anonymous public-read API (`GET /api/public/portfolio`, spec'd in `fairbay/grove` `docs/PLATFORM-SPEC.md` §8.2) over category paths (`/apps`, `/papers`, …). Publishing an item = flip `portfolio_visible` in Grove. Architecture pass pending (idea `f5598938`).
 
 ## Deployment
 
