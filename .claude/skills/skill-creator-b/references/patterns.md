@@ -249,3 +249,9 @@ to a pattern above — the pattern number is in parentheses.
    Reserve for genuinely fragile steps.
 5. **Nested reference files.** SKILL.md → A.md → B.md. Keep it one hop.
 6. **Testing after shipping.** Untested descriptions ship broken.
+7. **Self-graded gates.** Checkpoints that ask "did you do X?" or "was the
+   research thorough?" fail exactly when they're needed — a model that didn't
+   notice its work was shallow will rubber-stamp the self-assessment too.
+   Replace with mechanical gates: require enumerating what was actually done
+   (list queries by category, count outputs) against hard minimums, failing
+   if a category is empty.

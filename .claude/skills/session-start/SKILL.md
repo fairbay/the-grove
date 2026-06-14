@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-06-10-01"
+  version: "2026-06-10-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -44,6 +44,11 @@ Does NOT fire for:
 Grove's `project` table is the universal project index — code and non-code
 projects alike. Resolve against it first; a repo is a code-specific detail
 the project row carries, not the identity.
+
+**Loading Grove tools (chat):** the tool_search registry matches fuzzily on
+Grove tool names — descriptive queries take 2-3 attempts. Load first-try with
+the exact-name query: `grove_list_projects grove_create_task grove_update
+grove_log_decision`.
 
 Resolution order:
 

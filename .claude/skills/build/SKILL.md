@@ -5,7 +5,7 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-06-10-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -37,7 +37,13 @@ ephemeral chat context.
 5. **Any constraints?** Budget, platform, timeline, must-avoid.
 
 Pre-fill from memory and conversation context. Present as proposals to confirm,
-not blank questions. After answers:
+not blank questions. **Exception — pre-authorized work:** for synthetic/test
+articles or work Baylee has authorized wholesale, fill the brief yourself and
+proceed, stating assumptions inline; confirmation is for real projects where
+his answers change the build. When you do present the confirmation, the widget
+question must be self-contained — carry the brief's substance in the question
+text or options, because preceding prose can collapse under tool-activity
+summaries in the UI. After answers:
 
 - Write `BRIEF.md` to repo root (or CWD in Code) with the Q&A.
 - Push via git-ops. The brief is the durable artifact — future sessions

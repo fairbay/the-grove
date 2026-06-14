@@ -5,7 +5,7 @@ description: >
   "sync skills", "isn't triggering", "add that to [skill]." Fires on ANY skill
   file edit. Not for using skills or memory edits.
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-06-11-01"
 ---
 
 # skill-creator — build and maintain skills for Baylee's system
@@ -364,6 +364,7 @@ steps through this workflow, then return to the broader plan.
 4. **Check description.** Does the modification change when the skill should
    fire? If so, update and re-test (Phase 4).
 5. **Push and deliver** per Phase 5 (chat: zip + present; Code: push only).
+6. **Routine instructions (`routines/*/ROUTINE.md`) are in scope for this workflow.** They follow the same read-from-ops / targeted-edit / version-bump discipline, but their delivery ceremony differs: instead of zip + install, the report MUST end with the action item "Baylee re-pastes into the routine config at claude.ai/code/routines (<routine name>, version <new version>)." See CONVENTIONS.md § Routine Instruction Sync.
 
 ---
 

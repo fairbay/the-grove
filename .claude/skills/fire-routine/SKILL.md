@@ -5,7 +5,7 @@ description: >
   "drain the queue", "routine-fire X". Not for inline scoring/scouting
   (→ idea-scout) or sync delegation (→ delegate-*).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-12-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -25,16 +25,17 @@ interaction; the work continues elsewhere.
 | Name | Env file | What it does |
 |------|----------|--------------|
 | `scout-r` | `secrets/scout-r.env` | Runs idea-scout as a Routine — scores idea, commits to idea-vault. |
-| `skill-worker-r` | `secrets/skill-worker-r.env` | Drains Grove tasks tagged `routine:skill-worker` — reads work orders from task notes, implements changes, pushes to target repos, marks tasks done. |
+| `skill-worker-r` | `secrets/skill-worker-r.env` | Drains Grove tasks tagged `routine:skill-worker` — reads work orders from task notes, implements changes, pushes to target repos, marks tasks done. Fires nightly on schedule in addition to manual fires. |
+| `grove-prune-r` | — (schedule-only) | Nightly Grove hygiene — stale task/idea assessment. Fires on the nightly schedule. No fire credentials stored; to make it manually fire-able, store `secrets/grove-prune.env` (ROUTINE_FIRE_URL + ROUTINE_FIRE_TOKEN). |
 
-## Behavioral interrupt
+## Routing: fire vs inline
 
-**If you are about to fire a routine without an explicit fire trigger from
-Baylee, stop.** Async fires count against a daily cap and run out-of-session
-— firing one when Baylee wanted an inline answer wastes the cap and delays
-the result. Trigger words: `fire`, `routine-fire`, `async`, `drain`, `queue`,
-or the `-r` suffix on a routine name. Without one of these, route to the
-corresponding inline skill.
+Routine fires are not a precious resource to defend. Fire when Baylee uses a
+fire word (`fire`, `routine-fire`, `async`, `drain`, `queue`, or the `-r`
+suffix) — or when an objective Baylee has authorized is naturally implemented
+by a routine fire, even without fire vocabulary. Route to the inline sibling
+only when Baylee plainly wants an in-session answer. Reserve confirmation for
+large multi-fire batches (see batch firing below).
 
 | Message | Route to |
 |---------|----------|
@@ -45,6 +46,14 @@ corresponding inline skill.
 
 If the user names a routine without a fire word ("scout-r this idea"), treat
 the `-r` suffix as the explicit trigger.
+
+### Three-mode routing (skill-worker-r)
+
+| Mode | When to use | Poll? |
+|------|-------------|-------|
+| Queue-only | Default — nothing waiting on results; change lands overnight via the nightly drain | No |
+| Fire-and-forget | You want the change sooner (minutes) but the session doesn't depend on the result | No |
+| Fire-and-verify | Load-bearing: the fire is itself a test, or the next action depends on the result | Yes (Step 5) |
 
 ## Workflow
 
@@ -164,14 +173,16 @@ On failure:
 - 401 = token expired — rotate at `claude.ai/code/routines`, update the
   relevant `secrets/*.env`.
 - 429 = rate limited — Routine fires count against the daily cap.
+- 400 with reason `routine_paused` = the Routine is paused — Baylee unpauses
+  at `claude.ai/code/routines`, then refire.
 
-### 5. Post-fire verification — skill-worker-r ONLY
+### 5. Post-fire verification — skill-worker-r, load-bearing fires only
 
-Skip this step entirely for scout-r and any future read-only routine.
+Skip this step for scout-r, any read-only routine, and any fire-and-forget or queue-only skill-worker-r fire.
 
-skill-worker-r has a known failure mode: it can mark tasks done without the
-push succeeding. Catching this in the same session avoids re-investigation
-later.
+Polling is for load-bearing fires only — when the fire is itself a test or the session's next move depends on the result. For everything else, the mechanical completion gate plus the nightly drain are the safety net: an unwatched fire cannot produce a false done, and a refused task is retried automatically.
+
+`worker.py complete` is mechanically gated — it verifies each task's `verify:` lines against the default branch before accepting completion, and `worker.py check <id>` dry-runs the gate. When you do poll (load-bearing fires), this step catches collateral damage the gate can't see (wrong file edited alongside, gate-skipped tasks).
 
 1. **Poll up to ~5 minutes** (every ~30s) for the session to finish — check
    the session URL from Step 4. If still running after the cap, stop polling
@@ -208,6 +219,22 @@ he knows what to do once the routine finishes. The routine runs asynchronously
   you installable zips for any skills that were updated."
 - "If skill_sync shows no drift but Grove tasks were marked done, the routine
   may have failed silently — check the session log."
+
+## Queueing skill-worker tasks — verify lines are mandatory
+
+When creating a `routine:skill-worker` task ("queue this for the worker"),
+the task notes MUST include at least one machine-readable verify line:
+
+```
+verify: owner/repo/path/to/file :: distinctive phrase proving the change
+```
+
+`worker.py complete` is mechanically gated (anti-pattern 7): it fetches each
+verify target from the repo's DEFAULT BRANCH over the GitHub API and refuses
+completion unless every phrase is found. A queued task without verify lines
+cannot be completed by the routine — it will be skipped back to you. Pick a
+phrase that exists ONLY after the change (new text being added, the new
+version string), not text that's already in the file.
 
 ## Security
 

@@ -41,6 +41,33 @@ After `push_files()` returns a commit sha:
 
 In those cases just report the commit URL and stop.
 
+## Publishing a new site
+
+### Deploy gap
+
+The Vercel MCP `deploy_to_vercel` tool only returns CLI instructions — it cannot deploy. The Vercel CLI requires a token not stored in `ops/secrets/`. New repos require a one-time dashboard import at vercel.com/new; only already-imported projects auto-deploy on push.
+
+**Pipeline for a brand-new repo:**
+1. Push the repo to GitHub (git-ops handles this).
+2. Baylee imports at [vercel.com/new](https://vercel.com/new) — one-time, takes ~30 seconds.
+3. From that point on, every push to `main` triggers an auto-deploy; use the standard verify flow above.
+
+### Custom subdomains (bayleemiller.org)
+
+Each new subdomain needs one CNAME record added in Route 53 (the zone's current DNS host):
+- **Name:** the subdomain label (e.g., `warroom` for `warroom.bayleemiller.org`)
+- **Value:** the exact project-specific value shown in the Vercel project's Settings → Domains panel
+
+Copy the CNAME value from the project's Domains panel verbatim, trailing period included.
+
+Values are project-specific (e.g., `d1d4fc829fe7bc7c.vercel-dns-0XX.com.`) — don't guess or reuse a previous project's value.
+
+### Wildcard constraint
+
+A wildcard (`*.bayleemiller.org`) cannot be done with a Route 53 CNAME — per Vercel docs, wildcard domains require moving the zone's nameservers to Vercel (`ns1/ns2.vercel-dns.com`). **This is a Baylee-approved operation only.** `vault.bayleemiller.org` (Grove MCP) lives in this zone, so any NS migration requires a full record inventory and recreation in Vercel DNS before cutover. Never initiate an NS migration without an explicit Baylee directive.
+
+---
+
 ## Guardrails
 
 - Never trigger `Vercel:deploy_to_vercel` unless Baylee explicitly asks. The standard flow is push → auto-deploy, not manual deploy.

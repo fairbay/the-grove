@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-06-10-02"
+  version: "2026-06-11-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -280,10 +280,21 @@ Record:
 5. **notes** — one line only, only if something unusual happened (skill
    failed to fire, unexpected behavior, new trigger phrase discovered).
    Blank for normal sessions.
+6. **compliance** — fixed binary tally, self-reported. Answer each that applies (n/a when the trigger never occurred this session):
+   - `build_review_ran` — for any build delivered, did the prescribed Phase-7 review (delegate-adversarial / review-panel / window.claude harness) actually execute, vs. inline self-critique substitution? yes/no/n-a
+   - `present_before_push` — was every push preceded by present_files? yes/no
+   - `encoding_gate_cleared` — did every 3a/3b finding get a routing decision before the summary? yes/no
+   - `verify_lines_on_queued` — did every routine:skill-worker task created this session carry verify: lines? yes/no/n-a
+   - `grove_writeback_done` — project row + Rung-3 decisions written at archive? yes/no/n-a
+
+The compliance tally is self-graded and therefore not a gate (patterns.md anti-pattern 7) — a single entry proves nothing. Its value is the trend: drift shows up as repeated no's across sessions. Answer honestly including the no's; a clean sheet every session is itself a signal the tally isn't being taken seriously. Periodic audits (review-panel or skill audit) should spot-check entries against session evidence.
 
 ### 8. Watchlist
 
-Read `fairbay/ops/watchlist.md` via git-ops. For each item
+Read `fairbay/ops/watchlist.md` via git-ops. If the read 404s, log
+`watchlist: 404` in the telemetry notes line and continue the archive —
+a missing `fairbay/ops` file is a possible consolidation gap to report,
+never a cue to look in the archived pre-consolidation repos. For each item
 whose `condition` occurred this session, answer the `check` question and
 append a one-line log entry: `YYYY-MM-DD: yes/no [brief detail]`.
 

@@ -5,7 +5,7 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-06-10-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -196,6 +196,11 @@ Pre-fill from memory and conversation context. Present as proposals to correct,
 not blank questions. If the project already has a `MISSION.md`, read it via
 git-ops and ask what's changed — don't re-interview from scratch.
 
+**Mechanism vs feel.** Implementation and mechanism choices (data source,
+content assembly, storage, libraries) are builder calls — decide and state
+them, don't interview. Interview questions are reserved for product feel,
+audience, and success criteria, where Baylee's answer changes the build.
+
 **MISSION.md template:**
 
 ```markdown
@@ -218,6 +223,11 @@ Default to **spec-anchored** (spec + code both in repo, both version-controlled,
 5-7 interview *turns* (a turn batches 2-3 questions). One turn for mission,
 4-6 for spec. Use `ask_user_input_v0` with single_select or multi_select
 options where possible; reserve free text for identity and flow.
+
+**Widget questions must be self-contained.** Carry the proposal being
+confirmed in the question text or its options. Prose preceding a tool call
+can collapse under tool-activity summaries in the claude.ai UI — every
+widget question must make sense as the only thing on screen.
 
 ### Phase 0 — Bootstrap
 

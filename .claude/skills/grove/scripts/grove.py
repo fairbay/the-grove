@@ -44,6 +44,7 @@ VALID_SOURCES = {
     "claude-windows", "claude-web", "claude-ios",
     "web", "ios-app", "ios-widget",
     "siri-shortcut", "migration",
+    "skill-worker-r", "grove-prune-r",  # routine surfaces (grove migration 0008)
 }
 VALID_TASK_STATUSES = {"open", "done", "dropped"}
 VALID_IDEA_STATUSES = {

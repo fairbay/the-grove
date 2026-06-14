@@ -39,13 +39,98 @@ Usage:
 
 Reads GOOGLE_AI_KEY from secrets/gemini.env in fairbay/ops.
 """
+import base64
 import json
+import os
+import subprocess
 import urllib.error
 import urllib.request
-import sys
 
-sys.path.insert(0, '/mnt/skills/user/git-ops/scripts')
-from git_push import read_file  # noqa: E402
+# ---------------------------------------------------------------------------
+# Vendored GitHub read_file (no cross-skill dependency).
+#
+# This helper previously did `from git_push import read_file`, reaching into
+# the git-ops skill's scripts/ directory via a sys.path hack. That import only
+# resolved when both skill script dirs happened to be on sys.path at once —
+# not guaranteed in a fresh chat sandbox — so the skill's documented call path
+# silently failed to import. The only thing gemini.py needs from git_push is
+# the ability to read secrets/gemini.env, so the minimal reader is vendored
+# here. Behavior mirrors git_push.read_file: clone-aware (Routines read from
+# the local clone, no token) with a GitHub Contents API fallback (chat reads
+# via $GITHUB_PAT). Keep this in sync with git_push.read_file if that changes.
+# ---------------------------------------------------------------------------
+
+
+def _find_repo_clone(owner_repo: str):
+    """Return the local path to a git clone of owner_repo, or None."""
+    _, name = owner_repo.split('/', 1)
+    candidates = [
+        os.path.join(os.path.expanduser('~'), name),
+        os.path.join('/home/user', name),
+        os.path.abspath(name),
+        os.path.abspath(os.path.join('..', name)),
+    ]
+    for path in candidates:
+        if not os.path.isdir(os.path.join(path, '.git')):
+            continue
+        try:
+            result = subprocess.run(
+                ['git', '-C', path, 'remote', 'get-url', 'origin'],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0 and name in result.stdout:
+                return path
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            continue
+    return None
+
+
+def _github_token() -> str:
+    """Resolve GitHub PAT. In chat: $GITHUB_PAT (from a memory edit)."""
+    if os.environ.get('GITHUB_PAT'):
+        return os.environ['GITHUB_PAT'].strip()
+    path = os.environ.get('GITHUB_PAT_PATH') or '/home/claude/github-pat.txt'
+    if os.path.exists(path):
+        with open(path) as f:
+            return f.read().strip()
+    raise GeminiError(
+        "No GitHub PAT found — cannot read secrets/gemini.env. Set $GITHUB_PAT "
+        "(from the memory edit) or run from a Routine where fairbay/ops is cloned."
+    )
+
+
+def read_file(owner_repo: str, remote_path: str, branch: str = 'main') -> str:
+    """Read a repo file. Uses a local clone if present, else the GitHub API."""
+    clone_path = _find_repo_clone(owner_repo)
+    if clone_path:
+        local_file = os.path.join(clone_path, remote_path)
+        if os.path.isfile(local_file):
+            with open(local_file, 'r', errors='replace') as f:
+                return f.read()
+        raise GeminiError(f"File not found in clone: {remote_path}")
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/contents/"
+        f"{remote_path}?ref={branch}"
+    )
+    req = urllib.request.Request(url, method='GET')
+    req.add_header('Authorization', f'Bearer {_github_token()}')
+    req.add_header('Accept', 'application/vnd.github+json')
+    req.add_header('X-GitHub-Api-Version', '2022-11-28')
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        raise GeminiError(
+            f"Could not read {owner_repo}/{remote_path}: HTTP {e.code}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise GeminiError(
+            f"GitHub unreachable while reading {remote_path}: {e.reason}"
+        ) from e
+    if payload.get('encoding') == 'base64':
+        return base64.b64decode(payload['content']).decode('utf-8', errors='replace')
+    return payload.get('content', '')
+
 
 # -- Models ----------------------------------------------------------------
 MODEL_FLASH = 'gemini-2.5-flash'
