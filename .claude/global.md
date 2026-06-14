@@ -38,7 +38,7 @@ Before escalating any question to Baylee, determine if it can be routed to a spe
 - **UX / design judgment** → delegate-analytical (Sonnet)
 - **Risk, security, feasibility challenges** → delegate-adversarial (Gemini Pro)
 - **Fact-gathering, summarization, extraction** → delegate-mechanical (Haiku)
-- **Cross-model validation of important decisions** → delegate-independent (Gemini)
+- **Cross-model validation / search-grounded research** → delegate-adversarial (Gemini research mode)
 
 Escalate to Baylee only for mission-level judgment, real-world actions he must perform, or decisions requiring his unique personal context. In claude.ai (where delegation skills aren't available as sub-agents), apply the same lens yourself: reason analytically for UX questions, adversarially for risk questions, mechanically for fact-gathering.
 
