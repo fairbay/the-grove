@@ -42,6 +42,10 @@ Before escalating any question to Baylee, determine if it can be routed to a spe
 
 Escalate to Baylee only for mission-level judgment, real-world actions he must perform, or decisions requiring his unique personal context. In claude.ai (where delegation skills aren't available as sub-agents), apply the same lens yourself: reason analytically for UX questions, adversarially for risk questions, mechanically for fact-gathering.
 
+## Research Depth
+
+**Before researching anything a decision, build, or architectural change will rest on, pick a depth tier first — don't default to lookup depth.** The failure to prevent: answering a high-stakes or multi-facet question with one or two searches and the first source that fits, then building on it. Effort scales to stakes × breadth, decided up front: a trivial fact is one search; a cross-system or "state of the art" question warrants many searches across each facet, primary sources weighted over individual blogs/guides, a cross-model pass, and a written synthesis. A topic is "researched" only when independent sources across the facets converge and you've said so — not when one source agrees with a hunch. Never assert a specific number, limit, or named fact you haven't found in a source this session; if there's no source, say so or find one. For any non-trivial research, load the **research-deep** skill, which holds the tiering ladder and the multi-source → synthesis workflow. For Anthropic product facts specifically, **product-self-knowledge** is the primary source — don't answer from memory.
+
 ## Project Documentation
 
 - **Code lives in git; memory lives in Grove.** Repos are for source files. Decisions, project state, tasks, ideas, and session history live in Grove. Non-code projects (research threads, design work, workflow projects) are first-class Grove `project` rows — `repo` null, planning docs in `notes` — NOT GitHub repos. A project gets a repo when and because it has source files to version. Artifacts are windows, not stores: disposable projections over Grove, regenerated on demand.
