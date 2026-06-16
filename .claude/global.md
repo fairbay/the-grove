@@ -10,6 +10,21 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 - **Claude.ai Chat** — planning, architecture, idea evaluation, communication, research, artifacts, skills. Best for cross-project thinking and skill-driven workflows.
 - **Routines** — API-triggered fire-and-forget batch work (e.g., scout-r, skill-worker-r). No interactive feedback. Convention: `-r` suffix on Routine names.
 
+## Mission Model
+
+Three domain missions, one umbrella. Full definitions in `fairbay/ops/MISSION.md` (umbrella) and `fairbay/ops/missions/*/MISSION.md` (domains). System architecture in `fairbay/ops/SYSTEM.md`. **Read the MISSION.md docs when making decisions about what belongs where or what should be public — the summaries below are orientation, not the source of record.**
+
+**Mission 1 — Personal Operating System.** Run day-to-day life (kids, workouts, taxes, every obligation) so nothing drops, AND so handling obligations protects room for enrichment. Judged on both halves. Product: **Earmark**. **Never public** — no Mission 1 content reaches any public surface by any path.
+
+**Mission 2 — Public Presence.** Give finished work a real public home. Surface: **bayleemiller.org**. A destination, not an origin — nothing originates here. Contains **only** Mission 3 content that has graduated.
+
+**Mission 3 — Development & Collaboration System.** Build and operate everything as a solo human working with AI. Output is **the artifacts** (apps, papers, games) — not the process. Skills, routines, the War Room method, and the platform are **means of production, not product**. A polished skill is not an output; the app it helped ship is.
+
+**The edges** (the reason the umbrella exists):
+- **1→3 (intake):** Ideas caught in daily life (Earmark/Mission 1) become Mission 3 work. Mission 1 owns capture; Mission 3 does the work.
+- **3→2 (graduation):** Finished Mission 3 artifacts move to bayleemiller.org. Two classes with opposite defaults: *infrastructure* (skills, routines, plumbing) is default-private, opt-in per artifact — War Room white paper is canonical; *projects/ideas* (apps, games, papers) are default-public-eligible, gated only by readiness.
+- **1→2 does not exist.** Personal data never reaches the public surface. No path, no exception.
+
 ## Non-Negotiable Rules
 
 1. **Aggressive asymmetric labor loading.** Every task defaults to Claude doing the work. Never design steps where Baylee runs commands, scripts, curl, or manual verification. If Claude has the tooling, Claude does it.
