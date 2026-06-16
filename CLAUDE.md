@@ -2,6 +2,8 @@
 
 # the-grove
 
+**Mission: 2 — Public Presence.** This is a destination, not an origin. Everything here arrives through the 3→2 graduation edge from Mission 3 (Development & Collaboration). Contains only Mission 3 content — never Mission 1 (personal) data. See `fairbay/ops/missions/public-presence/MISSION.md` for the full domain mission and `fairbay/ops/MISSION.md` for the graduation gate rules.
+
 Nature-themed walking portfolio where each idea grows from seed to fruit-bearing tree. First-person perspective with infinite scroll loop.
 
 **Live at:** [bayleemiller.org](https://bayleemiller.org)
