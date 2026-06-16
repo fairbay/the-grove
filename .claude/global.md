@@ -26,10 +26,13 @@ When you encounter a decision point during execution, follow this procedure in o
 
 1. **Consult project documentation** — MISSION.md, SPEC.md, PLAN.md, BRIEF.md, CLAUDE.md, HANDOFF decisions, and `docs/decisions/` if it exists. Also read prior Grove decisions via `grove_list_decisions(project_ref=<repo or slug>, current_only=true)` — works on every surface.
 2. **Delegate to specialist** — Route the question to the appropriate lens before attempting to resolve it yourself or escalating. See Delegation Routing below.
+   - **Diagnosis discipline (Rung 2 gate):** When diagnosing failures or root causes, label evidence class on every claim: *observed* (tool-verified) vs *inferred* (consistent-with-symptoms). Inferred causes never get observed-confidence language. If a hypothesis is cheaply checkable (a few tool calls), verify BEFORE presenting it. When not immediately checkable, present ≥2 plausible causes each with its discriminating test — a single-cause story requires direct evidence. **No Baylee action item may rest on an unverified inference** — verify first, or explicitly mark the item contingent.
 3. **Make the call and document it** — Record the decision in HANDOFF.yaml under `decisions_made:` with: the decision, rationale, alternatives considered, confidence (high/medium/low), and whether it's reversible. Also log it to Grove via `grove_log_decision` — Grove is the cross-surface queryable record; the handoff carries it to the next session. This is expected autonomous competence, not a failure.
 4. **Escalate to Baylee** — Only if truly unresolvable, irreversible, or mission-level. Present distilled: the decision needed, the context, and your recommendation.
 
 Rung 3 is the expected operating mode for most decisions. The ladder exists to ensure decisions are informed (Rung 1), considered from the right angle (Rung 2), and documented (Rung 3) — not to avoid making them.
+
+**Low-confidence surfacing:** Whenever presenting work that rests on a low-confidence decision (inline plan, briefing, chat-status, review output, or mid-build), flag it inline with its alternatives as a non-blocking FYI. Don't bury low-confidence calls inside otherwise-confident output — surface them where the reader encounters the dependent work. This applies in every skill's output, not just session-start orientation.
 
 ## Delegation Routing
 
@@ -60,6 +63,8 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 ## Task & Idea Capture
 
 **Grove** is the central system (Supabase + Vercel API). MCP at `vault.bayleemiller.org/api/mcp`. ALL tasks, ideas, decisions, and project state go here — no iOS Reminders, no per-repo TODO.md, no artifact-storage ledgers.
+
+**Capture at crystallization:** When a concrete work item, patch, or follow-up is agreed mid-session, write the Grove task in the SAME TURN it crystallizes. Don't queue it for later — `chat-archive` write-back is a backstop for anything missed, not the primary capture mechanism. Ad-hoc or never-archived chats have no backstop at all, so in-turn capture is the only guarantee.
 
 ## Git Workflow
 
