@@ -5,7 +5,7 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-06-10-01"
+  version: "2026-06-15-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -68,6 +68,8 @@ If a plan exists (either form): it prescribes the technical approach for each st
 - **Scale-appropriate, not scale-proof.** Hard limits covering 95%+ of real usage with graceful fallback beat enterprise architecture for theoretical load.
 
 ## Build guardrails
+
+- **Empty search ≠ artifact absent.** If a repo search, code search, or file read returns empty for an artifact (MISSION.md, SPEC.md, a plan), that eliminates one location — it does NOT mean the artifact doesn't exist. Before building from scratch, check the Grove project record (`grove_get(entity_type="project", id=...)`, especially `notes` and `docs` fields) and prior session outputs. Building an artifact that already exists and is parked in Grove wastes the session and creates drift.
 
 - **Research before building.** Before choosing a stack, library, or API pattern, run 1-2 web searches to confirm current conventions. Training knowledge drifts — a quick doc search catches breaking changes. Default step, not a post-failure fallback.
 - **Test before delivering.** Parse JSON, require/import modules, mock data between components, curl reachable endpoints, validate schemas. State what was verified vs. what couldn't be tested.

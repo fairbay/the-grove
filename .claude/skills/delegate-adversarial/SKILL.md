@@ -2,10 +2,10 @@
 name: delegate-adversarial
 description: >
   Gemini Pro for adversarial review + research — "tear this apart",
-  security audit, score audit, demand validation. Not for standard
+  "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-06-16-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's

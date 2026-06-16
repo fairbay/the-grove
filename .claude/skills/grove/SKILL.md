@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-06-10-01"
+  version: "2026-06-15-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -61,6 +61,8 @@ When active, 13 tools are available natively — no code execution needed.
 | `grove_drop_task` | "Drop X", "never mind about X" |
 | `grove_events` | "What happened recently", audit history, Session Chronicle |
 
+**ID lookups: `grove_get` requires the full UUID.** IDs are commonly quoted as 8-char prefixes (e.g. `6bac6029`) — never pad a prefix into a fake UUID. Resolve the full ID first via `grove_list_decisions` / `grove_list_tasks` / `grove_list_projects` (`current_only=false` for decisions), then call `grove_get`.
+
 MCP is the only interface. The Python script (`scripts/grove.py`) is the fallback
 for Routines that lack MCP access — same operations, same auth flow.
 
@@ -97,9 +99,10 @@ Status progression (set by other skills, documented here for reference):
 
 `grove_log_decision` with: `decision` (the call), `project_ref`
 (`fairbay/<repo>`, a project slug, or `cross-project`), `alternatives`,
-`confidence`, `reversible`, `context`, `rung` (usually 3). Decisions are
-**append-only** — to correct one, log a new decision with `supersedes` set to
-the old ID. Never try `grove_update` on a decision.
+`confidence`, `reversible`, `context`, `rung` (usually 3). **`decision` is
+capped at 2000 chars — overflow detail goes in `context` and `alternatives`.**
+Decisions are **append-only** — to correct one, log a new decision with
+`supersedes` set to the old ID. Never try `grove_update` on a decision.
 
 ### "What did we decide about X"
 
@@ -115,6 +118,14 @@ carry `phase`, `blockers`, `next_actions`, `last_session`, `docs` status, and
 `grove_create_project` — omit `repo` for non-code projects; update with
 `grove_update(entity_type="project", ...)`. chat-archive refreshes the row at
 session end; session-start's briefing reads it.
+
+**The project RECORD (`grove_get(entity_type="project", id=...)`) is the
+authoritative source for what's been drafted, parked, or deferred.** The `notes`
+field carries parked planning docs for non-code projects; `docs` flags which
+artifacts (mission/spec/plan/brief) are drafted. Reading `grove_list_decisions`
+or `grove_list_tasks` does NOT satisfy "check the project" — those are separate
+objects. An empty repo search ≠ artifact doesn't exist: check the project record
+first.
 
 ## Browse and events
 

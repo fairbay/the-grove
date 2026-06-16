@@ -5,7 +5,7 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-06-10-01"
+  version: "2026-06-16-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -148,7 +148,20 @@ Rules:
 
 ### Auto-chain after express mode
 
-Default: chain to the build skill. State *"Plan complete — chaining to build."* unless the user said "just architect" or the plan flagged a blocking risk.
+Default: flow directly into the build skill. State *"Plan complete — chaining
+to build."* and proceed.
+
+**Stop-conditions (two qualifiers — flow through on everything else):**
+1. The user said "just architect" or "plan only."
+2. The plan contains a **pending Rung-4 decision** — a call that's
+   irreversible, mission-level, or explicitly flagged for Baylee's input.
+3. The plan involves **irreversible side effects on existing assets**:
+   forward-only migrations on existing tables, deletes of existing repos/data,
+   pushes to already-live-deployed repos, spending money, or external comms.
+
+If neither qualifier (2) nor (3) applies, chain immediately. On flow-through:
+render the plan inline (non-blocking), log any Rung-3 decisions to Grove, and
+note that Baylee can redirect mid-build.
 
 **Hand-off mechanics:** Express mode produces `build-plan-<slug>.md` in `/mnt/user-data/outputs/`, NOT a repo-level `PLAN.md`. When auto-chaining, the plan content is in-context — pass it directly to build. Build's Phase 0 should use the in-context plan rather than reading PLAN.md via git-ops (which won't exist for express-mode projects). If the user asks to push the plan to the repo, route through git-ops as `PLAN.md` — but that's a user-initiated action, not the default.
 
@@ -343,6 +356,18 @@ Push `PLAN.md` alongside `SPEC.md` in the same commit.
 - [ ] Pass criteria are specific and verifiable (not "looks good" or "works well")
 
 ### Phase 7 — Push + vault update
+
+**Deferred-layout breadcrumb.** When a layout or storage decision is deliberately
+deferred (e.g. "park in Grove project notes until repo restructure", "layout TBD"),
+create a stub file at the artifact's expected repo path before closing the session:
+
+```html
+<!-- PARKED: [artifact name] is drafted and stored in [location: Grove project <slug>,
+     notes field / Drive / etc.]. Layout deliberately deferred: [reason].
+     Do not rebuild — retrieve from the noted location instead. -->
+```
+
+Push the stub so a future repo search at the expected path finds a pointer, not silence.
 
 Route through **git-ops**:
 

@@ -5,7 +5,7 @@ description: >
   "still failing", "why is X happening", deploy failures, build errors. Not for
   features (→ build) or architecture (→ architect).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-16-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -62,6 +62,7 @@ State ONE hypothesis. It must:
 - Name a specific layer and a specific mechanism (`"trimForAnalyze in index.html caps base64 payload at 3.5MB"`)
 - Predict an observable outcome if true (`"if I log totalB64 before the trim, it'll be >3.5MB on full listings"`)
 - Be falsifiable in one tool call or test
+- **Label its evidence class:** *observed* (tool-verified this session) or *inferred* (consistent with symptoms but not directly confirmed). An inferred hypothesis never gets observed-confidence language ("the cause is…") — use "likely cause" or "hypothesis" until verified. Never build a Baylee action item on an unverified inference.
 
 **If you have multiple plausible hypotheses, you haven't finished Phase 1.** Go back. The right hypothesis is rarely a coin flip between two equally-likely options — it's the one the evidence actually points to.
 

@@ -27,6 +27,7 @@ import json
 import base64
 import shutil
 import subprocess
+import time
 import urllib.request
 import urllib.error
 
@@ -178,26 +179,40 @@ def _token():
         "or $GITHUB_PAT_PATH. In Routines, use clone-aware functions instead."
     )
 
-def api(method, path, body=None):
+def api(method, path, body=None, _retries=8):
+    """GitHub API call with retry-on-401 for egress proxy auth header drops.
+
+    Known failure mode (2026-06-10): transparent egress proxy intermittently
+    drops the Authorization header in bursts. Symptoms: valid PAT + bursty 401
+    + GitHub request-ids present in response. NOT a token problem — safe to
+    retry all methods including PATCH (ref update is idempotent for same SHA).
+    """
     url = f"https://api.github.com{path}"
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method)
-    req.add_header("Authorization", f"Bearer {_token()}")
-    req.add_header("Accept", "application/vnd.github+json")
-    req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    if data is not None:
-        req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            raw = resp.read().decode()
-            return resp.status, json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode()
+    last_code, last_body = None, None
+    for attempt in range(_retries):
+        req = urllib.request.Request(url, data=data, method=method)
+        req.add_header("Authorization", f"Bearer {_token()}")
+        req.add_header("Accept", "application/vnd.github+json")
+        req.add_header("X-GitHub-Api-Version", "2022-11-28")
+        if data is not None:
+            req.add_header("Content-Type", "application/json")
         try:
-            parsed = json.loads(raw)
-        except Exception:
-            parsed = {"raw": raw}
-        return e.code, parsed
+            with urllib.request.urlopen(req) as resp:
+                raw = resp.read().decode()
+                return resp.status, json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode()
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                parsed = {"raw": raw}
+            last_code, last_body = e.code, parsed
+            if e.code == 401 and attempt < _retries - 1:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            return e.code, parsed
+    return last_code, last_body
 
 # ---------------------------------------------------------------------------
 # Public interface
@@ -211,11 +226,70 @@ def push_files(owner_repo, branch, message, files):
 
     In a Routine or cloud session where the repo is cloned, uses native
     git CLI (fast, 1 network call). Otherwise uses Git Data API (6 calls).
+    On API 401 exhaustion (egress proxy auth flap), falls back to native
+    git transport via shallow clone.
     """
     clone_path = _find_repo_clone(owner_repo)
     if clone_path:
         return _push_via_cli(clone_path, branch, message, files)
-    return _push_via_api(owner_repo, branch, message, files)
+    try:
+        return _push_via_api(owner_repo, branch, message, files)
+    except RuntimeError as e:
+        if "401" in str(e):
+            print(f"[git-ops] API 401 after retries, falling back to native git: {e}",
+                  file=sys.stderr)
+            return _push_via_native_fallback(owner_repo, branch, message, files)
+        raise
+
+
+def _push_via_native_fallback(owner_repo, branch, message, files):
+    """Shallow clone + commit + push when API path fails due to auth flap.
+
+    Proven recovery path from 2026-06-10 (commit 690be66). Uses
+    x-access-token:PAT@github.com for HTTPS auth through the egress proxy.
+    """
+    import tempfile
+    token = _token()
+    clone_url = f"https://x-access-token:{token}@github.com/{owner_repo}.git"
+    tmpdir = tempfile.mkdtemp(prefix="git-fallback-")
+    try:
+        subprocess.run(
+            ["git", "clone", "--depth=1", f"--branch={branch}", clone_url, tmpdir],
+            check=True, capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", GIT_AUTHOR_NAME],
+            cwd=tmpdir, capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", GIT_AUTHOR_EMAIL],
+            cwd=tmpdir, capture_output=True,
+        )
+        for remote_path, local in files:
+            dest = os.path.join(tmpdir, remote_path)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            if isinstance(local, bytes):
+                with open(dest, "wb") as f:
+                    f.write(local)
+            else:
+                shutil.copy2(local, dest)
+            subprocess.run(["git", "add", remote_path], cwd=tmpdir,
+                           check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=tmpdir, check=True, capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["git", "push", "origin", branch],
+            cwd=tmpdir, check=True, capture_output=True, text=True,
+        )
+        sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=tmpdir, capture_output=True, text=True,
+        ).stdout.strip()
+        return sha, f"https://github.com/{owner_repo}/commit/{sha}"
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def _push_via_api(owner_repo, branch, message, files):

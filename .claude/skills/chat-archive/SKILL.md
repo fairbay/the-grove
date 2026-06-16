@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-06-11-01"
+  version: "2026-06-15-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -343,6 +343,20 @@ gone next session.
 
 The handoff YAML is Claude-to-Claude continuity; Grove is the queryable
 record. After the handoff is written, mirror the session state to Grove:
+
+**Park-time breadcrumb.** If any artifact produced or referenced this session
+is parked in Grove (project notes, idea notes) rather than committed to a repo,
+and that artifact has an obvious expected repo path (e.g. `MISSION.md`,
+`SPEC.md`, `PLAN.md`), create a stub file at that path in the repo:
+
+```html
+<!-- PARKED: [artifact name] is drafted and stored in Grove project [slug]
+     (notes field). Do not rebuild — read from Grove instead.
+     Deferred: [reason]. -->
+```
+
+Push the stub in the same commit as the handoff. This prevents future sessions
+from concluding the artifact doesn't exist because the repo search returned empty.
 
 1. **Project row.** `grove_list_projects(slug=<project slug>)`. If a row
    exists, `grove_update(entity_type="project", id, patch={phase, blockers,

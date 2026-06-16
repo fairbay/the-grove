@@ -1,11 +1,11 @@
 ---
 name: review-panel
 description: >
-  Multi-agent or cross-model review — "panel review", "Gemini review",
+  Multi-agent or cross-model review — "panel review",
   "calibrate scores", "audit my vault". Auto-runs build Phase 7.
   Not for isolated checks (→ delegate-analytical/adversarial).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-06-16-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -17,7 +17,7 @@ feedback Claude could have caught first.
 
 | Mode | Trigger | What gets reviewed |
 |---|---|---|
-| **A: Artifact** | "panel review", "Gemini review", build Phase 7 | code / computation / UX |
+| **A: Artifact** | "panel review", build Phase 7 | code / computation / UX |
 | **B: Scores** | "calibrate scores", "audit my vault", batch re-scores | vault scoring consistency |
 
 ## Collision zone with delegate-adversarial
@@ -26,7 +26,8 @@ Both find flaws. The split is structural, not topical.
 
 | User says / context | This skill | delegate-adversarial |
 |---|---|---|
-| "panel review", "Gemini review" | yes | no |
+| "panel review" | yes | no |
+| "Gemini review" | no | yes |
 | "calibrate scores", "audit vault" | yes (Mode B) | no |
 | build Phase 7 on Claude.ai (artifact) | yes (Path 1) | no |
 | build Phase 7 in Claude Code or Routines | no | yes |
@@ -35,8 +36,8 @@ Both find flaws. The split is structural, not topical.
 | Architecture critique, spec gap-find | no | yes |
 
 Rule of thumb: **iterative or multi-agent → here. Single-pass flaw list →
-delegate-adversarial.** A user who says "panel" or names Gemini wants multiple
-voices; a user who says "tear this apart" wants one decisive critic.
+delegate-adversarial.** A user who says "panel" wants multiple voices; a user
+who says "tear this apart" or "Gemini review" wants one decisive critic.
 
 ## Quality tiers (reference)
 

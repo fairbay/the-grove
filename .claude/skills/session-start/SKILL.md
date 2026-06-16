@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-06-10-02"
+  version: "2026-06-16-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -22,6 +22,14 @@ starts ready to work, not reconstructing context turn by turn.
 handoff, stop.** Run Phase 1 first. The instinct to jump into problem-solving
 skips the handoff, which forces context reconstruction later in the session
 at higher cost.
+
+**If you are about to search the repo, run code searches, or read git history
+BEFORE calling `grove_get` on the project record, stop.** The project RECORD
+(`grove_get(entity_type="project", id=...)`) is the authoritative source for what's
+been drafted, parked, or deferred — including `notes` (planning docs for non-code
+projects) and `docs` (which artifacts are drafted). An empty repo search does NOT
+mean the artifact doesn't exist; it means it isn't in the repo. Project record
+first, then repo.
 
 ## Trigger shapes
 
@@ -48,14 +56,20 @@ the project row carries, not the identity.
 **Loading Grove tools (chat):** the tool_search registry matches fuzzily on
 Grove tool names — descriptive queries take 2-3 attempts. Load first-try with
 the exact-name query: `grove_list_projects grove_create_task grove_update
-grove_log_decision`.
+grove_log_decision`. Then load `grove_list_decisions grove_get grove_list_tasks`
+in one follow-up call. Two calls total — do not search piecemeal.
 
 Resolution order:
 
-1. **Grove project.** `grove_list_projects(slug=<kebab-case name>)`, falling
-   back to `grove_list_projects(q=<name>)`. A hit gives the slug, `repo` (null
-   for non-code projects), phase, blockers, and next_actions — keep the row,
-   it feeds the Phase 5 briefing. If `repo` is set, that's the repo.
+1. **Grove project record (first, always).** `grove_list_projects(slug=<kebab-case name>)`,
+   falling back to `grove_list_projects(q=<name>)`. A hit gives the ID, slug, `repo`
+   (null for non-code projects), phase, blockers, and next_actions. **Then immediately
+   call `grove_get(entity_type="project", id=<project_id>)` to load the full record.**
+   The full record's `notes` field carries parked planning docs; `docs` flags which
+   artifacts (mission/spec/plan/brief) are drafted. This is the authoritative "what's
+   been done" check — a repo search that returns empty after this is expected, not a
+   conclusion the artifact doesn't exist. Keep the full record; it feeds the Phase 5
+   briefing. If `repo` is set, that's the repo.
 2. **CWD repo (Code only).** In Code, the CWD repo IS the project — but still
    run step 1 with the repo name to fetch the project row if one exists.
 3. **Grove ideas.** Search Grove ideas via MCP (`grove_list_ideas`) for the name.
@@ -75,6 +89,12 @@ If a project name maps to multiple repos (e.g. "Grove" → `grove`, `grove-web`,
 ambiguous, ask.
 
 ## Phase 2 — Load handoff
+
+**Early-exit:** If the Grove project row has `last_session=null` or was created
+today with no prior session, the row itself IS the handoff-equivalent — skip
+the handoff hunt entirely (no git-ops setup, no ops/handoffs listing, no repo
+HANDOFF.yaml read). Jump straight to Phase 4. This prevents 10+ tool calls
+to orient on a project that has no prior handoff to find.
 
 Resolution order — use the first that resolves:
 
@@ -112,13 +132,18 @@ Note this briefly and proceed.
 
 ## Phase 3 — Stale handoff check
 
-A handoff from days ago can be overridden by a more recent chat. Always check.
+**Skip entirely** if Phase 2 found no handoff (early-exit or none resolved).
+No handoff = nothing to check staleness of.
+
+When a handoff DID resolve, only run the stale check if the handoff is **older
+than 24 hours** (compare `meta.generated` to now). A handoff from earlier today
+or last night is fresh enough.
+
+When checking:
 
 1. Read `meta.generated` from the handoff YAML.
-2. Check for newer sessions:
-   - **Chat:** call `recent_chats(after=<generated_timestamp>, n=5)`.
-   - **Code:** check `git log --since=<timestamp>` for newer commits in the
-     repo, or check ops/handoffs/ for newer session handoffs.
+2. **One call max:** `recent_chats(after=<generated_timestamp>, n=5)` in chat,
+   or `git log --since=<timestamp>` in Code.
 3. If anything newer mentions the same project, flag before proceeding.
 4. If nothing newer, proceed.
 
@@ -240,6 +265,23 @@ confirmation.
 
 ## Anti-patterns
 
+- **Skipping the project record read.** `grove_list_decisions` and
+  `grove_list_tasks` are separate objects — reading them does NOT satisfy
+  "check the project." The project RECORD (`grove_get` on the project row)
+  is the only authoritative source for what's drafted, parked, or deferred.
+
+- **Treating repo-empty as artifact-absent.** An empty result from a repo
+  search, code search, or git history is elimination of that one location —
+  not a conclusion the artifact doesn't exist. Before "not found → build from
+  scratch", read the full Grove project record (notes/docs fields), then
+  check other stores (prior session outputs, Drive). One empty search does not
+  license a rebuild.
+
+- **Ignoring breadcrumbs in the repo.** If a file at an expected repo path
+  (e.g. `MISSION.md`, `SPEC.md`) contains a `<!-- PARKED: ... -->` or
+  similar pointer, that IS a breadcrumb — follow it to the noted location
+  before concluding the artifact is absent.
+
 - **Skipping the stale check.** A 3-day-old handoff may be overridden by
   yesterday's work. Always run Phase 3.
 - **Using conversation_search as a handoff substitute.** If no handoff is
@@ -257,6 +299,12 @@ confirmation.
   repo. Don't ask.
 - **Auto-starting work.** Orientation first, confirmation second, work third —
   except the singular-unambiguous-task carve-out.
+
+- **Chasing referenced artifacts during orientation.** Don't read other
+  handoffs, task bodies, plan doc contents, or linked decision chains during
+  the briefing. The project row + decisions are the briefing inputs; downstream
+  skills load the rest when work begins. Orientation should be 3-5 tool calls
+  for a known project, not 12+.
 
 ## Integration
 
