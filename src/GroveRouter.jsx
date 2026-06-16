@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import VaultDashboard from "./VaultDashboard";
 import Garden from "./App";
 import BookPage from "./BookPage";
+import ArticlePage from "./ArticlePage";
 
 /*
- * GroveRouter v2.2.0
+ * GroveRouter v2.4.0
  * 
  * Routes:
  * - /vault → VaultDashboard
  * - /books/stage-directions → BookPage
+ * - /works/:slug → ArticlePage
  * - / (default) → The Grove walking garden
  *
  * Vault data fetched from VaultSync (Google Apps Script).
@@ -37,9 +39,11 @@ export default function GroveRouter() {
   const path = window.location.pathname;
   const isVault = path === "/vault";
   const isBook = path.startsWith("/books/");
+  const isWork = path.startsWith("/works/");
+  const workSlug = isWork ? path.replace("/works/", "").replace(/\/$/, "") : null;
 
   useEffect(() => {
-    if (isVault || isBook) return;
+    if (isVault || isBook || isWork) return;
     fetch(VAULT_URL)
       .then((r) => {
         if (!r.ok) throw new Error(`Failed to load vault: ${r.status}`);
@@ -51,10 +55,11 @@ export default function GroveRouter() {
         setError(e.message);
         setProjects([]);
       });
-  }, [isVault, isBook]);
+  }, [isVault, isBook, isWork]);
 
   if (isVault) return <VaultDashboard />;
   if (isBook) return <BookPage />;
+  if (isWork) return <ArticlePage slug={workSlug} />;
 
   if (projects === null) {
     return (
