@@ -5,7 +5,7 @@ description: >
   live site", "what's in fairbay/X". Not for new-host setup (→ ship-it) or
   prototyping (→ build).
 metadata:
-  version: "2026-06-16-01"
+  version: "2026-06-16-02"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -44,11 +44,21 @@ The diff URL is Baylee's review mechanism. Never push before presenting — `pre
 
 ### Claude.ai chat
 
-PAT lives in Claude's memory edits. Set the env var before the first call:
+**PAT bootstrap (once per session).** The PAT is stored encrypted in
+Supabase Vault on the Grove project (`rhaueykqbtftaeosfldz`). Before the
+first git-ops call, bootstrap it:
 
 ```python
+# Step 1 — Read PAT from Vault via Supabase MCP
+# Call: Supabase:execute_sql(project_id="rhaueykqbtftaeosfldz",
+#   query="SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'GITHUB_PAT';")
+# The result contains the decrypted PAT value.
+
+# Step 2 — Write to file (git_push.py reads this as fallback)
 import os
-os.environ["GITHUB_PAT"] = "<token from memory>"
+with open("/home/claude/github-pat.txt", "w") as f:
+    f.write("<pat_value_from_step_1>")
+os.environ["GITHUB_PAT"] = "<pat_value_from_step_1>"
 ```
 
 Then import the helper:
@@ -59,6 +69,11 @@ for _p in [".claude/skills/git-ops/scripts", "/mnt/skills/user/git-ops/scripts"]
     if __import__("os").path.isdir(_p): sys.path.insert(0, _p); break
 from git_push import push_files, read_file, list_files, delete_repo, api
 ```
+
+**Do NOT store the PAT in memory edits, chat messages, or committed
+files.** Vault is the single source of truth. To rotate, update the
+secret in the Supabase Dashboard (Settings → Vault) — no skill or
+memory edit changes needed.
 
 ### Claude Code / Routines
 
@@ -151,8 +166,8 @@ Placed near the operations above, summarized here:
 
 ## Secret hygiene
 
-- The PAT lives in Claude's memory edits in chat sessions. NOT in this skill, NOT in commits, NOT in user-visible output.
-- If it leaks, rotate at https://github.com/settings/personal-access-tokens and update the memory edit. No skill rebuild needed.
+- The PAT lives in **Supabase Vault** (Grove project, `rhaueykqbtftaeosfldz`, secret name `GITHUB_PAT`). Encrypted at rest via pgsodium. NOT in memory edits, NOT in this skill, NOT in commits, NOT in user-visible output.
+- If it leaks, rotate at https://github.com/settings/personal-access-tokens and update the Vault secret in the Supabase Dashboard (Settings → Vault). No skill rebuild needed. Also update the `GH_PAT` GitHub Actions secret on `fairbay/ops`.
 - In Claude Code / Routines, the proxy handles auth — no token is stored or transmitted by the skill.
 
 ## Integration
