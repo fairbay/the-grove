@@ -5,7 +5,7 @@ description: >
   "sync skills", "isn't triggering", "add that to [skill]." Fires on ANY skill
   file edit. Not for using skills or memory edits.
 metadata:
-  version: "2026-06-11-01"
+  version: "2026-07-04-01"
 ---
 
 # skill-creator — build and maintain skills for Baylee's system
@@ -337,11 +337,13 @@ When syncing ("sync skills", "are my skills up to date?"):
 
 ```bash
 cd /home/claude/ops
-PYTHONPATH=".claude/skills/git-ops/scripts:$PYTHONPATH" python3 scripts/skill_sync.py check
+PYTHONPATH=".claude/skills/git-ops/scripts:$PYTHONPATH" python3 scripts/sync.py
 ```
 
-If drifted, run `package` to build `.skill` zips, then `present_files` for
-batch install. Requires the repo to be cloned first and `GITHUB_PAT` exported.
+This runs all three phases: chat skill check + packaging, cross-repo skill
+push, and cross-repo global.md push. If chat skills are drifted, it produces
+`.skill` zips — `present_files` them for batch install. Requires the repo to
+be cloned first and `GITHUB_PAT` exported.
 
 ---
 
