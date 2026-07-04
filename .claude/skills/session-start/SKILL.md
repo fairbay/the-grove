@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-06-16-01"
+  version: "2026-07-03-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -194,6 +194,62 @@ design (see architect skill), and projects that grow past prototype scope
 need the quality contract (acceptance criteria, success metrics, out-of-scope
 list) that only interview mode produces.
 
+## Phase 4c — Synthesize work queue
+
+Merge work items from all sources into one deduplicated, dependency-ordered
+list. Sources: handoff `next:`, Grove project `next_actions`, open Grove tasks
+(`grove_list_tasks(project_ref=..., status="open", limit=10)`), open
+adjudications (`grove_list_adjudications(list=<project slug>, status="open")`),
+and PLAN.md's active phase remaining steps. Cross-cutting items (skill updates,
+Grove work, research) are included alongside project-specific items — everything
+the session plans to do. Open adjudications aren't executable work — they wait
+on Baylee's judgment — so they feed the Phase 5 "Pending adjudications" count,
+not a queue batch.
+
+**Ordering principle — topological batches:**
+
+Sort items into sequential batches. Items within a batch have no dependencies
+on each other and can run in parallel. Batches are sequential gates — batch N+1
+waits for batch N.
+
+Classification tiers (batch assignment):
+
+1. **Blockers & correctness** — broken tools, bugs, anything producing wrong
+   output. Gates all downstream work.
+2. **Tooling & infrastructure** — pipeline improvements, flags, automation.
+   Group related changes together. These compound: every future run benefits.
+3. **Data enrichment & cleanup** — work that uses the tooling. Do after tooling
+   is solid. Independent enrichment tasks are parallel within this batch.
+4. **External data integration** — independent enrichment from outside sources.
+   Can float earlier if truly independent.
+5. **Downstream consumers** — prototype updates, UI changes, exports. Depend on
+   data being right — do last.
+
+**Rendering format (topological batch list):**
+
+```
+Next up (critical-path-ordered):
+
+Batch 1 ‖ [cluster label]
+  ○ Item A
+  ○ Item B
+
+Batch 2 — [cluster label]
+  ○ Item C [needs A]
+
+Batch 3 ‖ [cluster label]
+  ○ Item D
+  ○ Item E
+```
+
+`‖` after batch number = items within are parallel-safe. `—` = single item or
+sequential sub-items. Status: `○` pending, `◉` active, `●` done. Batch labels
+describe the cluster purpose (e.g., "Pipeline correctness", "Data quality").
+
+Within each batch, group related items. If an item could float to an earlier
+batch (no dependencies on prior batches), move it — don't penalize independent
+work with artificial sequencing.
+
 ## Phase 5 — Render the briefing (read-back gate)
 
 Render the briefing inline in chat from what Phases 1-4 loaded — the Grove
@@ -219,10 +275,12 @@ project row's last_session + most recent grove_events entries.]
 Omit if empty.]
 
 **Next up:**
-[Handoff `next:` items if present, else project row `next_actions`, numbered]
+[Phase 4c synthesized queue — topological batch format, critical-path-ordered]
 
 **Blockers:** [handoff `blocking_on:` merged with project row `blockers`,
 or "None"]
+**Pending adjudications:** [N] awaiting judgment →
+vault.bayleemiller.org/adjudicate [omit this line entirely when N is 0]
 ```
 
 If the handoff and the Grove project row disagree (e.g. different next
@@ -232,8 +290,13 @@ one line.
 #### Surfacing decisions
 
 Merge `grove_list_decisions` results with the handoff's `decisions_made:`
-(dedupe by content — a Rung-3 decision is usually in both). Surface them in
-the briefing between "where we left off" and "next up." Priority ordering:
+(dedupe by content — a Rung-3 decision is usually in both). Also merge in
+resolved adjudications relevant to the project's next actions —
+`grove_list_adjudications(list=<project slug>, status="done")` — a
+`resolution` (`option_id` + `notes`) is a verdict the session must consume
+before re-deciding anything previously sent to adjudication. Surface all of
+this in the briefing between "where we left off" and "next up." Priority
+ordering:
 
 1. **Low-confidence + irreversible** — flag prominently: "⚠️ Needs review:"
 2. **Low-confidence + reversible** — note for awareness: "FYI, can be changed:"

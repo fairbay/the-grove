@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-06-15-01"
+  version: "2026-07-03-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -99,7 +99,7 @@ code changes.
 
 ### 3. Gather and apply learnings
 
-Three passes. Meta-analysis is first and highest-leverage — it catches the
+Four passes. Meta-analysis is first and highest-leverage — it catches the
 lessons Baylee is least likely to flag explicitly.
 
 #### 3a. Meta-analysis — what would have made this session lower-effort?
@@ -140,6 +140,12 @@ routing decision. See `references/encoding-gate.md` for the routing tree.
   `routine:skill-worker` with contractor-grade notes (file path, exact
   change, rationale)
 - **Grove task** → create now
+- **Adjudication item** → a source conflict, unreachable/blocked-content gap,
+  or medium/low-confidence call surfaced this session that needs Baylee's
+  judgment: file via `grove_create_adjudication` (question, context,
+  discriminator, options[] each with `explanation` + `evidence_urls`) — not
+  buried as prose in task notes. Each option must stand alone, with enough
+  context to judge without chat history.
 - **No encoding needed** → state which existing edit/skill already covers it
 
 **Do not proceed to Step 4 until every finding has a routing decision.**
@@ -157,6 +163,39 @@ no chat context assumed. Include: why it exists, what "done" looks like, key
 decisions, and links to repos/artifacts. "Contractor-grade notes" (step 3b′)
 means a reader can execute without searching past chats. Same standard as
 add-to-do and grove.
+
+#### 3d. Permissions audit (chat only)
+
+Scan the session for every permission request, tool denial, or capability gap
+that required Baylee's intervention or degraded the response. Three categories:
+
+1. **Tool permission prompts.** Any time Claude requested access to a tool
+   and Baylee had to grant it (location, calendar, reminders, etc.). Note
+   which tool triggered the prompt and whether it could be pre-authorized.
+2. **Missing or disconnected connectors.** Any time Claude suggested
+   connecting an MCP app, searched the registry, or fell back to web search
+   because a connector wasn't available. Note the connector name.
+3. **Settings-gated capabilities.** Any time a response was limited because
+   a setting was off — web search disabled, code execution unavailable,
+   memory/past-chat search toggled off, artifacts disabled, etc.
+
+For each item found, determine the **preventive action** — the one-time
+setup step that would eliminate the permission request in future sessions:
+
+| Gap type | Preventive action |
+|----------|-------------------|
+| Tool permission prompt | Grant persistent access in Claude Settings → Privacy |
+| Missing MCP connector | Connect it in Claude Settings → Connected apps |
+| Setting toggled off | Enable in Claude Settings → Feature controls |
+| Connector auth expired | Re-authenticate in Connected apps |
+| No preventive action possible | Note as inherent (e.g., first-use tool grants on iOS) |
+
+**Output goes in Step 4** under "Permissions & setup gaps." If zero items
+found, skip — don't mention permissions in the summary.
+
+**Encoding:** If a gap recurred across multiple sessions (check
+`conversation_search`), create a memory edit or Grove task to track it.
+One-time grants don't need encoding — the summary is sufficient.
 
 ### 4. Session summary
 
@@ -181,6 +220,12 @@ Concise, scannable:
 - **Key decisions** — architectural choices, ideas shelved/killed, strategy
   shifts. These feed `decisions_made:` in the handoff (Step 9).
 - **What didn't work** — failed approaches worth remembering
+- **Permissions & setup gaps** (from 3d, only if any) — what Claude
+  requested permission for, what was missing, and the specific settings
+  path or connector name to prevent it next time. Format each as:
+  "[what happened] → **Fix:** [exact action, e.g. Claude Settings →
+  Connected apps → connect X]." Baylee should be able to act on each
+  item without further research.
 
 **Retro format (when applicable):** If the session surfaced a process lesson,
 state it in 3-5 sentences. Name the pattern, not the play-by-play. Then
@@ -253,96 +298,51 @@ push response — read it back.
 - Don't ask Baylee to paste secrets into chat; redirect to paste into the
   destination field.
 
-### 7. Telemetry
+### 7. (Removed — telemetry)
 
-Append a session entry to `fairbay/ops/telemetry/skill-usage.yaml`
-via git-ops. Mechanical logging only — no analysis, evaluation, or
-editorialization. Push in the same commit as other archive artifacts.
-
-**Canonical indentation — match it exactly or the file stops parsing:**
-list items 2 spaces under `sessions:` (`  - date:`), child keys at 4 spaces,
-nested list items at 6. Validate with `yaml.safe_load` before pushing; a
-misindented append breaks every future read (happened 2026-05→06, repaired
-2026-06-10).
-
-Record:
-
-1. **date** — today's date.
-2. **type** — classify: `build`, `debug`, `scout`, `plan`, `meta`, `mixed`.
-3. **skills_loaded** — every skill whose SKILL.md was read this session.
-   For each, note trigger type:
-   - `auto` — skill fired without Baylee naming it
-   - `manual` — Baylee explicitly invoked it ("scout this", "archive")
-   - `called-by-skill` — another skill's body triggered loading this one
-4. **redirects** — if Baylee corrected a skill choice ("no, I meant build
-   not architect"), log as `{from: architect, to: build, trigger: "build
-   this after scout"}`. Empty list if none.
-5. **notes** — one line only, only if something unusual happened (skill
-   failed to fire, unexpected behavior, new trigger phrase discovered).
-   Blank for normal sessions.
-6. **compliance** — fixed binary tally, self-reported. Answer each that applies (n/a when the trigger never occurred this session):
-   - `build_review_ran` — for any build delivered, did the prescribed Phase-7 review (delegate-adversarial / review-panel / window.claude harness) actually execute, vs. inline self-critique substitution? yes/no/n-a
-   - `present_before_push` — was every push preceded by present_files? yes/no
-   - `encoding_gate_cleared` — did every 3a/3b finding get a routing decision before the summary? yes/no
-   - `verify_lines_on_queued` — did every routine:skill-worker task created this session carry verify: lines? yes/no/n-a
-   - `grove_writeback_done` — project row + Rung-3 decisions written at archive? yes/no/n-a
-
-The compliance tally is self-graded and therefore not a gate (patterns.md anti-pattern 7) — a single entry proves nothing. Its value is the trend: drift shows up as repeated no's across sessions. Answer honestly including the no's; a clean sheet every session is itself a signal the tally isn't being taken seriously. Periodic audits (review-panel or skill audit) should spot-check entries against session evidence.
+Session metadata is captured via the Grove project row update (Step 9b:
+`last_session`, `next_actions`, `phase`) and decisions via `grove_log_decision`.
+The per-session `ops/telemetry/skill-usage.yaml` append was dropped 2026-06-29 —
+the self-graded compliance tally was never systematically audited and the ops
+push ceremony it required didn't earn its keep.
 
 ### 8. Watchlist
 
-Read `fairbay/ops/watchlist.md` via git-ops. If the read 404s, log
-`watchlist: 404` in the telemetry notes line and continue the archive —
-a missing `fairbay/ops` file is a possible consolidation gap to report,
-never a cue to look in the archived pre-consolidation repos. For each item
-whose `condition` occurred this session, answer the `check` question and
-append a one-line log entry: `YYYY-MM-DD: yes/no [brief detail]`.
+Read `fairbay/ops/watchlist.md` (local in Code, git-ops in chat). If the
+read 404s, note it and continue. For each item whose `condition` occurred
+this session, answer the `check` question and append a one-line log entry:
+`YYYY-MM-DD: yes/no [brief detail]`.
 
 If an item's `resolve` condition is met (e.g., "3 observations"), move the
 item to the `## Resolved` section.
 
-Push in the same commit as telemetry. If no items matched, skip — don't
-mention the watchlist at all.
+If any items matched and were updated, push the updated watchlist.md to ops.
+If no items matched, skip — don't mention the watchlist or push anything.
 
-### 9. Handoff document
+### 9. Handoff + Grove write-back
 
-**Always generate one.** Memory captures stable facts; session context fades
-between chats. A handoff saves the next instance from burning tool calls on
-search reconstruction.
+Two paths depending on what this session touched:
 
-See `references/handoff-schema.md` for the build vs session decision, the
-full YAML schema, CLAUDE.md maintenance, delivery via git-ops, and the
-no-blurb resumption convention.
+- **Build handoff** — session involved code changes in a product repo.
+  Write `HANDOFF.yaml` at the repo root. See `references/handoff-schema.md`
+  for the YAML schema, CLAUDE.md maintenance, and the no-blurb convention.
+- **Session-only work** (audits, skill updates, research, architectural
+  decisions not tied to a single build) — no separate handoff file. The
+  Grove write-back (9b below) IS the handoff. session-start reads Grove
+  project rows as a primary source.
 
-#### 9a. Populate `decisions_made:`
+#### 9a. Populate `decisions_made:` (build handoffs only)
 
 Scan the session for every Rung 3 autonomous decision — architectural choices,
 scope calls, library picks, tradeoff resolutions made without Baylee's explicit
 input. For each, record: `decision`, `rationale`, `alternatives`, `confidence`
 (high/medium/low), `reversible` (true/false). Skip trivial implementation
-details. session-start surfaces these in the next session's briefing, flagging
-low-confidence and irreversible decisions for review.
+details. These also get logged to Grove in 9b.
 
-**Push-failure fallback.** If the git-ops push fails (network error, timeout,
-auth issue):
+#### 9b. Grove write-back (mandatory)
 
-1. **Report the error explicitly.** Never write "skipped" without stating the
-   actual error. "No repo access" without a stack trace is not acceptable.
-2. **Retry once** with a fresh API call.
-3. **If still failing,** update the project's Grove idea or task notes with the
-   handoff YAML content via Grove MCP. Grove is always accessible. Prefix with
-   `## Session Handoff (YYYY-MM-DD)` so session-start can find it.
-4. **Tell Baylee** the handoff landed in Grove instead of the repo, so the
-   next session knows where to look.
-
-The handoff must reach persistent storage. Local filesystem
-(`/mnt/user-data/outputs/`) resets between sessions — a file only there is
-gone next session.
-
-#### 9b. Grove memory write-back
-
-The handoff YAML is Claude-to-Claude continuity; Grove is the queryable
-record. After the handoff is written, mirror the session state to Grove:
+Grove is the primary store of session continuity. For session-only work
+this IS the handoff; for build sessions it complements the repo HANDOFF.yaml.
 
 **Park-time breadcrumb.** If any artifact produced or referenced this session
 is parked in Grove (project notes, idea notes) rather than committed to a repo,
@@ -403,13 +403,13 @@ fails, say so explicitly.
 - [ ] Encoding gate cleared — every finding has a routing decision?
 - [ ] Memory edits applied — folds attempted first, count under 12?
 - [ ] `decisions_made:` populated with all Rung 3 decisions from session?
-- [ ] Handoff generated and pushed (build, session, or both)? If push failed, fallback to Grove?
+- [ ] Build handoff pushed to repo root (if code changes)? Session-only → Grove write-back is sufficient.
 - [ ] Grove write-back done (9b) — project row refreshed, Rung-3 decisions logged via grove_log_decision?
 - [ ] CLAUDE.md updated (if architecture/stack/structure changed)?
 - [ ] Summary written from verified read-backs, not memory?
 - [ ] **"Next step:" line in response body?** (mandatory, even if nothing)
 - [ ] Outstanding items (if >1) verified before listing?
-- [ ] Telemetry entry appended to skill-usage.yaml?
+- [ ] Permissions audit done (3d, chat only)? Setup gaps surfaced in summary?
 - [ ] Watchlist items checked (only the ones whose condition fired)?
 - [ ] Chat rename suggested?
 

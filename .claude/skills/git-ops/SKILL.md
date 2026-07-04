@@ -1,11 +1,14 @@
 ---
 name: git-ops
 description: >
-  GitHub interface — "push this", "commit this", "create a repo", "push fix to
-  live site", "what's in fairbay/X". Not for new-host setup (→ ship-it) or
-  prototyping (→ build).
+  THE ONLY authorized way to write to GitHub. Fires on "push this", "commit
+  this", "create a repo", "what's in fairbay/X" — AND whenever any task
+  (build, data export, doc update, skill sync) results in files that need to
+  land in a fairbay/* repo. Never use raw git commit/push — push_files()
+  enforces the commit identity that Vercel Hobby requires. Not for new-host
+  setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-06-16-02"
+  version: "2026-06-23-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -158,6 +161,7 @@ The full push-time discipline (test → present → push → diff URL → option
 
 Placed near the operations above, summarized here:
 
+- **NEVER use raw `git commit` / `git push` in chat sessions.** Always use `push_files()`. The function hardcodes the commit author identity to match the Vercel Hobby team owner. Raw git commands use whatever identity is in the container's git config (usually wrong), causing Vercel to BLOCK production deploys on private repos. This applies even when you've already cloned the repo — the clone is for reading, `push_files()` is for writing.
 - Branch may be `master`, not `main`. Check with `api("GET", f"/repos/{r}")["default_branch"]` if a push 404s.
 - Remote paths use forward slashes only. No leading `/`.
 - Don't rewrite the push sequence from scratch — the bundled script handles blob/tree/commit/ref correctly.

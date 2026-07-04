@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-06-16-01"
+  version: "2026-06-29-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -101,6 +101,26 @@ packaging reduces irrelevant findings by ~60%.
 - The task needs conversation history, tools, or memory → handle inline.
   Gemini has none of this context.
 
+## Imports (required before any call)
+
+Every workflow below requires this path setup first. Run it once per
+session — all three scripts live in the skill's own `scripts/` directory:
+
+```python
+import sys, os
+for _p in ['.claude/skills/delegate-adversarial/scripts',
+           '/mnt/skills/user/delegate-adversarial/scripts']:
+    if os.path.isdir(_p): sys.path.insert(0, _p); break
+from gemini import call, call_with_urls, research, GeminiError
+```
+
+For multi-pass project review, also import:
+
+```python
+from review_package import assemble_package, generate_tree_map
+from project_review import multi_pass_review, format_report
+```
+
 ## Workflow: Single-pass review
 
 ### 1. Assemble payload
@@ -182,7 +202,7 @@ Structured multi-pass review with context caching.
 ### 1. Assemble the review package
 
 ```python
-from review_package import assemble_package, generate_tree_map
+# (imports from preamble above)
 
 # Claude gathers these components first:
 # - schema_ddl from Supabase MCP (execute_sql on information_schema)
@@ -203,7 +223,7 @@ package = assemble_package(
 ### 2. Run the multi-pass review
 
 ```python
-from project_review import multi_pass_review, format_report
+# (imports from preamble above)
 
 findings, summary = multi_pass_review(
     package=package,
@@ -242,7 +262,7 @@ Bad: "Tell me about home inspection AI." (too vague, Gemini will ramble)
 ### 2. Call API with search grounding
 
 ```python
-from gemini import research, GeminiError
+# (imports from preamble above)
 
 try:
     output, usage = research(
@@ -287,11 +307,14 @@ Context cache storage: $1/M tokens/hour. Default TTL: 30 min.
 
 ### How the key is loaded
 
-`scripts/gemini.py` reads `secrets/gemini.env` from `fairbay/ops`
-via git-ops on every call. Same pattern as other API key storage.
+`gemini.py` reads `secrets/gemini.env` from `fairbay/ops`
+via the GitHub API (chat) or local clone (Claude Code) on every call.
 If the key is missing or invalid, `GeminiError` surfaces a clear message.
 
 ## Scripts reference
+
+Scripts live alongside the skill — `/mnt/skills/user/delegate-adversarial/scripts/`
+in chat, `.claude/skills/delegate-adversarial/scripts/` in Claude Code:
 
 | Script | Purpose |
 |--------|---------|

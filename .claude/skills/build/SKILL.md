@@ -5,7 +5,7 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-06-15-01"
+  version: "2026-06-17-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -71,6 +71,7 @@ If a plan exists (either form): it prescribes the technical approach for each st
 
 - **Empty search ≠ artifact absent.** If a repo search, code search, or file read returns empty for an artifact (MISSION.md, SPEC.md, a plan), that eliminates one location — it does NOT mean the artifact doesn't exist. Before building from scratch, check the Grove project record (`grove_get(entity_type="project", id=...)`, especially `notes` and `docs` fields) and prior session outputs. Building an artifact that already exists and is parked in Grove wastes the session and creates drift.
 
+- **Best-practice-first.** Before designing a custom solution, ask: "what do practitioners already do here?" Check for established domain practices, tool built-in capabilities, and regulatory frameworks before building. Especially important for data pipelines, extraction tasks, source discovery, and regulated domains (healthcare, finance, education). The pattern to avoid: building a custom scraper, hitting a wall, then discovering the library had stealth mode; or spending sessions hunting URLs, then finding a regulation mandated the canonical source type.
 - **Research before building.** Before choosing a stack, library, or API pattern, run 1-2 web searches to confirm current conventions. Training knowledge drifts — a quick doc search catches breaking changes. Default step, not a post-failure fallback.
 - **Test before delivering.** Parse JSON, require/import modules, mock data between components, curl reachable endpoints, validate schemas. State what was verified vs. what couldn't be tested.
 - **Complete files only.** Never patches, diffs, or insertion instructions — always complete, pushable files. Patches require source visibility Claude often doesn't have, and partial files cause silent breakage when applied to a slightly-different baseline. If the current source isn't visible, STOP and ask for it.
@@ -107,6 +108,7 @@ Skip for phases that are purely mechanical (lint, parse checks).
 2. **Is the core concept clear enough to build?** If mostly, state assumptions and proceed.
 3. **What's the right form factor?** (See decision guide below)
 4. **What is the ONE question this prototype answers?**
+5. **What do practitioners already do?** For data pipelines, source discovery, tool integrations, or regulated domains — search for established standards, tool-native features, or domain frameworks before designing custom approaches. Run this check before writing any code for the domain-specific parts.
 
 ### Phase 2: User voice research
 

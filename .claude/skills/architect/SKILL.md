@@ -5,7 +5,7 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-06-16-01"
+  version: "2026-06-17-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -82,6 +82,8 @@ Happy path only:
 For each step: what the user sees/does, what the system does, where it could break.
 
 ### Phase 3 — Technical architecture
+
+**Domain standards first.** Before designing custom schemas, pipelines, or data models for a specialized or regulated domain, ask: "what do practitioners already do?" Run 1-2 searches for established standards, regulatory requirements (e.g., 42 CFR for Medicaid, HIPAA for health data, FINRA for finance), or tool-native capabilities in the domain. Design around what already exists — don't build custom where standards constrain or tools already solve.
 
 **Research before asserting.** Run 1-2 web searches on current conventions (export syntax, API shape, platform docs) before recommending a stack. Training knowledge drifts; a quick doc search catches breaking changes. If research returns long API docs or platform references (>3K tokens), delegate summarization to delegate-mechanical — extract only the facts relevant to the architecture decision, keep the raw docs out of main context.
 

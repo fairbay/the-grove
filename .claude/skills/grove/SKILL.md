@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-06-15-01"
+  version: "2026-07-03-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -43,7 +43,7 @@ user voice → add-to-do.** Both call the same MCP tools.
 ## MCP tools
 
 Grove MCP is at `vault.bayleemiller.org/api/mcp` as a custom Claude connector.
-When active, 13 tools are available natively — no code execution needed.
+When active, 15 tools are available natively — no code execution needed.
 
 | Tool | Use when |
 |---|---|
@@ -53,6 +53,8 @@ When active, 13 tools are available natively — no code execution needed.
 | `grove_list_ideas` | "Show my ideas", "raw ideas", "what got greenlit" |
 | `grove_log_decision` | Rung-3 call made, "log this decision"; `supersedes` to correct |
 | `grove_list_decisions` | "What did we decide about X", session-start Rung-1 read |
+| `grove_create_adjudication` | File a decision request Claude can't safely make alone — source conflict, blocked/unreachable content, medium/low-confidence call |
+| `grove_list_adjudications` | "What's pending adjudication" (`status="open"`); consume resolved verdicts (`status="done"`) before re-deciding |
 | `grove_create_project` | New project (code or non-code; omit `repo` for non-code) |
 | `grove_list_projects` | "Project status", briefing reads, slug lookup |
 | `grove_get` | Fetch a single item by ID (task, idea, project, decision) |
@@ -126,6 +128,28 @@ artifacts (mission/spec/plan/brief) are drafted. Reading `grove_list_decisions`
 or `grove_list_tasks` does NOT satisfy "check the project" — those are separate
 objects. An empty repo search ≠ artifact doesn't exist: check the project record
 first.
+
+## Adjudications
+
+Adjudication items are Grove tasks tagged `adjudication` with structured
+`metadata.adjudication` (question, context, discriminator, options[] each
+with evidence URLs, resolution). They route decisions Claude can't safely
+make alone to Baylee via `vault.bayleemiller.org/adjudicate`, instead of
+guessing or burying the call in prose task notes.
+
+**Filing convention:** source conflicts, unreachable/blocked-content gaps,
+and medium/low-confidence data calls get filed as adjudication items via
+`grove_create_adjudication(question, context, discriminator, options=[{id,
+label, explanation, evidence_urls: [{url, label}]}], list=<project slug>,
+project_ref, priority)`. Each option needs its own `explanation` and
+`evidence_urls` — enough for Baylee to judge without chat context.
+
+**Consuming verdicts:** resolved items carry `resolution` = `{option_id,
+notes, resolved_at}`. Check `grove_list_adjudications(status="done",
+list=...)` before re-deciding anything previously sent to adjudication —
+a resolution is a verdict, not a suggestion. Use `status="open"` to see
+what's still awaiting judgment (session-start's Phase 5 briefing surfaces
+this count).
 
 ## Browse and events
 
@@ -229,7 +253,9 @@ migrate to Grove:
 - **← idea-scout:** Writes verdicts and scores onto ideas via `grove_update`.
 - **← add-to-do:** Task-shaped capture flows through the same MCP tools.
 - **← chat-archive:** Pulls open tasks for touched projects during session
-  wrap; writes the project row + Rung-3 decisions (Step 9b).
-- **→ session-start:** Project rows + decisions are the briefing's data source.
+  wrap; writes the project row + Rung-3 decisions (Step 9b); files
+  adjudication items for conflicts/gaps surfaced during encoding.
+- **→ session-start:** Project rows, decisions, and open adjudications are
+  the briefing's data source.
 - **→ idea-vault:** Reads idea state from Grove for browsing and comparison.
 - **→ idea-scout:** Newly raw ideas chain to scoring in a fresh chat.

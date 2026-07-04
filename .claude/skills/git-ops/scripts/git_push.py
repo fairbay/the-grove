@@ -32,12 +32,13 @@ import urllib.request
 import urllib.error
 
 # ---------------------------------------------------------------------------
-# Git identity — hardcoded to match GitHub account + Vercel team membership.
-# Without this, Claude Code sessions invent plausible-looking emails that
-# don't match any real account, causing Vercel seat-block on production.
+# Git identity — hardcoded to match GitHub account + Vercel Hobby plan owner.
+# Vercel Hobby blocks deploys when the commit author email can't be resolved
+# to the team owner's GitHub account. The noreply email is guaranteed linked.
+# Every push path (CLI, API, native fallback) uses these constants.
 # ---------------------------------------------------------------------------
-GIT_AUTHOR_NAME = "Baylee Miller"
-GIT_AUTHOR_EMAIL = "baylee.miller@gmail.com"
+GIT_AUTHOR_NAME = "fairbay"
+GIT_AUTHOR_EMAIL = "104952098+fairbay@users.noreply.github.com"
 
 # ---------------------------------------------------------------------------
 # Environment detection

@@ -18,18 +18,15 @@ should have been encoded elsewhere and cleared.**
 ## Type decision
 
 - **Build handoff** — session involved code changes in a product repo.
-  `HANDOFF.yaml` lands at the repo root.
-- **Session handoff** — strategic work, audits, skill updates, research,
-  architectural decisions not tied to a single build. Pushes to
-  `fairbay/ops/handoffs/YYYY-MM-DD-<slug>.yaml` via git-ops.
-- **Both** — touched a product repo AND did strategic work. Generate both.
-
-If in doubt, generate a session handoff. Cost of unnecessary: ~30s. Cost of
-missing: minutes of search reconstruction next session.
-
-**Heuristic:** If the only repo touched was `fairbay/ops`, this is a
-session handoff. Build handoffs are for product code repos. Skill updates are
-strategic/infrastructure work captured in session handoffs via `skills_changed`.
+  `HANDOFF.yaml` lands at the repo root. Generate one.
+- **Session-only work** — strategic work, audits, skill updates, research,
+  architectural decisions not tied to a single build. **No separate handoff
+  file.** The Grove write-back (chat-archive Step 9b) captures all continuity
+  state: project row (`phase`, `next_actions`, `blockers`, `last_session`)
+  + decisions via `grove_log_decision`. session-start reads Grove project
+  rows as a primary source.
+- **Both** — touched a product repo AND did strategic work. Generate a build
+  handoff for the product repo; the strategic context is covered by Grove.
 
 ## Format: YAML
 
@@ -232,20 +229,13 @@ the same commit as the handoff — not deferred to the next session.
   code — they're reference material for future sessions. Place artifacts in
   appropriate directories (`docs/` for specs, `public/` for client-facing
   code). Report the commit diff URL.
-- **Session handoff:** push to
-  `fairbay/ops/handoffs/YYYY-MM-DD-<slug>.yaml` via **git-ops** in
-  a single commit. The next instance reads it with
-  `read_file("fairbay/ops", "handoffs/YYYY-MM-DD-<slug>.yaml")` —
-  no download, no upload, no copy-paste. Report the commit diff URL.
+- **Session-only work:** no file to push. The Grove write-back (Step 9b)
+  is the delivery. session-start reads Grove project rows directly.
 
-**Push-failure fallback:** if git-ops push fails after one retry, update the
-project's Grove idea or task notes with the handoff YAML content. Prefix with
-`## Session Handoff (YYYY-MM-DD)`. Tell Baylee the handoff landed in Grove.
-Session-start's Phase 2 checks Grove idea notes as a fallback source.
-
-**Slug guidance:** 2-4 kebab-case words describing the session topic
-(`capture-architecture`, `listing-lens-v6-extraction`,
-`skill-routing-update`). Keep under 40 chars total.
+**Push-failure fallback (build handoffs):** if git-ops push fails after one
+retry, update the project's Grove project row notes with the handoff YAML
+content. Prefix with `## Session Handoff (YYYY-MM-DD)`. Tell Baylee the
+handoff landed in Grove.
 
 ## Resumption convention (no blurb needed)
 
