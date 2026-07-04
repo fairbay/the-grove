@@ -81,6 +81,8 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 **Capture at crystallization:** When a concrete work item, patch, or follow-up is agreed mid-session, write the Grove task in the SAME TURN it crystallizes. Don't queue it for later — `chat-archive` write-back is a backstop for anything missed, not the primary capture mechanism. Ad-hoc or never-archived chats have no backstop at all, so in-turn capture is the only guarantee.
 
+**Adjudication queue:** Items needing Baylee's judgment — source conflicts, unreachable/blocked content, medium/low-confidence data calls — get filed via `grove_create_adjudication` (structured options with explanations + clickable evidence URLs), NOT as prose in task notes. Baylee rules at vault.bayleemiller.org/adjudicate; sessions read verdicts back via `grove_list_adjudications(status="done")` and must consume them before re-deciding anything previously filed.
+
 ## Git Workflow
 
 - Push to `main` directly — no feature branches or PRs unless explicitly requested.
@@ -112,27 +114,91 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Agent Delegation & Token Efficiency
 
-In multi-agent jobs, the cost lever is the *model tier*, not delegation itself.
+**Default to inline execution.** Delegation has real overhead — instruction prep, context
+bootstrap (the sub-agent rebuilds understanding from scratch), and result interpretation add
+~30-40% more tokens than doing the work directly. A single agent matches or outperforms
+multi-agent systems on the majority of tasks when given equivalent tools and context. Delegate
+only when one of the triggers below fires — never because a task "could" be parallelized or
+"might" benefit from a fresh context window.
 
-- **Tier sub-agent models to task difficulty — pass `model:` explicitly on every Agent call.**
-  Mechanical work (apply/run a reviewed file, verify, hygiene/lint, format, simple search) → **haiku**.
-  Structured transformation (extraction, text→code/SQL, reconciliation) → **sonnet**.
-  Reserve **opus** for the orchestrator and genuinely hard reasoning. Delegating to an *opus*
-  sub-agent protects the orchestrator's context window but does NOT reduce spend — an opus
-  sub-agent doing trivial work is the most common waste.
+### When to delegate — decision framework
+
+Evaluate in this order. The first matching rule wins.
+
+**1. Established methodology exists → follow it.**
+Check project docs (`CLAUDE.md`, `docs/agent-templates/`, skill references) for a documented
+methodology that covers this task type. If one exists, follow it — including its delegation
+guidelines, model tier assignments, and verification steps. This prevents re-deriving decisions
+that have already been made and validated. Methodologies are living artifacts: update them when
+results reveal a flaw, but follow them until then.
+
+**2. Bulky → delegate always.**
+If the task will consume or generate large volumes where only a filtered signal matters to the
+orchestrator, delegate regardless of model tier. The value is context protection, not cost
+savings — keeping noise out of the orchestrator's window preserves reasoning quality for
+decisions that matter. Examples: reading many files to find one relevant passage, processing
+large SQL results, reviewing verbose logs. Same-tier delegation is justified here.
+
+**3. Repetitive → pilot, codify, then delegate.**
+If the task has multiple instances of structurally similar work:
+  1. **Pilot:** Execute the first instance inline to prove the methodology and catch edge cases.
+  2. **Codify:** Extract the proven steps into a reusable artifact — an agent prompt template
+     (in `docs/agent-templates/`), a script, or methodology notes in project docs. Include
+     slot variables, verification checks, and the model tier assignment.
+  3. **Delegate the remainder:** Spawn sub-agents for all remaining instances using the
+     codified methodology. The orchestrator's role shifts to quality-gating results.
+  4. **Spot-check:** After delegation, verify a sample of results against the methodology.
+     If drift is detected, update the methodology and re-delegate — don't revert to inline.
+
+The trigger: "Have I done something structurally identical to this already?" If yes, you
+should be delegating, not repeating. Similarity is the signal to codify, not to keep going.
+
+**4. Novel → execute inline.**
+If none of the above apply, the task is genuinely novel. Do it yourself. Novel work benefits
+from the orchestrator's full context, produces more traceable results when surprises arise,
+and — critically — is the raw material for future methodologies. Do it well enough to codify.
+
+### Model tiering
+
+When delegating, tier the model to the task — pass `model:` explicitly on every Agent call.
+
+- **Haiku** — mechanical work: apply a reviewed file, verify, lint, format, search, validation
+  scripts, export regeneration, git ops, PR management.
+- **Sonnet** — structured transformation: extraction, text→code/SQL, reconciliation, staging
+  loader construction, regex-span work.
+- **Opus** — proven multi-step protocols with documented methodology: cluster closure, source
+  discovery, re-anchoring, feature implementation.
+- **Fable** — genuinely novel reasoning: new methodology design, cross-concept decomposition,
+  structural data-model decisions, contamination detection in unfamiliar patterns, research
+  synthesis. If you can describe the steps before starting, it's not fable-tier work.
+
+**Orchestration-only rule.** The orchestrator decides WHAT to do and handles novel problems;
+sub-agents DO the proven execution. Direct execution of proven patterns on the orchestrator's
+model tier is wasted spend. This applies universally — not just on expensive models.
+
+### Delegation techniques
+
+When delegating, use the right technique for the shape of the work:
+
+- **Parallelize independent sub-tasks** for wall-clock savings. Fan-out is a property of HOW
+  you delegate, not a reason TO delegate — the delegation trigger comes from Rules 1-3 above.
+- **Maker-checker** for quality-sensitive generation: cheap model generates, capable model
+  validates. Inverts the usual tier assumption — useful when generation is straightforward but
+  correctness matters. Reported 40-60% cost reduction vs all-premium.
+- **Batch trivial operations into one cheap agent** rather than one agent per item (per-agent
+  startup + retry overhead compounds, especially when infra is flaky).
+
+### Efficiency rules
+
 - **Text-first, not visual.** Prefer extracted text (`pdftotext -layout`, HTML/text scrapes) over
   rendering PDFs/pages/screenshots as images. Visual inputs are the single largest token multiplier;
   use them only when text genuinely fails, and only for the specific page.
 - **Keep the orchestrator thin.** Never read large files (big SQL, PDFs, transcripts) into the main
   thread — delegate review/apply to a cheap sub-agent and keep only the summary. Avoid repeated
   status polls and per-step narration.
-- **Batch trivial operations into one cheap agent** rather than one agent per item (per-agent startup
-  + retry overhead compounds, especially when infra is flaky).
 - **Make delegated work resumable & idempotent.** Persist artifacts (commit generated files) so an
   infra/usage-limit failure costs a cheap retry, not a full re-spend. Decouple expensive generation
   from cheap application.
-- **Pilot before fan-out.** Validate the approach on one representative item before mass-spawning;
-  settle methodology first to avoid throwaway work.
 - **Bulk data never rides in LLM-constructed tool arguments.** An agent relaying a 50KB UPDATE
   statement silently dropped 39% of its VALUES rows while keeping valid syntax and the correct
   prefix/suffix — partial success invisible to status checks. Ship bulk rows via script (REST/file)
@@ -148,6 +214,20 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 ## Remote Control / Scheduling Tools
 
 **Do not use timers (`send_later`, triggers, scheduled wake-ups) for normal work.** Every timed wake-up replays the full session context — real usage cost for a check that usually finds nothing (Baylee's call, 2026-07-03, after timers burned through usage). PR babysitting, deploy watching, and routine follow-ups run on webhook events only; anything needing later attention goes in HANDOFF.yaml `next:` or a Grove task, picked up next session. Timers are reserved for the rare case Baylee explicitly asks for one. The tools stay in `permissions.allow` so that when he does ask, there's no approval pop-up.
+
+## Session Scope
+
+**Run until stopped, exhausted, or blocked.** A session ends only when one of these holds:
+
+1. Baylee says stop/archive.
+2. Context is genuinely near exhaustion with no clean stopping point inside the next work item.
+3. Everything remaining is blocked on Baylee (pending adjudications, a merge that gates all further work).
+
+Otherwise: finish an item → verify → log the decision → pull the next item from the backlog (HANDOFF `next:` / Grove `next_actions`) and keep working. Session swaps are expensive — the next session pays a full re-orientation (handoff + Grove + planning docs, tens of thousands of tokens plus Baylee's round-trip attention) before any work happens, while the harness auto-summarizes long context, so there is no token efficiency in wrapping early. (Baylee's call, 2026-07-04, after a session self-wrapped with ~73% of context unused.)
+
+- **PRs, merges, and deploys are checkpoints, not endings.** Ship, verify, then continue on a refreshed branch.
+- **No premature closing language.** "Session wrapped" / "all done" reads as a cue for Baylee to archive — reserve it for when an end condition above actually holds. Mid-session progress reports use chat-status framing: what's done, what's next, and that work is continuing.
+- This bounds when to *stop*, not how to batch: within a session, still order small items before large ones where a project prescribes it.
 
 ## Vercel Deployment
 
