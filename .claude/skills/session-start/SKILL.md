@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-07-03-01"
+  version: "2026-07-05-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -205,6 +205,14 @@ Grove work, research) are included alongside project-specific items — everythi
 the session plans to do. Open adjudications aren't executable work — they wait
 on Baylee's judgment — so they feed the Phase 5 "Pending adjudications" count,
 not a queue batch.
+
+**Verify before presenting.** Items that are programmatically verifiable (sync,
+deploy, install, push) should be checked before presenting as outstanding.
+If the item includes a trigger reference (e.g. "sync skills (global.md updated
+2026-07-04T17:43Z)"), compare against current state — a sync commit after the
+referenced timestamp means the item is already satisfied. Drop verified items
+from the queue silently; don't present stale action items that waste Baylee's
+attention.
 
 **Ordering principle — topological batches:**
 

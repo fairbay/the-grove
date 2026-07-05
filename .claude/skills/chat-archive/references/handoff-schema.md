@@ -114,6 +114,14 @@ Concrete work the next session should pick up. Prune aggressively:
 - **Backlog items** (valid but not next-session priority) → move to a Grove
   task or PLAN.md, remove from handoff.
 
+**Verifiable items need a trigger reference.** Items that a different session
+could satisfy (sync, deploy, install, push, run a script) must include what
+triggered them — enough context for the consumer to check staleness without
+chat history. Bad: `"Sync skills"`. Good:
+`"Sync skills (global.md updated 2026-07-04T17:43Z)"`. The timestamp or
+triggering event lets session-start (or Baylee) compare against current state
+and skip items already satisfied by an intervening session.
+
 If `next:` has more than ~5 items, it's a backlog, not a handoff. Promote the
 top 3-5 to `next:`, park the rest.
 
