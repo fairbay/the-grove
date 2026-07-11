@@ -188,6 +188,39 @@ When delegating, use the right technique for the shape of the work:
 - **Batch trivial operations into one cheap agent** rather than one agent per item (per-agent
   startup + retry overhead compounds, especially when infra is flaky).
 
+### Delegation quality loop
+
+Three checkpoints prevent batch delegation from burning tokens on diminishing returns:
+
+1. **Pre-flight triage.** Before dispatching ≥3 agents on the same workstream, run a data query
+   to categorize work items by expected yield (source quality, access likelihood, prior success
+   patterns in this session). Select clusters data-first, not intuitively — one query costs less
+   than one wasted agent. If the workstream has prior-batch results, use observed yield by
+   category to prioritize.
+
+2. **Post-batch triage.** When a delegation batch returns, the orchestrator processes findings
+   BEFORE dispatching the next batch. Three mandatory steps:
+   - **Capture:** File Grove tasks for concrete follow-ups (source repairs, re-anchoring) and
+     adjudication cards for ambiguous findings in the SAME TURN they surface. Sub-agent output
+     is a crystallization moment — the "capture at crystallization" rule applies here, not just
+     to decisions made in conversation.
+   - **Yield check:** Compute loadable results / total checked. Note the dominant failure mode.
+   - **Decide:** Explicitly choose continue, pivot, or escalate (see below). Log the choice.
+
+3. **Pivot-or-continue gate.** After the yield check, choose one:
+   - **Continue** — yield is acceptable OR specific high-yield clusters remain (identified by
+     the pre-flight triage, not by hope).
+   - **Pivot** — dominant failure mode is structural (wrong sources, stale docs, naming
+     mismatches); switch to the upstream fix before more downstream attempts.
+   - **Escalate** — pattern is unclear; surface to Baylee.
+   "Dispatched another batch" without a yield assessment is not a decision, it's momentum.
+
+(MBN Session 46: 8 agents across 2 batches checked 47 extractions, 15% yield. Post-batch 1
+the 18% yield and dominant NOT_FOUND pattern should have triggered a pivot to source repair;
+instead batch 2 repeated the same approach for 12% yield. A pre-flight triage query grouping
+by `source_type` would have steered toward high-yield PDF/grid sources and away from generic
+plan websites.)
+
 ### Efficiency rules
 
 - **Text-first, not visual.** Prefer extracted text (`pdftotext -layout`, HTML/text scrapes) over
@@ -245,6 +278,15 @@ Otherwise: finish an item → verify → log the decision → pull the next item
 - Test before pushing — syntax checks (`python -c`, `node -c`, `JSON.parse`) on generated files.
 - Validate end-to-end after deploy — call endpoints, check logs, verify behavior.
 - Never make Baylee the test runner. If Claude has access to the endpoint, database, or deploy pipeline, Claude runs the verification.
+
+## Task Closure Gate
+
+**Before closing any task, run adversarial review.** This is standard practice — no task is marked done without it. The review catches missed edge cases, wrong assumptions, and residual issues that the task executor is blind to (having just built the thing).
+
+- **Scope** scales to the task: a data migration gets a row-count + sample-value spot-check; a feature gets a behavioral test from an adversarial angle ("what breaks if..."); a research task gets a "what's missing / what contradicts this" pass.
+- **Model** scales to complexity: self-review for trivial mechanical work, delegate-adversarial (Gemini Pro or cross-model) for high-stakes or novel work. Use available metadata (files changed, DB rows affected, decision confidence, task tags) to calibrate.
+- **Prompt** should be task-specific: include what was done, what the success criteria were, and an explicit instruction to find flaws — not a generic "review this." The adversarial reviewer should try to break the work, not confirm it.
+- **Outcome** gates closure: if the review surfaces a real issue, fix it before marking done. If it surfaces a deferred concern, capture it (Grove task or adjudication) before marking done. "Reviewed, no issues" is a valid outcome — log it.
 
 ## Communication Style
 
