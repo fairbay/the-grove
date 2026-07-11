@@ -103,12 +103,16 @@ Include the Vercel project URL too if the repo is connected and the change is us
 
 ## 7. Verify deploy (when applicable)
 
-If the repo is Vercel-deployed and the change is user-facing, verify the deploy state. The flow is in `vercel-mcp.md` (this same references/ directory):
+If the repo is Vercel-deployed and the change is user-facing, collapse steps 5+7: call `push_and_verify()` instead of `push_files()` in step 5, passing the live URL and the version string this commit bumps:
 
-1. `Vercel:list_deployments` filtered by `meta.githubCommitSha`.
-2. Wait if `BUILDING` or `QUEUED`.
-3. On `ERROR`, fetch `Vercel:get_deployment_build_logs` and surface to Baylee.
-4. On `READY`, report the URL.
+```python
+from git_push import push_and_verify
+verdict = push_and_verify("fairbay/<repo>", "main", "<message>", files,
+                          verify_url="https://<app>.vercel.app", expect="v<bumped>")
+```
+
+- `VERIFIED_LIVE` → report verdict + diff URL in one line. Done — zero Vercel MCP calls.
+- `TIMEOUT_STALE` / `UNREACHABLE` → escalate to the MCP diagnosis chain in `vercel-mcp.md` (`list_deployments` by commit sha → build logs on `ERROR`).
 
 Skip verification for: doc-only commits, archive repos, vault-data pushes that don't affect a UI, or commits Baylee labelled WIP. Don't chase flaky builds more than once — two failures in a row, surface and stop.
 

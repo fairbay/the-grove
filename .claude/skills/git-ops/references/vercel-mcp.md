@@ -1,6 +1,8 @@
 # Vercel MCP — post-push deploy verification
 
-After a push to a Vercel-connected repo, the deploy kicks off automatically. This doc covers how to check on it.
+After a push to a Vercel-connected repo, the deploy kicks off automatically.
+
+**This is the failure-path reference.** The happy path is `push_and_verify()` in `scripts/git_push.py`, which verifies via live-URL polling with no MCP calls. Come here when it returns `TIMEOUT_STALE` / `UNREACHABLE`, when you need build or runtime logs, or for deploy states mid-investigation.
 
 ## Tool discovery
 

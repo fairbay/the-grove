@@ -8,7 +8,7 @@ description: >
   enforces the commit identity that Vercel Hobby requires. Not for new-host
   setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-06-23-01"
+  version: "2026-07-10-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -37,9 +37,9 @@ Pushes to **already-live sites** stay here — Vercel auto-deploys on push, so a
 1. Write files to disk locally.
 2. Test what's testable — `python -c`, `node -c`, `JSON.parse`, build runs. State what you verified inline.
 3. `present_files` so Baylee can see what's landing **before** it lands.
-4. Push via `scripts/git_push.py` — one atomic commit.
+4. Push via `scripts/git_push.py` — one atomic commit. For deploy-relevant pushes, call `push_and_verify()` instead of `push_files()` — same push plus live-URL deploy verification in one call.
 5. Report the commit diff URL: `https://github.com/<owner>/<repo>/commit/<sha>`.
-6. If the repo is Vercel-deployed and the change is user-visible, verify the deploy. See `references/vercel-mcp.md`.
+6. If `push_and_verify()` returned `TIMEOUT_STALE` or `UNREACHABLE` (or you used plain `push_files()` and need to check), escalate to the Vercel MCP diagnosis chain — `references/vercel-mcp.md`. The happy path needs zero MCP calls.
 
 The diff URL is Baylee's review mechanism. Never push before presenting — `present_files` is the in-flight check.
 
@@ -84,7 +84,7 @@ The repo is cloned and the git proxy handles auth. `push_files`, `read_file`, an
 
 Token resolution order (chat path only): `$GITHUB_PAT` env var → `$GITHUB_PAT_PATH` → `/home/claude/github-pat.txt`.
 
-## The four operations
+## The five operations
 
 ### Push (atomic multi-file commit)
 
@@ -101,6 +101,26 @@ sha, url = push_files("fairbay/my-repo", "main", "Commit message", files)
 ```
 
 One commit, one parent, all files atomic. Six API calls in the chat path; one git push in the clone path.
+
+### Push + verify (deploy-relevant pushes)
+
+```python
+from git_push import push_and_verify
+
+verdict = push_and_verify(
+    "fairbay/my-repo", "main", "fix: nav crash (v2.4.1)", files,
+    verify_url="https://myapp.vercel.app",   # or an /api/health endpoint
+    expect="v2.4.1",                          # the version string this commit bumps
+)
+# verdict["state"] -> VERIFIED_LIVE | TIMEOUT_STALE | UNREACHABLE | PUSHED
+```
+
+One call collapses push → wait → poll → confirm. `expect` should be the
+version string the same commit bumped — that is what makes a 200 mean "this
+code is live", not "some code is live". `VERIFIED_LIVE` → report the verdict
+and diff URL in one line, done. `TIMEOUT_STALE` / `UNREACHABLE` → run the
+MCP diagnosis chain in `references/vercel-mcp.md`. Defaults: 180s timeout,
+15s poll interval, 25s initial wait for Vercel pickup.
 
 ### Read
 

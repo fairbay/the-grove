@@ -457,6 +457,96 @@ def delete_repo(owner_repo):
     code, resp = api("DELETE", f"/repos/{owner_repo}")
     return code, resp
 
+
+# ---------------------------------------------------------------------------
+# push_and_verify — collapse push + deploy verification into one call
+# ---------------------------------------------------------------------------
+
+def _fetch_url(url, timeout=20):
+    """GET a URL. Returns (status, body_text). HTTP errors return their code."""
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "fairbay-git-ops/1.0",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode("utf-8", "replace")
+        except Exception:
+            body = ""
+        return e.code, body
+
+
+def push_and_verify(owner_repo, branch, message, files, verify_url=None,
+                    expect=None, timeout=180, interval=15, initial_wait=25):
+    """Push atomically, then verify the deploy by polling the live URL.
+
+    The strongest unauthenticated deploy signal is the version bump that
+    push conventions already require: pass expect=<new version string>
+    (e.g. "v2.4.1") and this polls verify_url until it appears in the body.
+
+    Returns a verdict dict:
+      state:
+        PUSHED         -- no verify_url given; push succeeded, nothing polled
+        VERIFIED_LIVE  -- 200 + expect found (expect=None -> weak reachability)
+        TIMEOUT_STALE  -- 200s seen but expect never appeared (slow build, or
+                          build failed and the old deploy is still serving)
+        UNREACHABLE    -- no 200 within timeout (site down / first deploy broke)
+      sha, commit_url  -- from push_files
+      evidence         -- attempts, elapsed_s, last_status, weak flag,
+                          last_body_snippet on failure
+
+    On TIMEOUT_STALE / UNREACHABLE, escalate to the Vercel MCP diagnosis
+    chain (references/vercel-mcp.md). The happy path needs no MCP calls.
+    """
+    sha, commit_url = push_files(owner_repo, branch, message, files)
+    verdict = {"sha": sha, "commit_url": commit_url,
+               "state": "PUSHED", "evidence": {}}
+    if not verify_url:
+        return verdict
+
+    sep = "&" if "?" in verify_url else "?"
+    start = time.time()
+    deadline = start + timeout
+    attempts, last_status, last_body = 0, None, ""
+    got_200 = False
+    time.sleep(initial_wait)  # let Vercel pick up the commit
+    while True:
+        attempts += 1
+        try:
+            last_status, last_body = _fetch_url(
+                f"{verify_url}{sep}pav={sha[:7]}-{attempts}")
+        except Exception as e:  # DNS/timeout/TLS -> treat as not-yet-reachable
+            last_status, last_body = None, f"fetch error: {e}"
+        if last_status == 200:
+            got_200 = True
+            if expect is None or expect in last_body:
+                verdict["state"] = "VERIFIED_LIVE"
+                verdict["evidence"] = {
+                    "attempts": attempts,
+                    "elapsed_s": round(time.time() - start, 1),
+                    "matched": expect,
+                    "weak": expect is None,
+                }
+                return verdict
+        if time.time() >= deadline:
+            break
+        time.sleep(interval)
+
+    verdict["state"] = "TIMEOUT_STALE" if got_200 else "UNREACHABLE"
+    verdict["evidence"] = {
+        "attempts": attempts,
+        "elapsed_s": round(time.time() - start, 1),
+        "last_status": last_status,
+        "expected": expect,
+        "last_body_snippet": (last_body or "")[:400],
+    }
+    return verdict
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 5:
         print("usage: git_push.py <owner/repo> <branch> <msg> <remote:local> ...", file=sys.stderr)
