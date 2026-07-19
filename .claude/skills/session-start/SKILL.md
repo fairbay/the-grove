@@ -55,8 +55,8 @@ the project row carries, not the identity.
 
 **Loading Grove tools (chat):** the tool_search registry matches fuzzily on
 Grove tool names — descriptive queries take 2-3 attempts. Load first-try with
-the exact-name query: `grove_list_projects grove_create_task grove_update
-grove_log_decision`. Then load `grove_list_decisions grove_get grove_list_tasks`
+the exact-name query: `grove_list_projects grove_create_task grove_update_task
+grove_update_project grove_log_decision`. Then load `grove_list_decisions grove_get grove_list_tasks`
 in one follow-up call. Two calls total — do not search piecemeal.
 
 Resolution order:

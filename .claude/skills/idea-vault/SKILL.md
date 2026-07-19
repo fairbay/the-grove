@@ -38,7 +38,7 @@ Use Grove MCP tools for all operations:
 | List/search | `grove_list_ideas` | Filters: `status`, `verdict`, `tag`, `q` (full-text) |
 | Get one | `grove_get` | By UUID |
 | Create | `grove_create_idea` | Minimum: title |
-| Update | `grove_update` | Partial update by UUID |
+| Update | `grove_update_idea` | Partial update by UUID |
 
 ## Schema
 
@@ -113,7 +113,7 @@ a scout report exists in conversation, auto-populate all fields.
 
 ### `update <title>` — modify
 
-Search → get UUID → `grove_update` with changed fields.
+Search → get UUID → `grove_update_idea` with changed fields.
 
 ### `compare <title> <title> [...]` — side-by-side
 
@@ -149,12 +149,12 @@ calibrate inside this skill.
 
 ### `remove <title>` — kill
 
-`grove_update` with `status: "killed"`. **Requires a kill reason** written into
+`grove_update_idea` with `status: "killed"`. **Requires a kill reason** written into
 `notes`. Don't delete — history is valuable.
 
 ### Error handling for Grove writes
 
-If any `grove_update` or `grove_create_idea` call fails: retry once, then
+If any `grove_update_idea` or `grove_create_idea` call fails: retry once, then
 report the error explicitly with the data that would have been written.
 Never claim "updated" without a successful MCP response.
 

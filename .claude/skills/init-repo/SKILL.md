@@ -73,7 +73,7 @@ CONVENTIONS.md:
 
 **`.claude/skills/`** — Read all files from `fairbay/ops/.claude/skills/`
 and push them to the target repo. Do this in the same commit as the other
-files — don't defer to a future `sync-skills.py` run.
+files — don't defer to a future `sync.py` run.
 
 ### 3. Push
 
@@ -98,5 +98,5 @@ Confirm the push succeeded. Report what was created vs. what already existed.
 
 - **← ship-it:** Phase 3 step 6 routes here when `.claude/` is missing.
 - **← git-ops:** After repo creation, init-repo sets up infrastructure.
-- **→ sync-skills.py:** After init, the repo is auto-discovered by future
+- **→ sync.py:** After init, the repo is auto-discovered by future
   sync runs (it now has `.claude/global.md`).

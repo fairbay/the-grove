@@ -154,7 +154,7 @@ with Claude Code, push the `.claude/` infrastructure in the same session:
 `.claude/global.md` (from `fairbay/ops/global-CLAUDE.md`),
 `.claude/settings.json` (SessionStart hook template in CONVENTIONS.md), and
 all skills from `fairbay/ops/.claude/skills/`. Skills must land
-before the first Claude Code session — don't defer to `sync-skills.py`.
+before the first Claude Code session — don't defer to `sync.py`.
 Same procedure as ship-it Phase 3 step 6.
 
 ### Delete a repo (Tier 3 — destructive)

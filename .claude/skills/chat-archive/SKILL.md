@@ -52,7 +52,7 @@ modified this session, verify delivery per surface:
   `present_files`. Git push alone is NOT delivery — Baylee must install
   manually in Claude settings. If any were missed, package and present now.
 - **Code:** skills are auto-discovered from the repo. Git push IS delivery.
-  No zip packaging or manual install needed. Run `sync-skills.py` if the
+  No zip packaging or manual install needed. Run `sync.py` if the
   skill needs to reach other repos.
 
 For each item:
@@ -380,8 +380,8 @@ Push the stub in the same commit as the handoff. This prevents future sessions
 from concluding the artifact doesn't exist because the repo search returned empty.
 
 1. **Project row.** `grove_list_projects(slug=<project slug>)`. If a row
-   exists, `grove_update(entity_type="project", id, patch={phase, blockers,
-   next_actions, last_session: <today>})` — patch only what changed. If no
+   exists, `grove_update_project(id, phase=..., blockers=...,
+   next_actions=..., last_session=<today>)` — pass only what changed. If no
    row exists and the session did substantive work on a named project,
    `grove_create_project` (slug, repo for code projects or omit for
    non-code, phase, next_actions; notes = planning context for non-code).

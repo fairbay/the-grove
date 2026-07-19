@@ -556,7 +556,7 @@ idea in Grove. Do not ask "want me to add this to Grove?" — just do it.
 - Include `zc:t1`, `zc:t2`, or `zc:t3` in tags per tier. Add `zc:byok` if
   BYOK pattern applies. Add `zc:popular` if popularity = high.
 
-**Update method (existing idea):** `grove_update` via MCP with the idea's UUID.
+**Update method (existing idea):** `grove_update_idea` via MCP with the idea's UUID.
 Search first with `grove_list_ideas` (query by title) to check for duplicates.
 If the idea exists, update scores/verdict/status in place.
 
@@ -637,7 +637,7 @@ have my scouts been?"
 ## Integration
 
 - **← brainstorm-engine:** scout an idea surfaced from a brainstorm batch.
-- **← idea-vault:** re-scout an existing vault entry (`grove_update` flow).
+- **← idea-vault:** re-scout an existing vault entry (`grove_update_idea` flow).
 - **→ architect:** auto-chain on Greenlight / Workhorse / Lark / Public Good.
 - **→ grove:** capture-only path (`status: raw`) when user wants to save
   without scoring; Phase 8 auto-add for scored ideas.

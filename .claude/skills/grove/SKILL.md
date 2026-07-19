@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-07-03-01"
+  version: "2026-07-19-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -43,7 +43,7 @@ user voice → add-to-do.** Both call the same MCP tools.
 ## MCP tools
 
 Grove MCP is at `vault.bayleemiller.org/api/mcp` as a custom Claude connector.
-When active, 15 tools are available natively — no code execution needed.
+When active, 17 tools are available natively — no code execution needed.
 
 | Tool | Use when |
 |---|---|
@@ -58,7 +58,9 @@ When active, 15 tools are available natively — no code execution needed.
 | `grove_create_project` | New project (code or non-code; omit `repo` for non-code) |
 | `grove_list_projects` | "Project status", briefing reads, slug lookup |
 | `grove_get` | Fetch a single item by ID (task, idea, project, decision) |
-| `grove_update` | Change fields on a task, idea, or project (NOT decisions) |
+| `grove_update_task` | Change fields on a task (title, notes, list, priority, due_at, tags, project_ref) |
+| `grove_update_idea` | Change fields on an idea (title, status, verdict, scores, tags, notes, metadata) |
+| `grove_update_project` | Change fields on a project (name, phase, blockers, next_actions, last_session, notes, docs) |
 | `grove_complete_task` | "Done with X", mark complete |
 | `grove_drop_task` | "Drop X", "never mind about X" |
 | `grove_events` | "What happened recently", audit history, Session Chronicle |
@@ -104,7 +106,7 @@ Status progression (set by other skills, documented here for reference):
 `confidence`, `reversible`, `context`, `rung` (usually 3). **`decision` is
 capped at 2000 chars — overflow detail goes in `context` and `alternatives`.**
 Decisions are **append-only** — to correct one, log a new decision with
-`supersedes` set to the old ID. Never try `grove_update` on a decision.
+`supersedes` set to the old ID. There is no update tool for decisions.
 
 ### "What did we decide about X"
 
@@ -118,7 +120,7 @@ the Rung-1 read at session start (see session-start skill).
 carry `phase`, `blockers`, `next_actions`, `last_session`, `docs` status, and
 `notes` (the planning-doc body for non-code projects). Create with
 `grove_create_project` — omit `repo` for non-code projects; update with
-`grove_update(entity_type="project", ...)`. chat-archive refreshes the row at
+`grove_update_project(...)`. chat-archive refreshes the row at
 session end; session-start's briefing reads it.
 
 **The project RECORD (`grove_get(entity_type="project", id=...)`) is the
@@ -224,11 +226,13 @@ If any Grove MCP call fails (timeout, connection error, server error):
 
 ## Update and delete
 
-`grove_update` patches any field on tasks, ideas, and projects. Use
-sparingly — most mutations are status transitions (raw → scouted, open →
+Three entity-specific update tools: `grove_update_task`, `grove_update_idea`,
+`grove_update_project`. Each accepts only the typed fields for that entity.
+Use sparingly — most mutations are status transitions (raw → scouted, open →
 done) handled by purpose-specific tools (`grove_complete_task`,
 `grove_drop_task`, scout writing a verdict). Decisions cannot be updated —
-append-only; supersede instead.
+append-only; supersede instead. Adjudications are tasks — update via
+`grove_update_task`.
 
 There is no delete. Drop a task with `grove_drop_task`; shelve an idea by
 setting `status: shelved`. The audit log retains everything.
@@ -250,7 +254,7 @@ migrate to Grove:
 
 ## Integration
 
-- **← idea-scout:** Writes verdicts and scores onto ideas via `grove_update`.
+- **← idea-scout:** Writes verdicts and scores onto ideas via `grove_update_idea`.
 - **← add-to-do:** Task-shaped capture flows through the same MCP tools.
 - **← chat-archive:** Pulls open tasks for touched projects during session
   wrap; writes the project row + Rung-3 decisions (Step 9b); files

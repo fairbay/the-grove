@@ -326,7 +326,7 @@ failures.
    **Code / Routines:**
    Git push IS delivery — skills are auto-discovered from `.claude/skills/`
    in the repo. No zip packaging or manual install needed. If the skill
-   needs to reach other repos, run `sync-skills.py` (see CONVENTIONS.md
+   needs to reach other repos, run `sync.py` (see CONVENTIONS.md
    § Skill sync).
 
 ---

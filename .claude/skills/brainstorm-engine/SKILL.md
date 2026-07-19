@@ -5,7 +5,7 @@ description: >
   for evaluating (→ idea-scout), building (→ build), browsing (→ idea-vault),
   or pitching (→ pitch-crafter).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-07-11-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -138,7 +138,11 @@ Sort into three tiers:
 - **Most fun to build:** which would be most enjoyable?
 - **Highest ceiling:** which has the most upside if it works?
 - **Recommended next step:** "Run idea-scout on [specific idea]" or "Narrow
-  further."
+  further." For internal-infrastructure or process ideas (enhancements to the
+  builder's own tooling, skills, or workflows — no external market), recommend
+  delegate-adversarial review of the proposal instead of idea-scout; scout's
+  market machinery (demand signals, business lens, competitive landscape) does
+  not apply and its feature-idea guard will bounce the routing anyway.
 
 ---
 
