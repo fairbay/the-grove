@@ -67,7 +67,7 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 ## Project Documentation
 
 - **Code lives in git; memory lives in Grove.** Repos are for source files. Decisions, project state, tasks, ideas, and session history live in Grove. Non-code projects (research threads, design work, workflow projects) are first-class Grove `project` rows — `repo` null, planning docs in `notes` — NOT GitHub repos. A project gets a repo when and because it has source files to version. Artifacts are windows, not stores: disposable projections over Grove, regenerated on demand.
-- **Skills** live in `fairbay/ops` (source of truth) and are synced to `.claude/skills/` in every repo via `ops/scripts/sync-skills.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it.
+- **Skills** live in `fairbay/ops` (source of truth) and are synced to `.claude/skills/` in every repo via `ops/scripts/sync.py`. **Never edit `.claude/skills/` in individual repos** — the sync overwrites it.
 - **Doc skeleton hierarchy:** MISSION.md (authority, WHY) → SPEC.md (requirements, WHAT) → PLAN.md (technical approach, HOW). BRIEF.md is the lightweight alternative — when no planning artifacts exist, the build skill generates one from 5 interview questions. Not every project needs all layers; BRIEF.md is valid on its own for small or early-stage work. HANDOFF.yaml is session state (who worked last, what's next), not part of the doc skeleton.
 - **Interview-mode engagement is the documentation trigger.** If a topic is worth interviewing about, the output becomes a durable artifact, not ephemeral chat context. Architect creates MISSION/SPEC/PLAN via interview; build creates BRIEF.md via quick interview; brainstorm-engine captures ideas durably.
 - **Before editing any skill file**, stop and load skill-creator-b first.
@@ -81,7 +81,7 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 **Capture at crystallization:** When a concrete work item, patch, or follow-up is agreed mid-session, write the Grove task in the SAME TURN it crystallizes. Don't queue it for later — `chat-archive` write-back is a backstop for anything missed, not the primary capture mechanism. Ad-hoc or never-archived chats have no backstop at all, so in-turn capture is the only guarantee.
 
-**Adjudication queue:** Items needing Baylee's judgment — source conflicts, unreachable/blocked content, medium/low-confidence data calls — get filed via `grove_create_adjudication` (structured options with explanations + clickable evidence URLs), NOT as prose in task notes. Baylee rules at vault.bayleemiller.org/adjudicate; sessions read verdicts back via `grove_list_adjudications(status="done")` and must consume them before re-deciding anything previously filed.
+**Adjudication queue:** Items needing Baylee's judgment — source conflicts, unreachable/blocked content, medium/low-confidence data calls — get filed via `grove_create_adjudication` (structured options with explanations + clickable evidence URLs), NOT as prose in task notes. Baylee rules at vault.bayleemiller.org/adjudicate; sessions read verdicts back via `grove_list_adjudications(status="done")` and must consume them before re-deciding anything previously filed. **Always include `recommendation`** (`option_id` + plain-language `reason`) and **`stakes`** (what changes, how many items affected, what risk looks like) — Baylee should be able to accept the recommendation in one click for most items. Option labels must be readable without domain expertise; technical detail goes in `explanation` (collapsed by default).
 
 ## Git Workflow
 
@@ -232,6 +232,10 @@ plan websites.)
 - **Make delegated work resumable & idempotent.** Persist artifacts (commit generated files) so an
   infra/usage-limit failure costs a cheap retry, not a full re-spend. Decouple expensive generation
   from cheap application.
+- **Background-agent notifications can be lost.** Especially after context summarization, completion
+  notifications may never arrive. Never conclude agents died without checking their output files —
+  agents write results to disk regardless of whether the notification reaches the orchestrator.
+  Check output paths (mtimes) before re-dispatching or reporting failure.
 - **Bulk data never rides in LLM-constructed tool arguments.** An agent relaying a 50KB UPDATE
   statement silently dropped 39% of its VALUES rows while keeping valid syntax and the correct
   prefix/suffix — partial success invisible to status checks. Ship bulk rows via script (REST/file)
@@ -302,6 +306,6 @@ Otherwise: finish an item → verify → log the decision → pull the next item
 
 **This is the single source of truth for cross-project preferences.** It lives in `fairbay/ops/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md`.
 
-**To update cross-project preferences:** Edit this file, then run `scripts/sync-global.py` to push to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
+**To update cross-project preferences:** Edit this file, then run `scripts/sync.py` to push to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
 
 **Why repo-committed, not just `~/.claude/CLAUDE.md`:** Cloud Claude Code web sessions run in ephemeral VMs cloned from GitHub. `~/.claude/` does not persist between web sessions. The repo-committed file is the only reliable persistence layer. `~/.claude/CLAUDE.md` is placed additionally on local machines for Desktop/CLI/VS Code coverage.
