@@ -5,7 +5,7 @@ description: >
   "drain the queue", "routine-fire X". Not for inline scoring/scouting
   (→ idea-scout) or sync delegation (→ delegate-*).
 metadata:
-  version: "2026-06-12-01"
+  version: "2026-10-01-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -235,6 +235,14 @@ completion unless every phrase is found. A queued task without verify lines
 cannot be completed by the routine — it will be skipped back to you. Pick a
 phrase that exists ONLY after the change (new text being added, the new
 version string), not text that's already in the file.
+
+## If create_trigger is denied
+
+When a chat→Code session fire via `create_trigger` is denied by the permission classifier (the block is intermittent and wording-dependent; observed 2026-09-29, MBN ledger-30 notifier):
+
+1. Do not retry, and do not reword the prompt to get past the classifier.
+2. Write the full prompt to a `.md` file right away, send it with `SendUserFile`, and tell Baylee in one line to paste it into a new Claude Code session on the repo.
+3. Keep the same prompt structure: authorization block, steps, landing, close-out.
 
 ## Security
 

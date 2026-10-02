@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-07-05-01"
+  version: "2026-10-02-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -170,6 +170,13 @@ step they need.
 
 Also read `CLAUDE.md` if present — it carries project-specific conventions.
 
+**Standing rules.** If `CLAUDE.md` has a section titled "Baylee's standing
+rules", read every rule before any proposal and name the list as loaded in
+the Phase 5 briefing. These are rulings Baylee made that later sessions
+contradicted while they lived only in the decision log; build, architect,
+and chat-archive gate on the same list, so the briefing is where the session
+confirms it has them.
+
 ## Phase 4b — Maturity checkpoint
 
 After loading CLAUDE.md and PLAN.md (or noting their absence), run a quick
@@ -273,6 +280,9 @@ Baylee into the work.
 ```
 **[Project Name]** — [phase, from Grove project row] — picked up from
 [source: handoff / Grove project / Grove idea] ([date])
+
+**Standing rules:** [N loaded from CLAUDE.md — omit this line when the
+section is absent]
 
 **Where we left off:**
 [1-3 lines from handoff `done:` — most recent only. If no handoff, the

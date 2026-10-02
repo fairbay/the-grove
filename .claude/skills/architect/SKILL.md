@@ -5,7 +5,7 @@ description: >
   this". Produces SPEC.md/PLAN.md. Not for raw ideas (→ idea-scout), code
   (→ build), or deploy (→ ship-it).
 metadata:
-  version: "2026-06-17-01"
+  version: "2026-10-02-02"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -31,6 +31,8 @@ Pick the mode up front. Don't blend them.
 **If you are about to build or modify 3+ files without a written plan, stop.** Draft a quick build sequence (express Phase 4) first — even five lines. Multi-file changes without a plan is how human action steps get dropped and skill installation ceremonies get skipped.
 
 **If a user says "write a SPEC.md" or "spec this" and you are about to start writing one without picking a mode, stop.** Run Mode selection first. Freehand specs skip the self-check, Actor/Route fields, and review delegation.
+
+**If you are about to propose copy, a data-collection step, a public promise, or anything involving money, and the repo `CLAUDE.md` has a section titled "Baylee's standing rules", stop.** Read the list and say in one line how many rules you read and which the proposal touches ("Standing rules: 6 read, touches #3 (quote it)" or "Standing rules: 6 read, none touched" — a bare "none" without the count is not the gate). A proposal that contradicts a rule says so in its first line and asks; it does not proceed. Applies in both modes — rulings kept only in the decision log were contradicted by later sessions, which is why the list is in CLAUDE.md.
 
 ---
 
@@ -306,7 +308,7 @@ Propose rather than ask blind: after Phase 2 you should be able to *draft* FRs a
 
 `delegate-adversarial` is the default review path. Escalate to `review-panel` (multi-agent) only when the project is high-stakes (regulated, contract-bound, multi-month commitment) and Baylee asks for the panel by name. Adversarial single-reviewer catches most spec gaps at a fraction of the cost.
 
-Write full `SPEC.md` to `/home/claude/SPEC.md` using the template below.
+Write full `SPEC.md` to `/home/claude/SPEC.md` using `references/spec-template.md`.
 Surface unresolved items with `[NEEDS CLARIFICATION: ...]` markers inline.
 - **Chat:** present via `present_files`.
 - **Code:** write to repo root; present inline summary. If >3 markers, do another interview turn; if 0-3, ask Baylee to resolve inline.
@@ -385,106 +387,10 @@ Update the vault (`fairbay/idea-vault` `ideas.json` + matching `archive/<slug>.m
 
 ### SPEC.md template
 
-```markdown
-# [Project] — Product Spec
-
-**Status:** draft | active | deprecated
-**SDD Level:** spec-anchored
-**Mission:** See [MISSION.md](MISSION.md) (authority for why this project exists)
-**Created:** YYYY-MM-DD
-**Last updated:** YYYY-MM-DD
-**Repo:** fairbay/...
-
----
-
-## 1. What + Why
-
-### Identity
-[One sentence: "Type that helps user do action so they can outcome"]
-
-### Primary User
-[Named, specific]
-
-### Problem Statement
-[Concrete pain, 2-4 sentences]
-
-### Non-Goals
-- ...
-
----
-
-## 2. Constraints
-
-### Platforms
-- ...
-
-### Hard Constraints
-- ...
-
-### Dependencies
-- ...
-
-### Risk Flags
-- ...
-
----
-
-## 3. Data + Behavior
-
-### Entities
-| Entity | Fields | Notes |
-|---|---|---|
-| ... | ... | ... |
-
-### User Flow (Happy Path)
-1. [Entry]
-2. [Step]
-3. [Core value]
-4. [Exit]
-
-### User Stories (consumer-facing only)
-- **US-001**: As a [persona], I want to [action], so that [outcome].
-  - *Given* [context], *when* [action], *then* [result].
-- **US-002**: ...
-
-### Functional Requirements
-- **FR-001**: System MUST ...
-- **FR-002**: System MUST ...
-
-### Edge Cases
-- **When X fails:** [behavior]
-
----
-
-## 4. Quality Contract
-
-### Acceptance Criteria
-- **FR-001**: Done when [observable].
-- **FR-002**: Done when ...
-
-### Success Criteria
-- **SC-001**: [metric]
-
-### Out of Scope (v1)
-- [Feature] — revisit when X
-- [Feature] — no
-
-### Assumptions (unvalidated)
-- ...
-
-### Rules for Future Changes
-- All changes must preserve FR-###, FR-###.
-
----
-
-## 5. Open Questions
-- [NC-001]: ...
-
----
-
-## Changelog
-- **YYYY-MM-DD**: Initial spec.
-```
+The full template lives in `references/spec-template.md` — read it when
+drafting (Phase 5), not before. Section order is fixed: header → 1. What +
+Why → 2. Constraints → 3. Data + Behavior → 4. Quality Contract → 5. Open
+Questions → Changelog.
 
 ### Self-check before delivery (interview mode)
 

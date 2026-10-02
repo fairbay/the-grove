@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-07-10-01"
+  version: "2026-10-02-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -329,16 +329,38 @@ push ceremony it required didn't earn its keep.
 
 ### 8. Watchlist
 
-Read `fairbay/ops/watchlist.md` (local in Code, git-ops in chat). If the
-read 404s, note it and continue. For each item whose `condition` occurred
-this session, answer the `check` question and append a one-line log entry:
-`YYYY-MM-DD: yes/no [brief detail]`.
+The source is `fairbay/ops/watchlist.md`. `sync.py` mirrors it to
+`.claude/watchlist.md` in every synced repo, so a Code session sees it without
+the ops repo attached.
 
-If an item's `resolve` condition is met (e.g., "3 observations"), move the
-item to the `## Resolved` section.
+**Surface branching:**
+- **Chat:** read `fairbay/ops/watchlist.md` via git-ops.
+- **Code:** read `.claude/watchlist.md` in the repo. In `fairbay/ops` itself,
+  `watchlist.md` at the root is the source — edit it directly. If the file is
+  missing, the repo has not been synced since the watchlist was added: say so
+  in one line and continue.
 
-If any items matched and were updated, push the updated watchlist.md to ops.
+For each item whose `condition` occurred this session, answer the `check`
+question and append one log line under the item:
+`- YYYY-MM-DD: yes/no — brief detail`. If the item's `resolve` condition is
+met (e.g. "3 observations"), move it to `## Resolved` — in the ops source
+only. A repo copy gets appended lines and nothing else, so the merge back
+into ops stays a clean append; the chat session that merges does the
+resolving.
+
 If no items matched, skip — don't mention the watchlist or push anything.
+If items matched:
+- **Chat:** push the updated `watchlist.md` to ops via git-ops.
+- **Code:** commit the edited copy in the same commit as the handoff. In a
+  non-ops repo, also add one line to the handoff `next:` list:
+  "Merge `.claude/watchlist.md` observations into `fairbay/ops/watchlist.md`
+  (chat session, git-ops)." That is the merge-back route — repo copy → next
+  chat session → ops source — chosen over a sync-side merge because the
+  observation stays a human-readable diff and nothing merges unattended.
+  `sync.py` holds (prints, does not overwrite) a repo copy whose last commit
+  is not a sync commit and that has lines the ops source lacks, and exits 2,
+  so an observation cannot be clobbered before it is merged. Merge the lines
+  verbatim — once they are in the source, the next sync releases the copy.
 
 ### 9. Handoff + Grove write-back
 
@@ -390,6 +412,15 @@ from concluding the artifact doesn't exist because the repo search returned empt
    alternatives, confidence, reversible, context, rung=3)`. Decisions are
    append-only — to correct an earlier one, pass `supersedes` with its ID
    instead of editing.
+3. **Standing rules.** If a ruling from Baylee this session added or changed
+   a rule, two things must already be true before the handoff commit: the
+   repo `CLAUDE.md` section "Baylee's standing rules" was edited in this
+   session (check the diff — one rule per line with the decision id), and a
+   Grove decision was logged — with `supersedes` pointing at the earlier
+   decision when the ruling replaces one. If either is missing, do it now.
+   A ruling that lives only in chat or only in the decision log gets
+   contradicted by the next session — that is the failure this list exists
+   to stop.
 
 Skip only if the session touched no project (pure Q&A). If Grove MCP fails,
 report the error, retry once, and note the gap in the handoff — never
@@ -431,7 +462,8 @@ fails, say so explicitly.
 - [ ] **"Next step:" line in response body?** (mandatory, even if nothing)
 - [ ] Outstanding items (if >1) verified before listing?
 - [ ] Permissions audit done (3d, chat only)? Setup gaps surfaced in summary?
-- [ ] Watchlist items checked (only the ones whose condition fired)?
+- [ ] Watchlist items checked (only the ones whose condition fired)? Code: repo copy committed + merge-back line in `next:`?
+- [ ] Standing rules: every ruling this session is in CLAUDE.md "Baylee's standing rules" with a superseding Grove decision?
 - [ ] Chat rename suggested?
 
 ## Integration

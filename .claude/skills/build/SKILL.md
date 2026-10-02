@@ -5,7 +5,7 @@ description: >
   planning (→ architect), bugs (→ systematic-debug), deploy (→ ship-it), or
   testing (→ systematic-test).
 metadata:
-  version: "2026-06-17-01"
+  version: "2026-10-02-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -56,6 +56,17 @@ If a plan exists (either form): it prescribes the technical approach for each st
 
 **Build reads PLAN only, not SPEC.** The plan embeds the relevant requirements for each step. Reading both causes the executor to re-plan from the spec and ignore the plan — the exact failure mode this architecture prevents. (systematic-debug reads both because debug needs SPEC to verify what "correct" looks like; build doesn't because PLAN already encodes that per step.)
 
+**Standing-rules gate.** If the repo `CLAUDE.md` has a section titled
+"Baylee's standing rules", read it alongside the plan (session-start loads it
+when it ran). Before proposing or building anything that collects data, makes
+a public promise, changes user-visible wording, or involves money, say in one
+line how many rules you read and which the proposal touches — "Standing
+rules: 6 read, touches #2 (no new data fields without consent copy), #5" or
+"Standing rules: 6 read, none touched". A bare "none" with no count is not
+the gate — the count proves the list was read. A proposal that contradicts a
+rule says so in its first line and asks; it does not proceed. The list exists because rulings
+kept only in the decision log were contradicted by later sessions.
+
 **Large plan? Delegate the extraction.** If PLAN.md is >3K tokens and you only need the approach for the current step, delegate to delegate-mechanical: "Read this plan and extract the complete approach for Step N. Return only that step's instructions." Keeps the full plan out of main context.
 
 ## Philosophy
@@ -91,6 +102,8 @@ criteria from PLAN.md or SPEC.md. Ask:
    dropped requirements that are in it, name the deviation.
 3. **Is the next phase still the right move?** Build context sometimes reveals
    that a later phase should come first, or that a phase is now unnecessary.
+4. **Did this phase introduce data collection, public copy, or money?** If so,
+   re-run the standing-rules gate (Phase 0) before moving on.
 
 If drift is detected: state what drifted, whether the mission/spec should be
 updated or the build corrected, and proceed with Baylee's confirmation for

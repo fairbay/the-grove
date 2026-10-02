@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-07-06-01"
+  version: "2026-10-01-01"
 ---
 
 # project-health — MBN data completeness & quality scorecard
@@ -17,6 +17,16 @@ Pulls live numbers from Supabase (`mqbnsjkeucvumdoqdeww`), Grove, and
 Vercel to produce an actionable scorecard. Replaces vanity counts
 (listing totals, row counts) with metrics tied to whether the product
 strategy actually works.
+
+**Pre-flight:** Supabase compute can be hibernated while `get_project`
+reports `ACTIVE_HEALTHY`. `execute_sql` over MCP times out against a
+hibernated project and does not wake it. `get_advisors` reveals the
+hibernated state, and opening the project in the Supabase dashboard
+wakes it. Check this before declaring the DB unreachable.
+
+**Scope note:** Findings about the current live site
+(medicaidrewards.com, legacy frontend) are not actionable before v1 —
+no work items should target it (decision c7930847).
 
 ## Metrics
 
@@ -30,6 +40,10 @@ strategy actually works.
 | **Source-backed** — % of listings with ≥1 extraction that has a source_id | `EXISTS (SELECT 1 FROM extractions WHERE reward_listing_id = rl.id AND source_id IS NOT NULL)` | Red <60%, amber <85%, green ≥85% |
 | **Handbook-anchored** — % of active PIAs with ≥1 extraction from a `plan_document` source | See handbook coverage query below | Red <50%, amber <80%, green ≥80% |
 
+**Metric rules (Grove decision 34950652, 2026-09-28):**
+- Plan coverage counts only programs with `is_member_facing = true` (join `program_insurer_areas` → `programs`); non-member-facing programs are excluded from both numerator and denominator (decision 34950652).
+- Handbook-anchored is reported as "n/a" and does not affect the green/amber/red verdict for the 9 FFS/PCCM states (AK, AL, CT, ID, ME, MT, SD, VT, WY) when the state's only member-facing row is the state program sourced from state documents (decision 34950652).
+
 ### Data quality — "Can users trust what we're showing?"
 
 | Metric | SQL | Thresholds |
@@ -37,17 +51,9 @@ strategy actually works.
 | **Confirmed %** — listings with evidence_type = 'confirmed' (not inferred_mandatory) | Per state from reward_listings.evidence_type | Red <60%, amber <90%, green ≥90% |
 | **Grounding score** — avg grounding_score on scored extractions | `AVG(grounding_score) FILTER (WHERE grounding_score IS NOT NULL)` per state | Red <0.6, amber <0.8, green ≥0.8 |
 | **Extraction density** — avg extractions per listing | `COUNT(e.id) / COUNT(DISTINCT rl.id)` per state | <1.0 = thin provenance |
-
-### Provenance infrastructure — "Is the multi-URL sourcing layer filling in?"
-
-Progress metrics for recently adopted standards. These track buildout
-velocity rather than red/amber/green thresholds — watch the trend.
-
-| Metric | SQL | Notes |
-|--------|-----|-------|
-| **Appearance coverage** — % of sources with ≥1 `source_appearances` row | `COUNT(DISTINCT sa.source_id) / COUNT(DISTINCT s.id)` | Tracks how much of the source corpus has multi-URL provenance. Baseline 2026-07-06: 6.6%. |
-| **Snapshot capture** — % of appearances with `snapshot_url` populated | `COUNT(*) FILTER (WHERE snapshot_url IS NOT NULL) / COUNT(*)` on source_appearances | Tracks archival evidence backing. Baseline 2026-07-06: 0%. |
-| **Link-label fill** — % of appearances with `link_label` populated | `COUNT(*) FILTER (WHERE link_label IS NOT NULL) / COUNT(*)` on source_appearances | Anchor text establishing officialness. Baseline 2026-07-06: 0%. |
+| **Appearance coverage** — % of sources with ≥1 `source_appearances` row | `COUNT(DISTINCT sa.source_id) / COUNT(DISTINCT s.id)` | Red <40%, amber <70%, green ≥70% |
+| **Snapshot capture** — % of appearances with `snapshot_url` populated | `COUNT(*) FILTER (WHERE snapshot_url IS NOT NULL) / COUNT(*)` on source_appearances | Red <25%, amber <50%, green ≥50% |
+| **Link-label fill** — % of appearances with `link_label` populated | `COUNT(*) FILTER (WHERE link_label IS NOT NULL) / COUNT(*)` on source_appearances | Red <70%, amber <90%, green ≥90% |
 
 ### Why these metrics and not others
 
@@ -81,13 +87,36 @@ velocity rather than red/amber/green thresholds — watch the trend.
   state comparison charts, OTC catalogs, and policy papers.
 - **Provenance infrastructure** metrics (appearance coverage, snapshot
   capture, link-label fill) track the source_appearances layer shipped
-  2026-07-06. This is buildout velocity, not a quality gate yet — the
-  schema exists but is 94% empty. Once appearance coverage exceeds 50%
-  and snapshot capture exceeds 25%, consider promoting to threshold
-  metrics.
+  2026-07-06. Promoted from velocity-only to threshold metrics on
+  2026-09-26: both promotion criteria (appearance coverage >50%,
+  snapshot capture >25%) were met as of 2026-09-25 (50.1% / 47.1%,
+  link-label fill 91.1%).
 - Listing counts, row counts, and table sizes are explicitly NOT health
   metrics. "757 listings" tells you nothing about whether those listings
   are complete, sourced, or useful.
+
+## Structural smells (Tier 1, 2026-09-25 sweep)
+
+Modeling issues a scorecard's aggregate percentages can hide. Check
+these alongside the metrics above — they surface plans whose numbers
+look fine but whose underlying structure is wrong:
+
+- **Copied enrollment across program rows** — sibling PIAs in the same
+  state sharing an identical `enrollment_count` usually means the
+  number was copied/estimated once, not sourced per program.
+- **program_type diversity** — a state where every PIA has the same
+  `program_type` may be missing real segmentation (MCO vs FFS vs
+  waiver not distinguished).
+- **is_regionalized vs plan count** — a state flagged
+  `is_regionalized` should show a plan count consistent with regional
+  carve-outs; one statewide plan on a regionalized state is a
+  modeling mismatch.
+- **FFS states modeled as one MCO** — fee-for-service states have no
+  MCO; representing one as a single MCO-type PIA misrepresents the
+  delivery model as managed care.
+- **Null enrollment share** — % of active PIAs with `enrollment_count`
+  NULL or 0. A high share hides which plans actually dominate a
+  state's market.
 
 ## Queries
 
@@ -183,7 +212,7 @@ WHERE pia.status = 'active'
 GROUP BY pia.state_id ORDER BY handbook_pct ASC;
 ```
 
-### Provenance infrastructure query
+### Provenance query
 
 ```sql
 SELECT

@@ -5,7 +5,7 @@ description: >
   "sync skills", "isn't triggering", "add that to [skill]." Fires on ANY skill
   file edit. Not for using skills or memory edits.
 metadata:
-  version: "2026-07-04-01"
+  version: "2026-10-02-01"
 ---
 
 # skill-creator — build and maintain skills for Baylee's system
@@ -335,15 +335,20 @@ failures.
 
 When syncing ("sync skills", "are my skills up to date?"):
 
-```bash
-cd /home/claude/ops
-PYTHONPATH=".claude/skills/git-ops/scripts:$PYTHONPATH" python3 scripts/sync.py
-```
+Cross-repo sync (phases 2–3: skills, global.md, watchlist into every repo)
+runs automatically — `.github/workflows/sync.yml` on fairbay/ops fires on
+every push to `main`. Chat only handles phase 1, installing drifted skills:
 
-This runs all three phases: chat skill check + packaging, cross-repo skill
-push, and cross-repo global.md push. If chat skills are drifted, it produces
-`.skill` zips — `present_files` them for batch install. Requires the repo to
-be cloned first and `GITHUB_PAT` exported.
+1. Attach fairbay/ops to the session (`add_repo`, read) and clone it.
+2. From the clone: `python3 scripts/sync.py --chat-only`
+3. `present_files` / `SendUserFile` the `.skill` zips for batch install.
+
+**If you are about to fetch a PAT from Vault to run a sync, stop.** Chat
+sessions don't need one: the session proxy authenticates repo-scoped GitHub
+calls for attached repos, and `sync.py` falls back to it automatically. A
+full manual run (all three phases) is only for when the Action is broken —
+check the latest `main` commit's check runs (`Sync Claude infrastructure`)
+before doing anything else.
 
 ---
 
