@@ -250,7 +250,14 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 
 ## Remote Control / Scheduling Tools
 
-**Do not use timers (`send_later`, triggers, scheduled wake-ups) for normal work.** Every timed wake-up replays the full session context — real usage cost for a check that usually finds nothing (Baylee's call, 2026-07-03, after timers burned through usage). PR babysitting, deploy watching, and routine follow-ups run on webhook events only; anything needing later attention goes in HANDOFF.yaml `next:` or a Grove task, picked up next session. Timers are reserved for the rare case Baylee explicitly asks for one. The tools stay in `permissions.allow` so that when he does ask, there's no approval pop-up.
+**Minimize Claude Code Remote tool calls.** All `mcp__Claude_Code_Remote__` tools (`send_later`, `create_trigger`, `fire_trigger`, `subscribe_pr_activity`, etc.) carry a mandatory permission prompt that cannot be suppressed — the platform marks them `requiresUserInteraction`. Every call costs Baylee a manual approval tap. Rules:
+
+- **No timers for normal work** (`send_later`, triggers, scheduled wake-ups). Every timed wake-up replays the full session context — real usage cost for a check that usually finds nothing (Baylee's call, 2026-07-03). Anything needing later attention goes in HANDOFF.yaml `next:` or a Grove task, picked up next session.
+- **No auto-subscribing to PR activity.** Do not call `subscribe_pr_activity` after creating PRs. Baylee is in the session watching the PR already; webhook subscriptions add prompt noise with no value. Subscribe only when Baylee explicitly asks to watch/babysit/monitor a PR.
+- **Opening a PR may auto-subscribe the session to PR activity.** That is the harness, not a call you made. Leave it until the PR merges or closes — it auto-unsubscribes on merge (observed 2026-10-01, MBN PRs #274/#275). Don't spend an approval tap on `unsubscribe_pr_activity` unless the PR stays open after the session.
+- **No `send_later` check-ins for PRs.** PR follow-up goes in HANDOFF `next:` or a Grove task, not scheduled self-pings.
+- **Repo tools** (`add_repo`, `list_repos`, `list_environments`) are unavoidable when needed — use them.
+- **Timers/triggers reserved** for the rare case Baylee explicitly asks for one.
 
 ## Session Scope
 
@@ -263,6 +270,8 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 Otherwise: finish an item → verify → log the decision → pull the next item from the backlog (HANDOFF `next:` / Grove `next_actions`) and keep working. Session swaps are expensive — the next session pays a full re-orientation (handoff + Grove + planning docs, tens of thousands of tokens plus Baylee's round-trip attention) before any work happens, while the harness auto-summarizes long context, so there is no token efficiency in wrapping early. (Baylee's call, 2026-07-04, after a session self-wrapped with ~73% of context unused.)
 
 - **PRs, merges, and deploys are checkpoints, not endings.** Ship, verify, then continue on a refreshed branch.
+- **Every session declares a defined end state and reports % toward it (Baylee, 2026-09-27).** After orientation, state the session goal as a fixed, countable unit list (e.g. "9 re-anchors × draft/review/apply + final export = 32 steps") and show it to Baylee before work starts. Every progress report leads with `Progress: N/M (X%)` against that list. Units discovered mid-session are added visibly (the denominator changes in the open, never silently). When the goal hits 100%, report it as done, then declare the next goal the same way before continuing.
+- **Batch large data work; touch the repo once.** When the live product isn't in active use, apply data changes to the database as they pass review and commit locally, then export/PR/merge once per batch — not per change. Push mid-batch only when the container may be reclaimed.
 - **No premature closing language.** "Session wrapped" / "all done" reads as a cue for Baylee to archive — reserve it for when an end condition above actually holds. Mid-session progress reports use chat-status framing: what's done, what's next, and that work is continuing.
 - This bounds when to *stop*, not how to batch: within a session, still order small items before large ones where a project prescribes it.
 
@@ -306,6 +315,6 @@ Otherwise: finish an item → verify → log the decision → pull the next item
 
 **This is the single source of truth for cross-project preferences.** It lives in `fairbay/ops/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md`.
 
-**To update cross-project preferences:** Edit this file, then run `scripts/sync.py` to push to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
+**To update cross-project preferences:** Edit this file and push to `main` — the `sync.yml` Action in `fairbay/ops` runs `scripts/sync.py` to push it to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
 
 **Why repo-committed, not just `~/.claude/CLAUDE.md`:** Cloud Claude Code web sessions run in ephemeral VMs cloned from GitHub. `~/.claude/` does not persist between web sessions. The repo-committed file is the only reliable persistence layer. `~/.claude/CLAUDE.md` is placed additionally on local machines for Desktop/CLI/VS Code coverage.
