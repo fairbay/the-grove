@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-06-29-01"
+  version: "2026-10-03-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -32,10 +32,15 @@ Three modes:
   review with context caching — upload data once, run multiple focused
   passes at 90% token discount.
 
-Model: `gemini-2.5-pro` by default. The reasoning depth justifies the
-cost for adversarial work — Flash misses security-relevant findings that
-Pro catches. Use `gemini-2.5-flash` only for research where speed matters
-more than depth.
+Model: `gemini-3.1-pro-preview` (the `gemini_chat` default) in chat. The
+reasoning depth justifies the cost for adversarial work — Flash misses
+security-relevant findings that Pro catches. Use `gemini-3.8-flash` for
+research where speed matters more than depth.
+
+**Surface note.** Code: MCP calls are capped at 60s by the harness. Use
+`gemini-3.8-flash` with `thinking_level=medium` for review calls; keep the
+prompt under ~8K tokens. Chat: the default pro model is fine (keep Pro for
+security-relevant findings).
 
 ## What "adversarial" means
 
@@ -268,7 +273,7 @@ try:
     output, usage = research(
         query='What products exist for AI-powered home inspection?',
         format_hint='Return JSON: {"products": [...], "signals": [...]}',
-        model='gemini-2.5-flash',  # flash is fine for research
+        model='gemini-3.8-flash',  # flash is fine for research
     )
 except GeminiError as e:
     print(f"Gemini error: {e}")
@@ -289,7 +294,7 @@ Research output includes grounding sources in `usage['sources']`. Report:
 | Multi-pass (3 passes, Pro) | ~$0.15 | Full project audit |
 | Research (Flash + search) | ~$0.01 | Demand validation, competitive intel |
 
-Gemini 2.5 Pro: $1.25/M input, $10/M output, 90% cache discount.
+Gemini Pro (3.1 preview; verify against `gemini_list_models`): $1.25/M input, $10/M output, 90% cache discount.
 Context cache storage: $1/M tokens/hour. Default TTL: 30 min.
 
 ## Setup
