@@ -258,6 +258,7 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 - **No `send_later` check-ins for PRs.** PR follow-up goes in HANDOFF `next:` or a Grove task, not scheduled self-pings.
 - **Repo tools** (`add_repo`, `list_repos`, `list_environments`) are unavoidable when needed — use them.
 - **Timers/triggers reserved** for the rare case Baylee explicitly asks for one.
+- **Vercel MCP connector token is read-only and returns 403 when listing a project's env vars.** It cannot confirm whether Baylee has added a secret. Ask Baylee in chat (one yes/no) instead of having a session probe for it.
 
 ## Session Scope
 
