@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-07-19-01"
+  version: "2026-10-08-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -104,7 +104,9 @@ Status progression (set by other skills, documented here for reference):
 `grove_log_decision` with: `decision` (the call), `project_ref`
 (`fairbay/<repo>`, a project slug, or `cross-project`), `alternatives`,
 `confidence`, `reversible`, `context`, `rung` (usually 3). **`decision` is
-capped at 2000 chars — overflow detail goes in `context` and `alternatives`.**
+capped at 2,000 characters (validation error above that); put the long form in
+the project row notes or a repo doc and keep the decision to the call, the
+rule, and the pointer.**
 Decisions are **append-only** — to correct one, log a new decision with
 `supersedes` set to the old ID. There is no update tool for decisions.
 
