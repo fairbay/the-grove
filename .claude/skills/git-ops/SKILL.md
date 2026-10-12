@@ -8,7 +8,7 @@ description: >
   enforces the commit identity that Vercel Hobby requires. Not for new-host
   setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-07-10-01"
+  version: "2026-10-12-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -187,6 +187,7 @@ Placed near the operations above, summarized here:
 - Don't rewrite the push sequence from scratch — the bundled script handles blob/tree/commit/ref correctly.
 - For binary or > 1MB reads, the contents endpoint returns base64 — `read_file` only handles UTF-8 text.
 - **Egress proxy auth flap (claude.ai containers).** Symptom: valid PAT + bursty 401 "Requires authentication" + GitHub request-ids present in response. Cause: transparent egress proxy intermittently drops the Authorization header. This is NOT a PAT expiry — don't tell Baylee to regenerate a healthy token. `api()` retries 8 times with backoff; `push_files()` falls back to native git transport (shallow clone with `x-access-token:PAT@github.com`) on 401 exhaustion. If the flap persists across sessions, Baylee may want to report to Anthropic.
+- **Cloud session limits: `gh api --paginate` fails through the session proxy.** The second page is requested by numeric repository id and the proxy answers 403 "Numeric-ID repository paths (repositories/{id}/...) are not supported through this proxy." The first page returns, so counts silently cover only the newest 100 rows. Page by hand instead: add `per_page=100&page=N` to the path and loop until a page comes back empty (or its last row is older than the window you need).
 
 ## Secret hygiene
 
