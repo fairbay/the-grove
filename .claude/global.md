@@ -260,6 +260,17 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 - **Timers/triggers reserved** for the rare case Baylee explicitly asks for one.
 - **Vercel MCP connector token is read-only and returns 403 when listing a project's env vars.** It cannot confirm whether Baylee has added a secret. Ask Baylee in chat (one yes/no) instead of having a session probe for it.
 
+## Web Fetches in Repo Sessions
+
+**With a repo attached, search first and fetch only URLs the search returned.** In a cloud session that has a repo attached, the fetch service asks Baylee to approve every URL Claude wrote itself ("Claude wants to fetch a web page"); a URL that came back from a web search in the same session goes through without asking (observed 2026-10-12: 3 of 3 from-memory URLs asked, 5 of 5 search-result URLs did not; Grove e6ca38cf). Every approval is a manual tap. Rules:
+
+- **Never type a URL from memory**, including a docs page you are sure of. Run a web search for the page, then fetch the result's URL exactly as returned.
+- **Sub-agents follow the same rule.** A prompt that sends a sub-agent to the web says so.
+- **A page that search can't surface costs one tap.** Fetch it only when the work needs it, and say which page and why. Don't retry a declined or failed fetch under another spelling.
+- **Nothing on our side turns the approval off.** "Always allow for this website" lasts for that chat only, a repo's `permissions.allow` list is not loaded in these sessions, and a `WebFetch` allow rule changed nothing (tried in `fairbay/ops`, reverted). Don't add allow rules or hooks to answer the approval: it is the platform's check on where a URL came from. Upstream report: anthropics/claude-code#99274.
+- **Heavy web research goes before a repo is attached**, or in a chat without one: about 20 fetches in a chat with no repo raised no approval.
+- Not yet tested: a URL Baylee pastes into the chat, and a link found inside a fetched page.
+
 ## Session Scope
 
 **Run until stopped, exhausted, or blocked.** A session ends only when one of these holds:
