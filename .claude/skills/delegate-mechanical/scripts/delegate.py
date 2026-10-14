@@ -1,50 +1,70 @@
 #!/usr/bin/env python3
 """
-Shared API call helper for the delegate-* skill family.
+Shared API call helper for the delegate-* skill family (runs on API credits, not the
+subscription).
 
-Used by delegate-mechanical, delegate-analytical, delegate-adversarial.
-Lives in delegate-mechanical/scripts/ because it has to live somewhere; all
-three skills are installed together as a family.
+Used by delegate-mechanical, delegate-analytical, delegate-adversarial. Lives in
+delegate-mechanical/scripts/, which sync.py copies into every repo's .claude/skills/.
 
-Usage:
+Python:
   import sys
-  sys.path.insert(0, '/mnt/skills/user/delegate-mechanical/scripts')
+  sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')   # chat: /mnt/skills/user/...
   from delegate import call
+  output, usage = call(model='claude-haiku-5-5', system='...', user='...', max_tokens=2048)
 
-  output, usage = call(
-      model='claude-haiku-4-5-20251001',
-      system='You are a focused assistant. Return only [format].',
-      user='[task instruction + content]',
-      max_tokens=2048,
-  )
+Command line (bulk text goes in files, never in tool arguments):
+  python3 .claude/skills/delegate-mechanical/scripts/delegate.py \
+      --model claude-sonnet-5-5 --system-file sys.txt --user-file task.txt [--max-tokens 4096]
+  The reply goes to stdout; token usage goes to stderr.
 
-Reads ANTHROPIC_API_KEY from secrets/delegate.env in fairbay/ops.
-Surfaces a clear error if the file or key is missing rather than retrying or
-falling back silently — Baylee needs to know to set it up or rotate the token.
+The key is ANTHROPIC_API_KEY in fairbay/ops secrets/delegate.env, found in this order:
+a local ops clone (this repo, or /home/user/ops), `gh api` on fairbay/ops (a Code session
+with ops attached; in a product-repo session attach it first: add_repo fairbay/ops, read),
+then git-ops read_file (chat). A missing key is surfaced, never retried or worked around.
 """
+import argparse
 import json
+import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
-
-sys.path.insert(0, '/mnt/skills/user/git-ops/scripts')
-from git_push import read_file  # noqa: E402
 
 
 class DelegateError(RuntimeError):
     """Surfaced verbatim — message tells Baylee what to do."""
 
 
-def _load_api_key() -> str:
+def _read_env_text() -> str:
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
+    for root in (top, "/home/user/ops"):
+        path = os.path.join(root, "secrets", "delegate.env") if root else ""
+        if path and os.path.isfile(path):
+            return open(path).read()
     try:
-        env = read_file('fairbay/ops', 'secrets/delegate.env')
+        out = subprocess.run(["gh", "api", "repos/fairbay/ops/contents/secrets/delegate.env",
+                              "-H", "Accept: application/vnd.github.raw"],
+                             capture_output=True, text=True, timeout=30)
+        if out.returncode == 0 and "ANTHROPIC_API_KEY" in out.stdout:
+            return out.stdout
+    except Exception:
+        pass
+    for p in (".claude/skills/git-ops/scripts", "/mnt/skills/user/git-ops/scripts"):
+        if os.path.isdir(p) and p not in sys.path:
+            sys.path.insert(0, p)
+    try:
+        from git_push import read_file  # chat path (PAT)
+        return read_file('fairbay/ops', 'secrets/delegate.env')
     except Exception as e:
         raise DelegateError(
-            "secrets/delegate.env not found in fairbay/ops. "
-            "First-time setup: create the file with "
+            "secrets/delegate.env not reachable. In a Code session on another repo, attach "
+            "fairbay/ops (add_repo, read) and retry. First-time setup: create the file with "
             "ANTHROPIC_API_KEY=sk-ant-... from console.anthropic.com."
         ) from e
 
+
+def _load_api_key() -> str:
+    env = _read_env_text()
     pairs = dict(
         line.split('=', 1)
         for line in env.strip().split('\n')
@@ -90,3 +110,26 @@ def call(model: str, system: str, user: str, max_tokens: int = 2048) -> tuple[st
 
     text = "".join(b["text"] for b in result["content"] if b["type"] == "text")
     return text, result.get("usage", {})
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="One Anthropic API call on API credits.")
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--system-file", required=True)
+    ap.add_argument("--user-file", required=True)
+    ap.add_argument("--max-tokens", type=int, default=2048)
+    a = ap.parse_args()
+    try:
+        text, usage = call(a.model, open(a.system_file).read(), open(a.user_file).read(), a.max_tokens)
+    except DelegateError as e:
+        print(f"delegate: {e}", file=sys.stderr)
+        return 1
+    print(text)
+    print(json.dumps({"model": a.model, "input_tokens": usage.get("input_tokens"),
+                      "output_tokens": usage.get("output_tokens")}), file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

@@ -5,7 +5,7 @@ description: >
   proactively. Not for flaw-finding (→ delegate-adversarial), rote
   (→ delegate-mechanical), panel reviews (→ review-panel).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-10-14-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -16,7 +16,7 @@ Offload subtasks that require weighing, comparing, or evaluating to a sonnet
 instance via the Anthropic API. The sub-agent runs in isolation — only the
 result enters the main chat.
 
-Model: `claude-sonnet-4-6` — strong analysis (~40-60 tok/s), $3/$15 per M tokens.
+Model: `claude-sonnet-5-5` (verified on the API 2026-10-14). Runs on API credits, not the subscription; the command line in delegate-mechanical works here too.
 
 ## What "analytical" means
 
@@ -82,11 +82,11 @@ plan to echo the system prompt, raw input, or reasoning back into the main chat.
 
 ```python
 import sys
-sys.path.insert(0, '/mnt/skills/user/delegate-mechanical/scripts')
+sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')  # chat: '/mnt/skills/user/delegate-mechanical/scripts'
 from delegate import call
 
 output, usage = call(
-    model='claude-sonnet-4-6',
+    model='claude-sonnet-5-5',
     system=system_prompt,
     user=user_message,
 )

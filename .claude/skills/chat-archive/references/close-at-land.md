@@ -57,8 +57,8 @@ Order matters: draft first, then the owner task, so the line names a real number
 **Preconditions.**
 - The PR is a draft and has an owner task.
 - No other Claude PR in this repo is ready (I3). Run
-  `pr_state.py report --repo fairbay/<repo>` (in ops `scripts/`; elsewhere fetch
-  it as session-start Phase 0 does): any row G3–G6b other than this PR → ask
+  `pr_state.py report --repo fairbay/<repo>` (`.claude/skills/session-start/scripts/`,
+  synced into every repo): any row G3–G6b other than this PR → ask
   Baylee about that PR (merge or close) in one tap and act only on his answer,
   even when another session opened it; or keep this one in draft. Two ready PRs
   would both rewrite HANDOFF.yaml. The standing-rules PR of step 2 is the one

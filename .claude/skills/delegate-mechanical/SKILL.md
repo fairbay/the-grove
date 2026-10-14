@@ -5,7 +5,7 @@ description: >
   filter by tag/keyword, scan. Use proactively. Not for judgment
   (→ delegate-analytical) or async (→ fire-routine).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-10-14-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -16,7 +16,7 @@ Offload subtasks that need comprehension but not judgment to a haiku instance
 via the Anthropic API. The sub-agent runs in isolation — only the result enters
 the main chat.
 
-Model: `claude-haiku-4-5-20251001` — fast (~80-120 tok/s), $1/$5 per M tokens.
+Model: `claude-haiku-5-5` (verified on the API 2026-10-14). Runs on API credits, not the subscription.
 
 ## What "mechanical" means
 
@@ -79,15 +79,21 @@ only the extracted result needs surfacing.
 
 ```python
 import sys
-sys.path.insert(0, '/mnt/skills/user/delegate-mechanical/scripts')
+sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')  # chat: '/mnt/skills/user/delegate-mechanical/scripts'
 from delegate import call
 
 output, usage = call(
-    model='claude-haiku-4-5-20251001',
+    model='claude-haiku-5-5',
     system=system_prompt,
     user=user_message,
 )
 ```
+
+Or from Bash, with the prompts in files (Code sessions; bulk text never rides in
+tool arguments): `python3 .claude/skills/delegate-mechanical/scripts/delegate.py
+--model claude-haiku-5-5 --system-file sys.txt --user-file task.txt`. The reply is on stdout,
+token usage on stderr. In a product-repo Code session, attach fairbay/ops (read)
+first so the helper can read the key.
 
 If the helper raises `DelegateError`, surface its message verbatim — it tells
 Baylee whether to set up `secrets/delegate.env` or rotate the token. Do not

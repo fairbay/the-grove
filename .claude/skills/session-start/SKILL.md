@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-14-02"
+  version: "2026-10-14-03"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -63,16 +63,14 @@ Skip for non-code projects (`repo` null).
 repo's policy):
 
 ```bash
-S=scripts/pr_state.py   # in an ops checkout; elsewhere fetch it from ops main:
-[ -f "$S" ] || { S=/tmp/pr_state.py; gh api repos/fairbay/ops/contents/scripts/pr_state.py \
-  -H "Accept: application/vnd.github.raw" > "$S" || rm -f "$S"; }
+S=.claude/skills/session-start/scripts/pr_state.py   # synced into every repo with the skills
 [ -f "$S" ] && python3 "$S" report --repo fairbay/<repo> --table || echo "gate script unavailable"
 ```
 
 Use `report` without `--table` for JSON when a row needs its detail (majors,
-check names). If the script can't be fetched, list open PRs with
-`gh api repos/fairbay/<repo>/pulls?state=open` and say the gate script was
-unavailable.
+check names). If the repo has no copy yet (not synced since 2026-10-14), list
+open PRs with `gh api repos/fairbay/<repo>/pulls?state=open` and say the gate
+script was unavailable.
 
 **Present it as Batch 0** of the Phase 4c queue and as the first section of the
 Phase 5 briefing. Each row carries the gate row (G1–G13) and the recommendation
@@ -458,7 +456,7 @@ confirmation.
   hook (`scripts/session_handoff.py inject`) that injects the same handoffs as
   `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
-- **← pr_state.py:** Phase 0 runs `ops/scripts/pr_state.py report` (land-and-leave
+- **← pr_state.py:** Phase 0 runs this skill's `scripts/pr_state.py report` (land-and-leave
   entry gate, `ops/docs/land-and-leave-SPEC.md` §7.5, §10).
 - **→ build / systematic-test / systematic-debug:** Hands off the loaded PLAN.md
   context so they don't refetch.
