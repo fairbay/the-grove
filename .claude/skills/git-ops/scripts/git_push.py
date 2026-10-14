@@ -88,6 +88,21 @@ def _push_via_cli(clone_path, branch, message, files):
             raise RuntimeError(f"git {cmd[1]} failed: {r.stderr.strip()}")
         return r
 
+    # The commit lands on whatever is checked out, and `git push origin
+    # <branch>` pushes the local ref of that name. If they differ, the commit
+    # never reaches <branch> (or a rebase rewrites the wrong branch). Refuse
+    # before touching anything.
+    current = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=clone_path, capture_output=True, text=True,
+    ).stdout.strip()
+    if current != branch:
+        raise RuntimeError(
+            f"clone at {clone_path} is on '{current}', not the target "
+            f"branch '{branch}'. Check out '{branch}' first, or pass the "
+            f"checked-out branch as the target."
+        )
+
     # Pull latest to avoid conflicts with concurrent vault updates
     try:
         _run(["git", "pull", "--rebase", "origin", branch])
@@ -101,6 +116,8 @@ def _push_via_cli(clone_path, branch, message, files):
         if isinstance(local, bytes):
             with open(dest, "wb") as f:
                 f.write(local)
+        elif os.path.exists(dest) and os.path.samefile(local, dest):
+            pass  # already in place in the clone (copy2 would raise SameFileError)
         else:
             shutil.copy2(local, dest)
 
