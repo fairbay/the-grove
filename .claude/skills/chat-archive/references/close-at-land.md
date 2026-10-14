@@ -82,6 +82,13 @@ Order matters: draft first, then the owner task, so the line names a real number
    in pending tense ("Lands with #n: …"). `next:` pruned per
    `handoff-schema.md`: carry forward every open item a previous session left,
    even one outside this PR's work. Decisions in `decisions_made:`.
+   **A PR outside the repo's own workstream** (a cross-cutting rule change from
+   an ops session, say) keeps the baton it finds: it sets `meta.landing`,
+   `meta.generated` and `meta.surface` (naming whose baton the rest is), writes
+   its own `done:` line, and adds one line pointing at the previous session's
+   `done:` (its detail lives in Grove). It prunes from `next:` only items it
+   verified are complete, and leaves `progress:` and every other section as they
+   were. MBN #368 (S1) is the worked example.
 4. **Grove markers.**
    - Project row: replace or append `LANDING fairbay/<repo>#<n>: <what lands>`
      in `next_actions` (`grove_update_project`; the array replaces the old one,
