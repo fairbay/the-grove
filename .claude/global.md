@@ -85,7 +85,8 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Git Workflow
 
-- Push to `main` directly — no feature branches or PRs unless explicitly requested.
+- **Where work lands depends on the surface.** Chat sessions push to `main` directly through git-ops (`push_files`). Claude Code web sessions can only push `claude/*` branches: open the PR as a draft when the work starts, keep it a draft while working (drafts start no CI), and mark it ready once, when the work is finished and the handoff for it is written into the branch. Baylee's merge tap (or his merge on GitHub) lands it. A repo's own CLAUDE.md may narrow this.
+- **Check the repo's open pull requests before starting new work there.** A ready PR is merged, closed or put back to draft first; a draft continues only if a Grove task owns it. Design and rollout: `fairbay/ops` docs/land-and-leave-SPEC.md.
 - Version bump (patch) in package.json on every push.
 - Regenerate lockfile with `npm install` after dependency changes, before committing.
 - Provide a commit link after every completed unit of work.
