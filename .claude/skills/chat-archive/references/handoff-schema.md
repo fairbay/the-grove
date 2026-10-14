@@ -46,6 +46,7 @@ meta:
   project: "repo-or-topic-name"
   type: build  # "build" or "session"
   session_chat_id: null  # include if available
+  landing: "fairbay/<repo>#<n>"  # only when the handoff rides a PR (close-at-land); omit for direct-to-main
 
 done:
   - "Rewrote api/analyze.js for two-stage pipeline"
@@ -99,6 +100,11 @@ Summarize what **this session** shipped. 1-3 bullet points. The next session's
 `session-start` shows "most recent only, 1-3 lines" — anything beyond that is
 never read. A prior session's `done:` items are replaced wholesale, not
 appended to.
+
+**Pending tense in a PR.** When `meta.landing` is set, the handoff describes the
+world once that PR merges and says so: "Lands with #n: …". The next session
+reads it from `main` after the merge, or from the PR head while the PR is still
+open (session-start Phase 0), so it stays true either way.
 
 **Anti-pattern:** Accumulating every completed item across sessions. This turns
 the handoff into a changelog that costs hundreds of tokens and provides zero

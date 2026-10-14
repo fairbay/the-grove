@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-14-01"
+  version: "2026-10-14-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -47,13 +47,13 @@ Does NOT fire for:
 - A fresh idea with no prior work → idea-scout
 - Generic greetings without a project reference → respond normally
 
-## Phase 0 — PR gate (report-only)
+## Phase 0 — PR gate (no blocking yet)
 
 Every session on a repo starts by checking that repo's open PRs, so work that
 never landed is seen before new work begins (land-and-leave entry gate,
-`ops/docs/land-and-leave-SPEC.md` §7.5). **Rollout step 2: report only.** Show
-the report; don't block, don't ask a tap, don't merge or close anything.
-Blocking and the tap arrive in rollout step 4.
+`ops/docs/land-and-leave-SPEC.md` §7.5). **Rollout step 3:** report, look up
+owners, promote merged work. Don't block, don't ask a tap, don't merge or close
+a PR here. Blocking, rollback and the tap arrive in rollout step 4.
 
 **When.** As soon as the repo is known: in Code that is the CWD, so before
 Phase 1; in chat, right after Phase 1 step 1 returns the project's `repo`.
@@ -81,8 +81,27 @@ by hand, never handed off; recommendation: hand off now").
 
 - **Unreachable (G1):** say "PRs unchecked: <reason>". Never report all clear
   when GitHub couldn't be read.
-- **G8 drafts** read "needs an `owns:` task, else G7". Owner tasks start with
-  rollout step 3; until then show G8 as reported, with no Grove lookup.
+- **G8 drafts:** for each, `grove_list_tasks(q="owns: fairbay/<repo>#<n>",
+  status="open", compact=false)` and keep only tasks with a notes line exactly
+  `owns: fairbay/<repo>#<n>` (`q` is fuzzy). One found → "in progress: #n —
+  <task title>"; two or more → list them all and say so. None → report it as G7
+  (no owner).
+- **A ready PR's handoff.** For a Claude PR in G3–G5b (it carries the
+  close-at-land commit), its HANDOFF.yaml on the PR head is the newest baton:
+  Phase 2 reads it from there (`gh api repos/fairbay/<repo>/contents/HANDOFF.yaml?ref=<head_ref>
+  -H "Accept: application/vnd.github.raw"`) when its `meta.landing` names that PR.
+- **Promote merged work** once the Grove project row is known (in Code, right
+  after Phase 1 step 1; marker grammar and steps:
+  chat-archive `references/close-at-land.md`, "Promotion after a merge"). Gather
+  the project row's `next_actions` lines starting `LANDING fairbay/<repo>#` and
+  the tasks from `grove_list_tasks(q="landing: fairbay/<repo>#", compact=false,
+  limit=100)` (page until short) whose notes carry an exact
+  `landing: fairbay/<repo>#<n>` line. For their
+  distinct numbers run `pr_state.py check <n>[,<n>…] --repo fairbay/<repo>`;
+  each `merged` one is promoted now, without a tap (re-read the project row right
+  before rewriting it; no per-merge deploy check at entry, G2 covers main's head). A `closed` one is listed
+  ("#n closed unmerged: markers left for step 4"), an open one is already in the
+  table. Report what was promoted in one line.
 - **Another session's PR** (a ready PR opened today, a draft in progress) is
   information for Baylee, not work for this session. Don't touch it.
 

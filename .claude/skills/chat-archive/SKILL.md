@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-02-01"
+  version: "2026-10-14-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -26,6 +26,7 @@ shifts is handled by memory edit, not this skill.
 References used by this skill (one hop):
 - `references/handoff-schema.md` — YAML schema, build vs session, delivery
 - `references/encoding-gate.md` — memory edit principles, finding routing
+- `references/close-at-land.md` — PR hand-off: markers, owner tasks, ready, merge tap
 
 **Surface-specific steps in this skill:**
 - Step 1: skill install check + confirmation batch differ by surface
@@ -33,6 +34,15 @@ References used by this skill (one hop):
 - Step 3b″: learnings-queue drain is Code-only (hook-captured corrections)
 - Step 4: "view memory edits" is chat-only
 - Step 10: rename chat is chat-only
+
+## Close-at-land — a draft PR's work is finished
+
+**If you are about to mark a PR ready, stop.** Run
+`references/close-at-land.md` instead: handoff and Grove markers written for the
+post-merge state, `pre_ready` checks, the `Close-at-land:` commit, ready, then
+one merge tap. It is the PR-scoped mini archive: the session goes on afterwards,
+and this full archive still runs at session end (its Step 9 handoff is then the
+one already in the close-at-land commit).
 
 ---
 
@@ -367,7 +377,8 @@ If items matched:
 Two paths depending on what this session touched:
 
 - **Build handoff** — session involved code changes in a product repo.
-  Write `HANDOFF.yaml` at the repo root. See `references/handoff-schema.md`
+  Write `HANDOFF.yaml` at the repo root. Work in a PR: the handoff rides the
+  close-at-land commit (`references/close-at-land.md`), not a later push. See `references/handoff-schema.md`
   for the YAML schema, CLAUDE.md maintenance, and the no-blurb convention.
 - **Session-only work** (audits, skill updates, research, architectural
   decisions not tied to a single build) — no separate handoff file. The

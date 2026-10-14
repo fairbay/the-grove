@@ -8,7 +8,7 @@ description: >
   enforces the commit identity that Vercel Hobby requires. Not for new-host
   setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-13-01"
+  version: "2026-10-14-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -172,7 +172,7 @@ For deleting **files** (not repos), push with `sha: null` in the tree entry — 
 
 The full push-time discipline (test → present → push → diff URL → optional verify) lives in `references/push-protocol.md` — other skills load that file when they push inside their workflows. When the user calls git-ops directly, these still apply:
 
-- **Push to `main`.** No feature branches or PRs unless Baylee asks.
+- **Push to `main`** from chat. Code web sessions: `claude/*` branch, draft PR with an owner task, ready only via close-at-land (`references/push-protocol.md` §5).
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit.
 - **Regenerate `package-lock.json`** (`npm install`) if `dependencies` / `devDependencies` changed, before committing.
 - **Reply with the commit diff URL** — that's Baylee's review surface.

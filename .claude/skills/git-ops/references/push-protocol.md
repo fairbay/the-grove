@@ -63,7 +63,7 @@ One commit, all files. Deletions go in via `{ path, delete: true }`-style tree e
 
 CLAUDE.md push conventions — apply on every push from any skill:
 
-- **Push to `main`.** No feature branches or PRs unless Baylee asked.
+- **Push to `main`** from chat sessions. Code web sessions push `claude/*` branches (below).
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit. Without this, "is my new code live?" is guesswork.
 - **Regenerate `package-lock.json`** (`npm install`) if dependency sections changed, before committing — Vercel installs from the lockfile.
 
@@ -90,6 +90,13 @@ already on a `claude/*` branch, this is the right path.
 **Fallback:** If the merge fails (merge conflict, branch protection), the
 error message includes the PR URL. Report it to Baylee — the PR is open
 and can be manually merged.
+
+**Which path, by repo policy** (`.claude/landing.yaml`, `merge_policy`):
+- `self` (ops): `push_and_merge()` for small infrastructure changes, as above.
+- `tap` (product repos, e.g. MBN), or any work spanning more than one turn: a
+  draft PR plus an owner task when the work starts, and close-at-land to hand it
+  off (chat-archive `references/close-at-land.md`). Never mark such a PR ready
+  any other way.
 
 ## 6. Report the diff URL
 
