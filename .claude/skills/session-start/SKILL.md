@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-02-01"
+  version: "2026-10-14-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -46,6 +46,45 @@ Does NOT fire for:
 - "archive this", session-end signals → chat-archive
 - A fresh idea with no prior work → idea-scout
 - Generic greetings without a project reference → respond normally
+
+## Phase 0 — PR gate (report-only)
+
+Every session on a repo starts by checking that repo's open PRs, so work that
+never landed is seen before new work begins (land-and-leave entry gate,
+`ops/docs/land-and-leave-SPEC.md` §7.5). **Rollout step 2: report only.** Show
+the report; don't block, don't ask a tap, don't merge or close anything.
+Blocking and the tap arrive in rollout step 4.
+
+**When.** As soon as the repo is known: in Code that is the CWD, so before
+Phase 1; in chat, right after Phase 1 step 1 returns the project's `repo`.
+Skip for non-code projects (`repo` null).
+
+**Run** (one Bash call, stdlib Python; it reads `.claude/landing.yaml` for the
+repo's policy):
+
+```bash
+S=scripts/pr_state.py   # in an ops checkout; elsewhere fetch it from ops main:
+[ -f "$S" ] || { S=/tmp/pr_state.py; gh api repos/fairbay/ops/contents/scripts/pr_state.py \
+  -H "Accept: application/vnd.github.raw" > "$S" || rm -f "$S"; }
+[ -f "$S" ] && python3 "$S" report --repo fairbay/<repo> --table || echo "gate script unavailable"
+```
+
+Use `report` without `--table` for JSON when a row needs its detail (majors,
+check names). If the script can't be fetched, list open PRs with
+`gh api repos/fairbay/<repo>/pulls?state=open` and say the gate script was
+unavailable.
+
+**Present it as Batch 0** of the Phase 4c queue and as the first section of the
+Phase 5 briefing. Each row carries the gate row (G1–G13) and the recommendation
+the step-4 tap will pre-select; render them as information ("#366 G6b: ready
+by hand, never handed off; recommendation: hand off now").
+
+- **Unreachable (G1):** say "PRs unchecked: <reason>". Never report all clear
+  when GitHub couldn't be read.
+- **G8 drafts** read "needs an `owns:` task, else G7". Owner tasks start with
+  rollout step 3; until then show G8 as reported, with no Grove lookup.
+- **Another session's PR** (a ready PR opened today, a draft in progress) is
+  information for Baylee, not work for this session. Don't touch it.
 
 ## Phase 1 — Resolve project (Grove first)
 
@@ -281,6 +320,9 @@ Baylee into the work.
 **[Project Name]** — [phase, from Grove project row] — picked up from
 [source: handoff / Grove project / Grove idea] ([date])
 
+**PR gate (report-only):** [Phase 0 table, or "No open PRs", or
+"PRs unchecked: <reason>"; omit for non-code projects]
+
 **Standing rules:** [N loaded from CLAUDE.md — omit this line when the
 section is absent]
 
@@ -397,6 +439,8 @@ confirmation.
   hook (`scripts/session_handoff.py inject`) that injects the same handoffs as
   `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
+- **← pr_state.py:** Phase 0 runs `ops/scripts/pr_state.py report` (land-and-leave
+  entry gate, `ops/docs/land-and-leave-SPEC.md` §7.5, §10).
 - **→ build / systematic-test / systematic-debug:** Hands off the loaded PLAN.md
   context so they don't refetch.
 - **→ chat-status:** Mid-session checkpoints once work begins.
