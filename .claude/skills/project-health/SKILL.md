@@ -5,299 +5,239 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-01-01"
+  version: "2026-10-17-01"
 ---
 
-# project-health — MBN data completeness & quality scorecard
+# project-health — is the live MBN site trustworthy, current, and shipping?
 
-**Version gate (chat only):** Compare `metadata.version` against
-`fairbay/ops` via git-ops. If behind, warn once and continue.
+**Version gate (chat only):** In claude.ai, compare this skill's
+`metadata.version` against `fairbay/ops` via git-ops. If behind,
+warn once and continue. If fetch fails, skip silently. In Claude Code /
+Routines, skip — skills are synced from source.
 
-Pulls live numbers from Supabase (`mqbnsjkeucvumdoqdeww`), Grove, and
-Vercel to produce an actionable scorecard. Replaces vanity counts
-(listing totals, row counts) with metrics tied to whether the product
-strategy actually works.
+Act like an auditor who reports what moved, not what is big. medicaidrewards.com
+has served the V4 app since 2026-09-26, so every finding is about what members see
+today. Listing totals and row counts are never health metrics.
 
-**Pre-flight:** Supabase compute can be hibernated while `get_project`
-reports `ACTIVE_HEALTHY`. `execute_sql` over MCP times out against a
-hibernated project and does not wake it. `get_advisors` reveals the
-hibernated state, and opening the project in the Supabase dashboard
-wakes it. Check this before declaring the DB unreachable.
+The run reads; it never writes content or builds a fix. Data fixes go through the
+migration library in a data session; visible changes need Baylee's OK on
+screenshots (MBN CLAUDE.md standing rules). The run's outputs are a report,
+Grove tasks and one Grove decision.
 
-**Scope note:** Findings about the current live site
-(medicaidrewards.com, legacy frontend) are not actionable before v1 —
-no work items should target it (decision c7930847).
+**Fixed identifiers:** Supabase `mqbnsjkeucvumdoqdeww`; repo
+`fairbay/medicaid-benefits-navigator`; Grove list `medicaid-benefits-navigator`,
+`project_ref` `fairbay/medicaid-benefits-navigator`; Vercel project
+`prj_dtvpPh1fOMELsmJNJSxuVYGXrcMD`, team `team_hDPlehxYhRW7Hrq8ddre65Qg`.
+
+## Workflow
+
+1. **Goal line.** The first message says `Goal: health check, 0/7 — OFF-PATH
+   (Baylee asked), launch readiness D/12` (MBN CLAUDE.md "Two progress numbers":
+   a health check moves no ledger item, and Baylee asking for it is the OK).
+   Each checkpoint reports `Session: N/7 (X%)`.
+2. **Pre-flight.** `get_advisors(security)`. It doubles as the hibernation check:
+   compute can sleep while `get_project` says `ACTIVE_HEALTHY`, and `execute_sql`
+   then times out. If it is asleep, give Baylee one numbered step, opening
+   https://supabase.com/dashboard/project/mqbnsjkeucvumdoqdeww to wake it, and
+   run everything that doesn't need the database meanwhile. Never declare the
+   database down before this.
+3. **Gather.** Run every block in `references/queries.md`. Then:
+   - **Repo** (Code: the working tree; chat: attach the repo with read access and
+     clone it, per the global rule "Design runs read the real system first"):
+     - Read the launch-readiness ledger and the LR-11 row in PLAN.md. Read the
+       line `launch readiness: D/12`; never recompute it.
+     - Get the LR-11 rate from the `accuracy_checks` table once it exists; until
+       then, from `reports/accuracy/` (docs/ACCURACY-AUDIT.md).
+     - Run `npm run data:pull`, then `node scripts/wording-debt.mjs` and
+       `node scripts/validate-data.mjs --gate` on the live set. The gate is the
+       same check publish runs: reward-unit drift, broken links. Exit 0 is the bar.
+   - **Live site:** `curl -sL https://www.medicaidrewards.com/data/manifest.json`
+     and read its `exported_at`. It must be later than Q7's `last_applied`.
+     A READY deployment does not prove the data is current.
+   - **GitHub** (`gh api repos/fairbay/medicaid-benefits-navigator/...`):
+     - `actions/workflows/smoke.yml/runs?event=schedule&per_page=1` and the same
+       for `backup.yml` (the scheduled runs only; smoke also runs on pushes).
+     - `actions/workflows/publish.yml/runs?per_page=1`.
+     - `commits/main/status` (the `Vercel` context).
+     - `pulls?state=open`: ready PRs, and drafts older than 14 days.
+     - For a failed run, read `check-runs/<id>/annotations`. A billing annotation
+       means the Actions minutes are gone: say so and don't retry.
+     - Don't use `--paginate` through the session proxy; page by hand.
+   - **Vercel:** `list_deployments` (latest production state) and
+     `get_runtime_errors` for production.
+   - **Grove:**
+     - `grove_list_adjudications(list, status="open")` and the open tasks on
+       the list.
+     - The baseline: the newest decision whose text starts `Health check ` in
+       `grove_list_decisions(project_ref, limit=30, compact=false)`. With none,
+       fall back to the `health-check-*` tasks and
+       `reports/2026-09-28-project-health.md` in the repo.
+   If a source can't be reached, say which and report the rest.
+4. **Score** against the tables below and compare every number with the baseline.
+   A finding is a class until shown otherwise. When a metric has a gap, count
+   every row in the gap and find where it started (Q4's weekly breakdown is the
+   pattern), not one example.
+5. **Report** (see "Report").
+6. **File in Grove** (see "Grove").
+7. **Check the work.** Check every figure in the report and the decision against
+   the raw output. Re-run the arithmetic; don't recall it.
 
 ## Metrics
 
-### Data completeness — "Can we show users everything they need?"
+### Headline
 
-| Metric | SQL | Thresholds |
-|--------|-----|-----------|
-| **Plan coverage** — % of active PIAs with ≥1 listing | `COUNT(DISTINCT pia.id) FILTER (WHERE rl_ct > 0) / COUNT(DISTINCT pia.id)` per state | Red <60%, amber <90%, green ≥90% |
-| **Eligibility fill** — % of listings with populated eligibility JSONB | `FILTER (WHERE eligibility IS NOT NULL AND eligibility::text NOT IN ('null','{}','[]'))` | Red <70%, amber <90%, green ≥90% |
-| **Values fill** — % of INCENTIVE/GOODS listings with dollar amounts | Join rewards on reward_class IN ('INCENTIVE','GOODS'), filter values populated | Red <30%, amber <60%, green ≥60% |
-| **Source-backed** — % of listings with ≥1 extraction that has a source_id | `EXISTS (SELECT 1 FROM extractions WHERE reward_listing_id = rl.id AND source_id IS NOT NULL)` | Red <60%, amber <85%, green ≥85% |
-| **Handbook-anchored** — % of active PIAs with ≥1 extraction from a `plan_document` source | See handbook coverage query below | Red <50%, amber <80%, green ≥80% |
+- **Launch readiness D/12**, with the open LR rows and what each waits on.
+- **LR-11 accuracy rate** (sampled accuracy audit, Grove 877562ca). Until a
+  rate exists, report its step. Once it exists, the rate and its margin lead the
+  report: it is the only metric that measures whether what a member reads is right.
 
-**Metric rules (Grove decision 34950652, 2026-09-28):**
-- Plan coverage counts only programs with `is_member_facing = true` (join `program_insurer_areas` → `programs`); non-member-facing programs are excluded from both numerator and denominator (decision 34950652).
-- Handbook-anchored is reported as "n/a" and does not affect the green/amber/red verdict for the 9 FFS/PCCM states (AK, AL, CT, ID, ME, MT, SD, VT, WY) when the state's only member-facing row is the state program sourced from state documents (decision 34950652).
+### Trust and currency (red / amber / green)
 
-### Data quality — "Can users trust what we're showing?"
+| Metric | Query | Red | Amber | Green |
+|---|---|---|---|---|
+| Snapshot capture (appearances of live sources) | Q4 | <25% | <50% | ≥50% |
+| Appearance coverage (live sources) | Q4 | <40% | <70% | ≥70% |
+| Link-label fill | Q4 | <70% | <90% | ≥90% |
+| Handbook-anchored plans (n/a states left out) | Q3 | <80% | <95% | ≥95% |
+| Reward cards showing the plan-year note (lower is better) | Q5 | >25% | >10% | ≤10% |
+| Shown listings with reward units | Q6 | <90% | <98% | ≥98% |
+| Security advisors | pre-flight | any ERROR | any WARN | INFO only |
 
-| Metric | SQL | Thresholds |
-|--------|-----|-----------|
-| **Confirmed %** — listings with evidence_type = 'confirmed' (not inferred_mandatory) | Per state from reward_listings.evidence_type | Red <60%, amber <90%, green ≥90% |
-| **Grounding score** — avg grounding_score on scored extractions | `AVG(grounding_score) FILTER (WHERE grounding_score IS NOT NULL)` per state | Red <0.6, amber <0.8, green ≥0.8 |
-| **Extraction density** — avg extractions per listing | `COUNT(e.id) / COUNT(DISTINCT rl.id)` per state | <1.0 = thin provenance |
-| **Appearance coverage** — % of sources with ≥1 `source_appearances` row | `COUNT(DISTINCT sa.source_id) / COUNT(DISTINCT s.id)` | Red <40%, amber <70%, green ≥70% |
-| **Snapshot capture** — % of appearances with `snapshot_url` populated | `COUNT(*) FILTER (WHERE snapshot_url IS NOT NULL) / COUNT(*)` on source_appearances | Red <25%, amber <50%, green ≥50% |
-| **Link-label fill** — % of appearances with `link_label` populated | `COUNT(*) FILTER (WHERE link_label IS NOT NULL) / COUNT(*)` on source_appearances | Red <70%, amber <90%, green ≥90% |
+- **Handbook:** name every gap plan from Q3, whatever the colour; the list is the
+  work. A state program filed as a plan shows up here.
+- **Plan-year note:** this is the share of reward pages that say "From the 20xx
+  plan documents; 20yy may differ." (FR-036). It jumps on January 1. Until the
+  January rollover sweep (Grove ddb807a0) closes, report it against that sweep
+  instead of colouring it. In the per-state list, rank states by cards affected,
+  not by percentage: an FFS state with four rewards reads 100%. Baylee's open
+  decision f3a98351 on the plan-year line may change what this counts.
+- **Q4 scope:** Q4 measures over sources behind shown listings. Runs before
+  2026-10-17 measured over all sources; say so when comparing with them.
 
-### Why these metrics and not others
+### Trend only (number and delta, no colour)
 
-- **Plan coverage** matters because a zero-listing plan = empty page for
-  that plan's members. This is the highest-severity gap.
-- **Eligibility fill** matters because the action-first UX ("how do I get
-  this?") needs to tell users who qualifies. Without it, listings are
-  informational noise.
-- **Values fill** matters because the freebie-first content strategy
-  (NC-008) makes dollar amounts the headline hook. "You're missing out on
-  $X" goes dead without values. Only measured on INCENTIVE/GOODS — SERVICE
-  and PROGRAM rewards don't have monetary values.
-- **Source-backed** matters because unverifiable listings undermine trust.
-  The product shows "source" links — if a listing has no source, the link
-  is empty.
-- **Confirmed %** separates plan-document-sourced data from regulatory
-  inference. CA at 7.4% confirmed means almost all its data is inferred,
-  not extracted.
-- **Grounding score** measures extraction fidelity. 1.0 = verbatim match
-  to source document. Low scores indicate the extraction drifted from what
-  the source actually says.
-- **Handbook-anchored** matters because the handbook-first doctrine
-  (Grove decisions 3c2c983b, legal validation 2026-07-05) designates
-  the MCO member handbook as the authoritative source. A PIA whose
-  extractions come only from plan websites or state comparison charts
-  hasn't been verified against the canonical document. At 50.7%
-  (Jul 2026 baseline), half the dataset predates the doctrine. This
-  is a transitional metric — once all PIAs are handbook-anchored it
-  can be retired or folded into confirmed %. Note: `pdf` source_type
-  is NOT equivalent to `plan_document` — the pdf bucket contains
-  state comparison charts, OTC catalogs, and policy papers.
-- **Provenance infrastructure** metrics (appearance coverage, snapshot
-  capture, link-label fill) track the source_appearances layer shipped
-  2026-07-06. Promoted from velocity-only to threshold metrics on
-  2026-09-26: both promotion criteria (appearance coverage >50%,
-  snapshot capture >25%) were met as of 2026-09-25 (50.1% / 47.1%,
-  link-label fill 91.1%).
-- Listing counts, row counts, and table sizes are explicitly NOT health
-  metrics. "757 listings" tells you nothing about whether those listings
-  are complete, sourced, or useful.
+- **Source checks:** live sources checked in the last 120 days, and
+  `never_checked` (Q5). No scheduled fingerprint run exists yet, so this gets a
+  colour only once one does (SOURCE-DISCOVERY "Staleness detection").
+- **Wording:** "N of M shown listing texts carry a standing-rule flag", from
+  `wording-debt.mjs`. It falls as wording sweeps land; a rise means a batch added
+  flagged text.
+- **Multi-unit listings** (Q6): the functional-atomization backlog (PLAN Step 28
+  C1, Grove 9e68976d). It falls as C1 lands.
+- **Open unit reviews** and **POINT units** (Q6). The standing rule is "No points,
+  ever", so the POINT count should reach zero (Grove 98158534, 20caffcc).
+- **Enrollment null share** (Q8, member-facing rows outside FFS/PCCM states).
+- **`ops.row_history` growth** since the baseline (Q9). It has no retention yet.
 
-## Structural smells (Tier 1, 2026-09-25 sweep)
+### Regression guards (expected to hold; any break is a top finding)
 
-Modeling issues a scorecard's aggregate percentages can hide. Check
-these alongside the metrics above — they surface plans whose numbers
-look fine but whose underlying structure is wrong:
+From Q1, and per state from Q2:
 
-- **Copied enrollment across program rows** — sibling PIAs in the same
-  state sharing an identical `enrollment_count` usually means the
-  number was copied/estimated once, not sourced per program.
-- **program_type diversity** — a state where every PIA has the same
-  `program_type` may be missing real segmentation (MCO vs FFS vs
-  waiver not distinguished).
-- **is_regionalized vs plan count** — a state flagged
-  `is_regionalized` should show a plan count consistent with regional
-  carve-outs; one statewide plan on a regionalized state is a
-  modeling mismatch.
-- **FFS states modeled as one MCO** — fee-for-service states have no
-  MCO; representing one as a single MCO-type PIA misrepresents the
-  delivery model as managed care.
-- **Null enrollment share** — % of active PIAs with `enrollment_count`
-  NULL or 0. A high share hides which plans actually dominate a
-  state's market.
+- Plans without listings = 0. A member-facing plan with none is an empty page;
+  name it from Q1's second block.
+- Listings without a source = 0.
+- Every state's extractions per listing ≥ 1.0.
+- Eligibility, values on INCENTIVE/GOODS, and confirmed ≥98% overall, and no
+  state below 90%.
+- Grounding average ≥0.95.
+- Any drop from the baseline.
 
-## Queries
+Report the guards as one line when all hold.
 
-### Completeness query (run as one)
+A drop in eligibility or values needs an explanation, and is never filled by
+inference: "only what official documents state" and "where the plan has not
+published a rule, link, never summarise" make an absent value legitimate. These
+two guards read the legacy lists; move them to reward units when phase 4 of the
+unit model makes those lists projections.
 
-```sql
-SELECT
-  pia.state_id,
-  COUNT(DISTINCT pia.id) as total_plans,
-  COUNT(DISTINCT pia.id) FILTER (WHERE rl_ct.ct > 0) as plans_with_listings,
-  COUNT(DISTINCT pia.id) FILTER (WHERE rl_ct.ct = 0 OR rl_ct.ct IS NULL) as zero_listing_plans,
-  ROUND(100.0 * COUNT(DISTINCT pia.id) FILTER (WHERE rl_ct.ct > 0)
-    / NULLIF(COUNT(DISTINCT pia.id), 0), 1) as plan_coverage_pct
-FROM program_insurer_areas pia
-LEFT JOIN LATERAL (
-  SELECT COUNT(*) as ct FROM reward_listings WHERE program_insurer_area_id = pia.id
-) rl_ct ON true
-WHERE pia.status = 'active'
-GROUP BY pia.state_id ORDER BY pia.state_id;
-```
+### Pipeline (pass / fail)
 
-```sql
-SELECT
-  pia.state_id,
-  COUNT(rl.id) as total_listings,
-  ROUND(100.0 * COUNT(rl.id) FILTER (
-    WHERE rl.eligibility IS NOT NULL
-    AND rl.eligibility::text NOT IN ('null','{}','[]')
-  ) / NULLIF(COUNT(rl.id), 0), 1) as eligibility_pct,
-  COUNT(rl.id) FILTER (
-    WHERE r.reward_class IN ('INCENTIVE','GOODS')
-  ) as incentive_goods_ct,
-  ROUND(100.0 * COUNT(rl.id) FILTER (
-    WHERE r.reward_class IN ('INCENTIVE','GOODS')
-    AND rl.values IS NOT NULL
-    AND rl.values::text NOT IN ('null','{}','[]')
-  ) / NULLIF(COUNT(rl.id) FILTER (
-    WHERE r.reward_class IN ('INCENTIVE','GOODS')
-  ), 0), 1) as values_pct,
-  ROUND(100.0 * COUNT(DISTINCT rl.id) FILTER (WHERE EXISTS (
-    SELECT 1 FROM extractions e
-    WHERE e.reward_listing_id = rl.id AND e.source_id IS NOT NULL
-  )) / NULLIF(COUNT(rl.id), 0), 1) as source_backed_pct
-FROM reward_listings rl
-JOIN program_insurer_areas pia
-  ON pia.id = rl.program_insurer_area_id AND pia.status = 'active'
-LEFT JOIN rewards r ON r.id = rl.reward_id
-GROUP BY pia.state_id ORDER BY pia.state_id;
-```
+- **Live data current:** the manifest's `exported_at` is later than `last_applied`.
+- **Publish holds** (Q7): no row, or one no older than a running apply. An old
+  hold blocks every build and publish.
+- **Applied, not published** (Q7): zero, or `oldest_unpublished` within the day.
+- **Vercel:** latest production deployment READY; the `Vercel` status on main is
+  success; no new runtime errors.
+- **Workflows:** the last scheduled `smoke.yml` and `backup.yml` runs succeeded
+  in the last 26 hours; the last `publish.yml` run succeeded and is later than
+  `last_applied`.
+- **Data gate:** `validate-data.mjs --gate` exits 0.
+- **Database size** (Q9) under 400 MB (the free tier allows 500 MB).
+- **Queues:** open adjudications; untriaged feedback (Q7; above zero sends it to
+  the weekly triage, Grove c0c2d6e3); ready PRs; drafts older than 14 days.
 
-### Quality query
+### Structural smells (Q8, Q10)
 
-```sql
-SELECT
-  pia.state_id,
-  ROUND(100.0 * COUNT(rl.id) FILTER (
-    WHERE rl.evidence_type = 'confirmed'
-  ) / NULLIF(COUNT(rl.id), 0), 1) as confirmed_pct,
-  ROUND(COUNT(e.id)::numeric
-    / NULLIF(COUNT(DISTINCT rl.id), 0), 1) as extractions_per_listing,
-  ROUND(AVG(e.grounding_score) FILTER (
-    WHERE e.grounding_score IS NOT NULL
-  ), 2) as avg_grounding_score
-FROM reward_listings rl
-JOIN program_insurer_areas pia
-  ON pia.id = rl.program_insurer_area_id AND pia.status = 'active'
-LEFT JOIN extractions e ON e.reward_listing_id = rl.id
-GROUP BY pia.state_id ORDER BY pia.state_id;
-```
+- **Regionalized states whose `region_model_status` is not `verified`.** The site
+  auto-picks a plan only where it is verified (`MRAdapt.nextStep`). List these
+  states by status.
+- **A regionalized state with a single member-facing insurer** (a modeling
+  mismatch).
+- **`ffs_mco_rows` above zero:** a member-facing COMPREHENSIVE_MCO row in an FFS
+  state.
+- **`dup_enroll_rows` above zero:** an enrollment count copied across rows, not
+  sourced.
+- **Q10: plan rows in any status other than active, exited or out_of_scope.** The
+  site shows them.
 
-### Handbook coverage query
+### Rules
 
-```sql
-SELECT
-  pia.state_id,
-  COUNT(DISTINCT pia.id) as total_plans,
-  COUNT(DISTINCT pia.id) FILTER (WHERE EXISTS (
-    SELECT 1 FROM extractions e
-    JOIN sources s ON s.id = e.source_id
-    WHERE e.reward_listing_id IN (
-      SELECT id FROM reward_listings WHERE program_insurer_area_id = pia.id
-    ) AND s.source_type = 'plan_document'
-  )) as plans_with_handbook,
-  ROUND(100.0 * COUNT(DISTINCT pia.id) FILTER (WHERE EXISTS (
-    SELECT 1 FROM extractions e
-    JOIN sources s ON s.id = e.source_id
-    WHERE e.reward_listing_id IN (
-      SELECT id FROM reward_listings WHERE program_insurer_area_id = pia.id
-    ) AND s.source_type = 'plan_document'
-  )) / NULLIF(COUNT(DISTINCT pia.id), 0), 1) as handbook_pct
-FROM program_insurer_areas pia
-WHERE pia.status = 'active'
-GROUP BY pia.state_id ORDER BY handbook_pct ASC;
-```
+- **Shown** is the export's filter, status not in (exited, out_of_scope), used in
+  every query.
+- Plan coverage and handbook count member-facing programs only. Handbook is n/a
+  for an FFS or PCCM state with no plan handbook (decision 34950652).
+- Confirmed % counts distinct listings.
+- Only `plan_document` counts as a handbook.
 
-### Provenance query
+## Report
 
-```sql
-SELECT
-  (SELECT COUNT(*) FROM sources) as total_sources,
-  (SELECT COUNT(DISTINCT source_id) FROM source_appearances) as sources_with_appearances,
-  ROUND(100.0 * (SELECT COUNT(DISTINCT source_id) FROM source_appearances)
-    / NULLIF((SELECT COUNT(*) FROM sources), 0), 1) as appearance_coverage_pct,
-  (SELECT COUNT(*) FROM source_appearances) as total_appearances,
-  (SELECT COUNT(*) FROM source_appearances WHERE snapshot_url IS NOT NULL) as with_snapshot,
-  (SELECT COUNT(*) FROM source_appearances WHERE link_label IS NOT NULL) as with_link_label;
-```
+Lead with the answer: what is red, what moved since the baseline, and launch
+readiness. Order findings by what a member would hit, not by the lowest number.
+Each finding gives the metric, what members see because of it, its scope
+(counted), and the Grove task that owns it.
 
-### Supporting queries
+**Surface branching:**
+- **Chat:** at most two inline visuals, styled for dark mode, since Baylee is
+  often on a phone. Never use colour alone for status; pair it with an icon and a
+  label.
+  - First visual: the headline numbers and every scored metric with its status.
+  - Second visual: the per-state watch list from Q2, sortable, holding only
+    states with a non-green value, a guard break or a non-verified region model.
+  - Prose goes between and after the visuals; actions come last.
+- **Code / Routines:** the same content as markdown in the session or run output.
+  Don't write a report file to the repo; the Grove decision is the record.
 
-```sql
--- Table sizes (sanity check, not a health metric)
-SELECT relname, n_live_tup FROM pg_stat_user_tables
-WHERE schemaname = 'public' ORDER BY n_live_tup DESC;
+## Grove
 
--- Migration count
-SELECT COUNT(*) as total, MAX(name) as latest
-FROM supabase_migrations.schema_migrations;
-
--- Reward category distribution
-SELECT rc.name, COUNT(DISTINCT r.id) as rewards,
-  COUNT(DISTINCT rl.id) as listings
-FROM reward_categories rc
-LEFT JOIN rewards r ON r.reward_category_id = rc.id
-LEFT JOIN reward_listings rl ON rl.reward_id = r.id
-GROUP BY rc.name ORDER BY COUNT(DISTINCT rl.id) DESC;
-
--- Source type breakdown
-SELECT source_type, COUNT(*) FROM sources GROUP BY source_type ORDER BY COUNT(*) DESC;
-
--- PIA status breakdown
-SELECT status, COUNT(*) FROM program_insurer_areas GROUP BY status;
-
--- Enrollment coverage
-SELECT
-  COUNT(*) FILTER (WHERE enrollment_count > 0) as populated,
-  COUNT(*) FILTER (WHERE enrollment_count = 0 OR enrollment_count IS NULL) as zero
-FROM program_insurer_areas WHERE status = 'active';
-```
-
-## Report structure
-
-Use visualizer for all sections. Interleave prose between visuals.
-
-1. **Key metrics dashboard** — metric cards: listings, catalog size, active
-   plans, extractions, sources, migrations, states covered. Quick sanity
-   check, not the health measure.
-
-2. **Completeness scorecard** — interactive table, one row per state, columns
-   for each completeness + quality metric. Sortable by any column. Filterable:
-   "all states", "gaps only" (any metric below amber threshold), "strongest"
-   (all metrics green). Bar charts in each cell with color thresholds.
-
-3. **Critical findings** — prose analysis of what the scorecard reveals.
-   Ordered by user impact, not by which number is lowest. Each finding:
-   the metric, why it matters for the product strategy, specific scope.
-
-4. **Prioritized action list** — stack-ranked. Each item specific enough to
-   become a Grove task. Create the tasks in Grove with the
-   `health-check-YYYY-MM-DD` tag.
-
-## Grove integration
-
-- Query `grove_list_tasks` for open MBN tasks.
-- Query `grove_list_decisions` for recent architectural decisions.
-- Check Vercel `list_deployments` for deploy health.
-- After analysis, create Grove tasks for each action item with:
-  - Before/after metrics
-  - Done definition
-  - Approach section
-  - `health-check-YYYY-MM-DD` tag
-- Log a decision capturing the metrics framework findings.
-
-## Comparison to previous health checks
-
-If previous health-check tasks exist (search by tag), compare current
-metrics to the targets set in those tasks. Show what improved and what
-didn't.
+- **Search before filing.** For each finding, look for an open task that already
+  covers it (`grove_list_tasks` with `q` on its key words, and past runs' tags).
+  If one exists:
+  - Read it in full with `grove_get` first: `grove_update_task` replaces `notes`
+    and `tags` whole.
+  - Write back the old notes with a dated `## Update, health check YYYY-MM-DD`
+    section on top.
+  - Keep the old tags and add this run's tag.
+  - Raise the priority if the metric turned red.
+  - Never file a duplicate.
+- **New tasks** only for red or amber metrics, guard breaks, pipeline failures and
+  new structural smells, at most five per run.
+  - Each has Why, Before (live numbers), Approach, and Done when.
+  - Tag `health-check-YYYY-MM-DD`; list `medicaid-benefits-navigator`.
+  - Anything smaller goes in the decision.
+- **One decision per run.**
+  - The text starts `Health check YYYY-MM-DD:` and holds every metric's value and
+    the watch-list state codes; it is the next run's baseline.
+  - Under 2,000 characters.
+  - Tags `project-health` and `health-check-YYYY-MM-DD`.
+- **Two tracks:** a finding that needs Baylee in the real world (an account, a
+  lawyer, an outside service) goes as one line to Grove project `mbn-launch-ops`
+  and isn't discussed (MBN PLAN.md "Tracks").
 
 ## Integration
 
-- **← session-start:** Can run at session start for orientation.
-- **→ add-to-do / grove:** Findings produce Grove tasks.
-- **→ chat-archive:** If running at end of session, hand off.
+- **← session-start:** can open a session for orientation.
+- **→ add-to-do / grove:** findings become Grove tasks.
+- **→ chat-archive:** at session end, hand off.
+- **Skill upkeep:** a metric that stays green across several runs moves to the
+  guards. A new product surface or pipeline stage gets a metric here
+  (skill-creator-b).
