@@ -117,8 +117,6 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 ## Agent Delegation & Token Efficiency
 
-**Temporary, until Friday 2026-10-16 16:00 ET (Baylee, 2026-10-14; the week's subscription usage is nearly spent, API credits are unused): delegate through the API, not sub-agents.** Work you would hand to an `Agent` sub-agent (review, summary, extraction, drafting, adversarial checks) goes to `.claude/skills/delegate-mechanical/scripts/delegate.py` instead: Haiku (`claude-haiku-5-5`) for mechanical work, Sonnet (`claude-sonnet-5-5`) for judgment, Opus (`claude-opus-5-5`) only where the tiering below says so. Prompts go in files (`--system-file`, `--user-file`). In a product-repo Code session, attach `fairbay/ops` (read) first so the helper can read the key. Use an `Agent` sub-agent only for work that needs tools (reading the repo, running commands), and keep it small. Keep sessions short and the orchestrator thin: its own turns still count against the subscription. After the deadline this paragraph no longer applies; the next ops session removes it.
-
 **Default to inline execution.** Delegation has real overhead — instruction prep, context
 bootstrap (the sub-agent rebuilds understanding from scratch), and result interpretation add
 ~30-40% more tokens than doing the work directly. A single agent matches or outperforms
