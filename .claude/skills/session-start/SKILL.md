@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-14-03"
+  version: "2026-10-17-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -385,6 +385,13 @@ Baylee can redirect without researching from scratch. Wait for Baylee to
 acknowledge or override before proceeding with work that depends on these
 decisions.
 
+**Stale-artifact check.** Before recommending that Baylee spend time on a review
+artifact, ruling page, adjudication set or screenshots, check that it postdates
+the merges, data changes and rulings that bear on it: Grove decisions since its
+build; the repo's merges since; for data artifacts, the change log for the rows
+it shows. If it is stale, say so and route it for a rebuild instead of sending
+him there.
+
 If no handoff AND no Grove project row was found:
 
 ```
@@ -402,6 +409,13 @@ checkpoint — Baylee confirms or redirects before work begins.
 unambiguous task AND Baylee said "work on" (not "check on", "status of"),
 proceed directly after presenting the orientation. The handoff itself is the
 confirmation.
+
+Proceeding means the briefing message and the first work step are in the same
+turn: after the briefing text, make the first tool call of the work (branch,
+first read) before ending the turn. Never end a turn on "starting now". If the
+work needs a go for a live or outward step (a repo rule such as MBN DATA-WORK
+"Ask for the go once, at the start"), ask it in that same turn with
+AskUserQuestion and continue on the answer.
 
 ## Anti-patterns
 

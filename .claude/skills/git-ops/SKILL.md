@@ -1,14 +1,11 @@
 ---
 name: git-ops
 description: >
-  THE ONLY authorized way to write to GitHub. Fires on "push this", "commit
-  this", "create a repo", "what's in fairbay/X" — AND whenever any task
-  (build, data export, doc update, skill sync) results in files that need to
-  land in a fairbay/* repo. Never use raw git commit/push — push_files()
-  enforces the commit identity that Vercel Hobby requires. Not for new-host
-  setup (→ ship-it) or prototyping (→ build).
+  Write to GitHub: "push this", "commit this", "create a repo",
+  "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
+  Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-14-01"
+  version: "2026-10-17-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -182,6 +179,7 @@ The full push-time discipline (test → present → push → diff URL → option
 Placed near the operations above, summarized here:
 
 - **NEVER use raw `git commit` / `git push` in chat sessions.** Always use `push_files()`. The function hardcodes the commit author identity to match the Vercel Hobby team owner. Raw git commands use whatever identity is in the container's git config (usually wrong), causing Vercel to BLOCK production deploys on private repos. This applies even when you've already cloned the repo — the clone is for reading, `push_files()` is for writing.
+- Files already inside the clone may be passed by path as `(remote_path, local_path)`: `_push_via_cli` skips the copy when both are the same file. If the clone is on a different branch than the one you target, the push refuses with a clear error instead of pushing a ref that lacks the commit; check out the target branch first.
 - Branch may be `master`, not `main`. Check with `api("GET", f"/repos/{r}")["default_branch"]` if a push 404s.
 - Remote paths use forward slashes only. No leading `/`.
 - Don't rewrite the push sequence from scratch — the bundled script handles blob/tree/commit/ref correctly.

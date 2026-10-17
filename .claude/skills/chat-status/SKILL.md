@@ -5,7 +5,7 @@ description: >
   summaries, topic shifts. Use proactively. Not session start (→ session-start)
   or close (→ chat-archive).
 metadata:
-  version: "2026-05-27-02"
+  version: "2026-10-17-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -91,6 +91,13 @@ next step is just a summary.
 - Nothing needed: "Nothing — this workstream is complete."
 - Requires a new chat: "Start a new chat and say 'work on [project].'" No
   kickoff blurb — the handoff doc provides context.
+
+**Stale-artifact check (applies to the one lookup this section allows).** Before recommending that Baylee spend time on a review
+artifact, ruling page, adjudication set or screenshots, check that it postdates
+the merges, data changes and rulings that bear on it: Grove decisions since its
+build; the repo's merges since; for data artifacts, the change log for the rows
+it shows. If it is stale, say so and route it for a rebuild instead of sending
+him there.
 
 For longer multi-destination action items (env vars in Vercel + DNS in
 Cloudflare), defer to chat-archive's full Step 6 formatting (group by

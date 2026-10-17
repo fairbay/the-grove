@@ -98,6 +98,21 @@ and can be manually merged.
   off (chat-archive `references/close-at-land.md`). Never mark such a PR ready
   any other way.
 
+#### PR routes through the session proxy
+
+GraphQL is refused in chat and Code sessions; the refusal names the proxy's
+own routes. Probed 2026-10-13 from a chat session with fairbay/ops and
+medicaid-benefits-navigator attached.
+
+| Route | Result |
+|---|---|
+| `POST /repos/{o}/{r}/pulls/{n}/ccr/ready_for_review` | Works. |
+| `POST /repos/{o}/{r}/pulls/{n}/ccr/convert_to_draft` | Works. The only way back to draft without GraphQL; GitHub's public REST has none. |
+| `PUT\|DELETE /repos/{o}/{r}/pulls/{n}/ccr/auto_merge` | 422 "Auto merge is not allowed for this repository" on Free private repos. |
+| `GET /repos/{o}/{r}/pulls/{n}/ccr/review_threads` | Named by the proxy, not tested. |
+| `POST /repos/{o}/{r}/pulls/{n}/ccr/comments/{id}/resolve` and `/unresolve` | Named by the proxy, not tested. |
+| `PUT /repos/{o}/{r}/pulls/{n}/merge` | Works from chat with repos attached, after Baylee's in-conversation tap. A Code-tab session refused an unapproved merge on 2026-10-10 ("Merge Without Review"). |
+
 ## 6. Report the diff URL
 
 Always reply with the commit diff link. This is the primary review mechanism.
