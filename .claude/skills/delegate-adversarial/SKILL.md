@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-18-01"
+  version: "2026-10-18-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -41,7 +41,7 @@ environment). There is no direct provider call and no key file.
 
 Model: the review default is the `llm.prices` row with `default_for = 'review'`
 (`gemini-3.1-pro-preview` as seeded; `MODEL_PRO` mirrors it) and the research
-default is `default_for = 'mechanical'` (`gemini-2.5-flash`). Every body carries
+default is `default_for = 'mechanical'` (`gemini-3.8-flash`). Every body carries
 an explicit thinking setting (`gemini.THINKING`, default `low`) and an output
 limit, or the doorway refuses it. Price a run first: `doorway_estimate(...)` or
 `select llm.estimate(...)`, and say the total before starting.
@@ -324,7 +324,7 @@ Research output includes grounding sources in `usage['sources']`. Report:
 | Multi-pass (3 passes, Pro) | ~$0.15 | Full project audit |
 | Research (Flash + search) | ~$0.01 | Demand validation, competitive intel |
 
-Prices live in `llm.prices` (seeded: 3.1 Pro preview about $2/M input and $12/M output; 2.5 Flash $0.30 and $2.50); `llm.estimate` uses them. Re-check Google's pricing page before relying on an estimate.
+Prices live in `llm.prices` (seeded: 3.1 Pro preview about $2/M input and $12/M output; 3.8 Flash about $0.75 and $3.75, from a third-party price page dated 2026-10-18); `llm.estimate` uses them. Re-check Google's pricing page before relying on an estimate.
 Context cache storage: $1/M tokens/hour. Default TTL: 30 min.
 
 ## Setup

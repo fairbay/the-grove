@@ -54,7 +54,7 @@ import urllib.request
 # -- Models ----------------------------------------------------------------
 # One home for the model names: llm.prices (default_for = 'review' | 'mechanical').
 # These constants are the seeded values; llm_doorway.default_model() reads the live row.
-MODEL_FLASH = 'gemini-2.5-flash'
+MODEL_FLASH = 'gemini-3.8-flash'
 MODEL_PRO = 'gemini-3.1-pro-preview'
 
 # -- The doorway -----------------------------------------------------------
@@ -78,7 +78,7 @@ _NOT_THROUGH_DOORWAY = (
 
 
 def thinking_config(model: str, level: str | None = None) -> dict:
-    """An explicit thinking setting for the body: thinkingLevel on Gemini 3, thinkingBudget on 2.5."""
+    """An explicit thinking setting for the body: thinkingLevel on Gemini 3 and later, thinkingBudget on older models."""
     level = level or THINKING
     if model.startswith('gemini-3'):
         return {'thinkingLevel': level}
