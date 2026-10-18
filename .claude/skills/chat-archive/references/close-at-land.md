@@ -146,7 +146,15 @@ Order matters: draft first, then the owner task, so the line names a real number
 
    In a `merge_policy: self` repo the session may merge without a tap where the
    platform allows it; a refused merge call falls back to the tap.
-3. **On yes:**
+
+   **Merge and archive** (Baylee, 2026-10-18). When the session has no other
+   work ongoing or planned once this PR lands (it was the last item, or the
+   repo's rules end the session after it, such as MBN's one data batch per
+   session), add the option "Merge and archive" to the G3 or G5b question and
+   pre-select it ahead of "Merge". One answer then merges and archives, so
+   Baylee never spends a second turn asking for the archive. While other work
+   remains, ask as in the table.
+3. **On yes** (Merge, or Merge and archive):
    - Merge, pinned to the head the tap was about, so a moved head aborts (F4):
      `gh api -X PUT repos/fairbay/<repo>/pulls/<n>/merge -f merge_method=<policy merge_method> -f sha=<head sha>`.
    - Deploy check (`deploy_check: vercel`): `pr_state.py check <n>` →
@@ -154,6 +162,10 @@ Order matters: draft first, then the owner task, so the line names a real number
      still nothing after about 2 minutes, or `failure`: the repo CLAUDE.md
      runbook (MBN: "After a merge, check that Vercel built it").
    - Promote (below).
+   - **Merge and archive:** after the promotion, run the full archive (SKILL.md
+     Steps 1–10) in the same turn without asking again. When this merge request
+     already came from inside the archive (Step 9's close-at-land), finish the
+     remaining archive steps instead of starting them over.
 4. **On no, or no answer:** nothing more. The PR stays ready; abandoning the chat
    is safe, and the next session's gate picks it up (G3).
 
