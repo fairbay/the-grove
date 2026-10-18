@@ -5,7 +5,7 @@ description: >
   "state of the art". Not quick lookups, scoring (→ idea-scout), or
   flaw-finding (→ delegate-adversarial).
 metadata:
-  version: "2026-06-14-01"
+  version: "2026-10-18-01"
 ---
 
 # research-deep — calibrate research effort to stakes, then synthesize
@@ -102,6 +102,12 @@ Score the question on two axes, then pick the tier.
 | Low–med, wide **or** med, narrow | **T1 Scan** | 3–5 searches across the main facets. Short synthesis. Note the biggest open question. |
 | High, narrow **or** med, wide | **T2 Investigation** | 6–12 searches. Decompose into facets, cover each, weight sources, write a synthesis that names convergence and conflicts. Consider a cross-model pass. |
 | High, wide | **T3 Deep** | 12+ searches across all facets + cross-model breadth (Gemini, below) + consider the claude.ai Research feature. Full synthesis with per-facet confidence and an explicit "what would change this answer." |
+
+**Web access with a repo attached (global rule "Web Fetches in Repo Sessions").**
+Search first; fetch only URLs the search returned; never a URL typed from
+memory or a redirect target. Any sub-agent sent to search carries the global
+rule's verbatim paragraph in its brief. At T2 and above, run the searches
+before attaching a repo to the session when the order is yours to choose.
 
 **State the tier you picked and why, in one line, before searching.** This is
 the up-front commitment that prevents under-investment. If T0, just answer —
