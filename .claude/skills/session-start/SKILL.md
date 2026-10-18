@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-17-01"
+  version: "2026-10-18-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -232,6 +232,20 @@ the Phase 5 briefing. These are rulings Baylee made that later sessions
 contradicted while they lived only in the decision log; build, architect,
 and chat-archive gate on the same list, so the briefing is where the session
 confirms it has them.
+
+**Expired temporary rules.** Grep the loaded rules (`global-CLAUDE.md` in
+ops; `.claude/global.md` and the repo's `CLAUDE.md` elsewhere) for dated
+temporary rules — a paragraph or bullet containing "Temporary" or "until"
+followed by an ISO date (`YYYY-MM-DD`), optionally after a weekday:
+
+```bash
+grep -nE '(Temporary|until)[^.]{0,40}[0-9]{4}-[0-9]{2}-[0-9]{2}' global-CLAUDE.md .claude/global.md CLAUDE.md 2>/dev/null
+```
+
+If any date is before today, name it in the briefing in one line ("Expired
+temporary rule in <file>: <first 80 chars>"). In an ops session, remove it in
+the session's first push. Elsewhere, file a one-line skill-worker work order
+(global rules are edited only in ops).
 
 ## Phase 4b — Maturity checkpoint
 
