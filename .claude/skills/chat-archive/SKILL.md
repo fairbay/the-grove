@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-18-01"
+  version: "2026-10-18-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -167,6 +167,9 @@ Skip silently if the file doesn't exist or the surface is chat (no hooks).
 Before proceeding to Step 4, verify each finding from 3a and 3b has a
 routing decision. See `references/encoding-gate.md` for the routing tree.
 
+- **Class probe** → for every issue fixed this session, name the mechanical
+  probe run over the whole set (its count), or the reason none applies, before
+  the finding gets a routing decision (global rule 5).
 - **Memory edit** → apply now (chat: `memory_user_edits`; Code: add to
   CLAUDE.md or create a Grove task for the next chat session to apply)
 - **Skill update** → push now, or create a Grove task tagged

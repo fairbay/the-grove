@@ -5,7 +5,7 @@ description: >
   filter by tag/keyword, scan. Use proactively. Not for judgment
   (→ delegate-analytical) or async (→ fire-routine).
 metadata:
-  version: "2026-10-14-01"
+  version: "2026-10-18-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -24,6 +24,14 @@ Pattern-matchable, no domain judgment. The criterion is concrete: a tag, a
 regex, a question with a stated answer location, a template. If evaluating each
 item requires Claude to bring outside knowledge to bear, the work is analytical
 → `delegate-analytical`.
+
+**Harness note (Agent-tool sub-agents in cloud Code sessions).** A sub-agent may
+be unable to write files outside its working set ("Subagents should return
+findings as text"): brief it to reply with findings as text and save them
+yourself. Its final report is recoverable from `tasks/<id>.output` (the
+SubagentHandback tool_use input) when the completion notification is lost. A
+sub-agent sent to the web carries the global rule's search-first paragraph
+verbatim.
 
 ## Behavioral interrupts
 

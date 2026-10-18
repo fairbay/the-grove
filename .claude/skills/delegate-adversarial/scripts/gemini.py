@@ -37,171 +37,83 @@ Usage:
   out2, _ = call_cached(cache_name, user='Audit data quality...')
   delete_cache(cache_name)
 
-Reads GOOGLE_AI_KEY from secrets/gemini.env in fairbay/ops.
+Every call goes through the outside-model doorway (llm_doorway.py; MBN m1308):
+the key lives in the Supabase Vault and is never read by this script. The
+caching and Files API helpers are not routed through the doorway yet and raise
+GeminiError; use call() / research() / call_with_urls(), or Baylee's manual
+Gemini channel for a large raw-context review.
 """
 import base64
 import json
 import os
+import sys
 import subprocess
 import urllib.error
 import urllib.request
 
-# ---------------------------------------------------------------------------
-# Vendored GitHub read_file (no cross-skill dependency).
-#
-# This helper previously did `from git_push import read_file`, reaching into
-# the git-ops skill's scripts/ directory via a sys.path hack. That import only
-# resolved when both skill script dirs happened to be on sys.path at once —
-# not guaranteed in a fresh chat sandbox — so the skill's documented call path
-# silently failed to import. The only thing gemini.py needs from git_push is
-# the ability to read secrets/gemini.env, so the minimal reader is vendored
-# here. Behavior mirrors git_push.read_file: clone-aware (Routines read from
-# the local clone, no token) with a GitHub Contents API fallback (chat reads
-# via $GITHUB_PAT). Keep this in sync with git_push.read_file if that changes.
-# ---------------------------------------------------------------------------
-
-
-def _find_repo_clone(owner_repo: str):
-    """Return the local path to a git clone of owner_repo, or None."""
-    _, name = owner_repo.split('/', 1)
-    candidates = [
-        os.path.join(os.path.expanduser('~'), name),
-        os.path.join('/home/user', name),
-        os.path.abspath(name),
-        os.path.abspath(os.path.join('..', name)),
-    ]
-    for path in candidates:
-        if not os.path.isdir(os.path.join(path, '.git')):
-            continue
-        try:
-            result = subprocess.run(
-                ['git', '-C', path, 'remote', 'get-url', 'origin'],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode == 0 and name in result.stdout:
-                return path
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            continue
-    return None
-
-
-def _github_token() -> str:
-    """Resolve GitHub PAT. In chat: $GITHUB_PAT (from a memory edit)."""
-    if os.environ.get('GITHUB_PAT'):
-        return os.environ['GITHUB_PAT'].strip()
-    path = os.environ.get('GITHUB_PAT_PATH') or '/home/claude/github-pat.txt'
-    if os.path.exists(path):
-        with open(path) as f:
-            return f.read().strip()
-    raise GeminiError(
-        "No GitHub PAT found — cannot read secrets/gemini.env. Set $GITHUB_PAT "
-        "(from the memory edit) or run from a Routine where fairbay/ops is cloned."
-    )
-
-
-def read_file(owner_repo: str, remote_path: str, branch: str = 'main') -> str:
-    """Read a repo file. Uses a local clone if present, else the GitHub API."""
-    clone_path = _find_repo_clone(owner_repo)
-    if clone_path:
-        local_file = os.path.join(clone_path, remote_path)
-        if os.path.isfile(local_file):
-            with open(local_file, 'r', errors='replace') as f:
-                return f.read()
-        raise GeminiError(f"File not found in clone: {remote_path}")
-    url = (
-        f"https://api.github.com/repos/{owner_repo}/contents/"
-        f"{remote_path}?ref={branch}"
-    )
-    req = urllib.request.Request(url, method='GET')
-    req.add_header('Authorization', f'Bearer {_github_token()}')
-    req.add_header('Accept', 'application/vnd.github+json')
-    req.add_header('X-GitHub-Api-Version', '2022-11-28')
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            payload = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        raise GeminiError(
-            f"Could not read {owner_repo}/{remote_path}: HTTP {e.code}"
-        ) from e
-    except urllib.error.URLError as e:
-        raise GeminiError(
-            f"GitHub unreachable while reading {remote_path}: {e.reason}"
-        ) from e
-    if payload.get('encoding') == 'base64':
-        return base64.b64decode(payload['content']).decode('utf-8', errors='replace')
-    return payload.get('content', '')
-
-
 # -- Models ----------------------------------------------------------------
+# One home for the model names: llm.prices (default_for = 'review' | 'mechanical').
+# These constants are the seeded values; llm_doorway.default_model() reads the live row.
 MODEL_FLASH = 'gemini-2.5-flash'
-MODEL_PRO = 'gemini-2.5-pro'
+MODEL_PRO = 'gemini-3.1-pro-preview'
 
-# -- API base --------------------------------------------------------------
-API_BASE = 'https://generativelanguage.googleapis.com'
+# -- The doorway -----------------------------------------------------------
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from llm_doorway import DoorwayError, call as _doorway_call, estimate as doorway_estimate, default_model  # noqa: E402,F401
+
+PURPOSE = 'delegate-adversarial'   # set by the caller before a run, e.g. gemini.PURPOSE = 'idea-scout research'
+SURFACE = os.environ.get('LLM_DOORWAY_SURFACE', 'code')
+RUN_ID = None                      # set to group a multi-call run; pair with RUN_BUDGET_USD
+RUN_BUDGET_USD = None
+THINKING = 'low'                   # 'low' | 'medium' | 'high'; every body carries an explicit setting or the doorway refuses
+
+API_BASE = 'https://generativelanguage.googleapis.com'  # only in the helpers that raise _NOT_THROUGH_DOORWAY
+
+_NOT_THROUGH_DOORWAY = (
+    "Not available through the doorway yet (context caching and the Files API call other endpoints). "
+    "Use call() / call_with_urls() / research(), or Baylee's manual Gemini channel for a large raw-context review."
+)
+
+
+def thinking_config(model: str, level: str | None = None) -> dict:
+    """An explicit thinking setting for the body: thinkingLevel on Gemini 3, thinkingBudget on 2.5."""
+    level = level or THINKING
+    if model.startswith('gemini-3'):
+        return {'thinkingLevel': level}
+    budget = {'low': 1024, 'medium': 8192, 'high': 24576}.get(level, 1024)
+    return {'thinkingBudget': budget}
 
 
 class GeminiError(RuntimeError):
     """Surfaced verbatim — message tells Baylee what to do."""
 
 
-# -- Key loading -----------------------------------------------------------
-
-def _load_api_key() -> str:
-    try:
-        env = read_file('fairbay/ops', 'secrets/gemini.env')
-    except Exception as e:
-        raise GeminiError(
-            "secrets/gemini.env not found in fairbay/ops. "
-            "Create the file with GOOGLE_AI_KEY=<key> from aistudio.google.com."
-        ) from e
-
-    pairs = dict(
-        line.split('=', 1)
-        for line in env.strip().split('\n')
-        if '=' in line and not line.startswith('#')
-    )
-    key = pairs.get('GOOGLE_AI_KEY', '').strip()
-    if not key:
-        raise GeminiError(
-            "GOOGLE_AI_KEY missing from secrets/gemini.env. "
-            "Get a key at aistudio.google.com and update the file."
-        )
-    return key
-
-
 # -- Low-level HTTP helpers ------------------------------------------------
 
 def _post(model: str, payload: dict) -> dict:
-    """POST to Gemini generateContent endpoint."""
-    key = _load_api_key()
-    url = (
-        f"{API_BASE}/v1beta/"
-        f"models/{model}:generateContent?key={key}"
-    )
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    """POST to Gemini generateContent through the doorway; returns the provider's response body."""
+    payload.setdefault('generationConfig', {})
+    payload['generationConfig'].setdefault('thinkingConfig', thinking_config(model))
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode(errors='replace')
-        raise GeminiError(f"Gemini API HTTP {e.code}: {body}") from e
-    except urllib.error.URLError as e:
-        raise GeminiError(
-            f"Gemini API unreachable: {e.reason}. "
-            "Is generativelanguage.googleapis.com in the egress allowlist?"
-        ) from e
+        res = _doorway_call('google', model, payload, purpose=PURPOSE, surface=SURFACE,
+                            run_id=RUN_ID, run_budget_usd=RUN_BUDGET_USD, text_only=False)
+    except DoorwayError as e:
+        raise GeminiError(str(e)) from e
+    status = res.get('status')
+    if status == 'done' and res.get('response'):
+        return res['response']
+    raise GeminiError(
+        f"Doorway {status}: {res.get('message') or res.get('error') or 'no response'} "
+        f"(call {res.get('call_id')}). Stop and report this; a retry or a model substitution is Baylee's call."
+    )
 
 
 def _api_request(method: str, path: str, body: dict = None,
                  timeout: int = 120) -> dict:
     """Generic REST call to Gemini API (for caching, files, etc.)."""
-    key = _load_api_key()
+    raise GeminiError(_NOT_THROUGH_DOORWAY)
     separator = '&' if '?' in path else '?'
     url = f"{API_BASE}{path}{separator}key={key}"
     data = json.dumps(body).encode() if body else None
@@ -458,7 +370,8 @@ def call_cached(
         user: The review prompt for this specific pass.
         urls: Optional list of URLs for Gemini to fetch (e.g. repo URL).
     """
-    key = _load_api_key()
+    raise GeminiError(_NOT_THROUGH_DOORWAY)
+    key = None
     url = (
         f"{API_BASE}/v1beta/"
         f"models/{model}:generateContent?key={key}"
@@ -528,7 +441,8 @@ def upload_file(
         File URI (e.g. 'https://generativelanguage.googleapis.com/...')
         to reference in generateContent calls.
     """
-    key = _load_api_key()
+    raise GeminiError(_NOT_THROUGH_DOORWAY)
+    key = None
 
     # Step 1: Initiate resumable upload
     init_url = (

@@ -5,7 +5,7 @@ description: >
   proactively. Not for flaw-finding (→ delegate-adversarial), rote
   (→ delegate-mechanical), panel reviews (→ review-panel).
 metadata:
-  version: "2026-10-14-01"
+  version: "2026-10-18-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -26,6 +26,14 @@ shortlist where each item was *evaluated* against criteria. Distinguished from:
 - **mechanical:** the criterion is pattern-matchable (tag, keyword, regex).
 - **adversarial:** the goal is to find flaws, not weigh tradeoffs.
 - **review-panel:** multi-agent, multi-round; this skill is solo, single-pass.
+
+**Harness note (Agent-tool sub-agents in cloud Code sessions).** A sub-agent may
+be unable to write files outside its working set ("Subagents should return
+findings as text"): brief it to reply with findings as text and save them
+yourself. Its final report is recoverable from `tasks/<id>.output` (the
+SubagentHandback tool_use input) when the completion notification is lost. A
+sub-agent sent to the web carries the global rule's search-first paragraph
+verbatim.
 
 ## Behavioral interrupts
 
