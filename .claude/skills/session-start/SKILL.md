@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-18-02"
+  version: "2026-10-19-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -181,7 +181,8 @@ Resolution order — use the first that resolves:
 Handoffs are surface-agnostic: `meta.surface` may be `claude-web`,
 `claude-code`, or `routine`. Treat a Claude-Code-origin handoff exactly like a
 chat-origin one — the schema is identical. (On the Claude Code surface this same
-load happens automatically via a SessionStart hook; in chat it's this skill.)
+load happens automatically via a SessionStart hook in single-repo sessions; in
+chat and multi-repo sessions it's this skill.)
 
 If none resolves, skip to Phase 4 — the project may be new or pre-handoff.
 Note this briefly and proceed.
@@ -457,9 +458,10 @@ AskUserQuestion and continue on the answer.
   found, present "no handoff found" and ask — don't run multiple search calls
   to reconstruct context from chat fragments. That's slower, noisier, and
   produces lossy context.
-- **Running this skill in Code when the SessionStart hook already injected
-  handoffs.** In Code, the hook handles Phase 2 automatically. This skill
-  adds Phase 4-5 (PLAN.md loading + orientation) on top.
+- **Running Phases 0–2 in Code when the SessionStart hook's block is already
+  in context.** The hook then covers the PR gate and the handoff; this skill
+  adds Phase 4-5 on top. No injected block (several repos attached, or the
+  hook failed): run Phases 0–2 yourself.
 - **Dumping the entire PLAN.md.** Load it into context; don't narrate it.
   Downstream skills extract the step they need.
 - **Re-deriving the plan.** If PLAN.md exists, the approach is settled. Don't
@@ -482,7 +484,8 @@ AskUserQuestion and continue on the answer.
 - **← grove:** `grove_list_projects`, `grove_list_decisions`, `grove_events`
   are the briefing's data source — the store of record for project memory.
 - **↔ Claude Code:** On the Claude Code surface the entry gate is a SessionStart
-  hook (`scripts/session_handoff.py inject`) that injects the same handoffs as
+  hook (this skill's `scripts/session_handoff.py inject`, an entry managed by
+  fairbay/ops) that injects the same handoffs as
   `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
 - **← pr_state.py:** Phase 0 runs this skill's `scripts/pr_state.py report` (land-and-leave

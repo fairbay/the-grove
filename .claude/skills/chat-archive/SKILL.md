@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-19-02"
+  version: "2026-10-19-03"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -144,23 +144,21 @@ evaluated, quirks discovered, platform facts confirmed.
 
 #### 3b″. Drain the learnings queue (Code / Routines only)
 
-If `<cwd>/.claude/learnings-queue.jsonl` exists, the `capture_corrections.py`
-hook queued correction / preference / positive-feedback signals from this
-session's prompts (and possibly prior sessions in the same repo). Read it now:
+If `.claude/learnings-queue.jsonl` exists at the repo root (`$CLAUDE_PROJECT_DIR`,
+else `git rev-parse --show-toplevel`), the capture hook queued correction /
+preference / positive signals from Baylee's prompts in this container. Read it:
 
 1. Each entry is a raw finding — merge with the 3a/3b list and route through
-   the encoding gate (3b′) like any other finding. `correction` entries are
-   top-priority (Baylee explicitly flagged friction); `preference` entries
-   usually route to CLAUDE.md or a memory-edit Grove task; `positive` entries
-   confirm patterns worth keeping — usually "no encoding needed," occasionally
-   a skill note.
-2. Deduplicate against what 3a already caught in-conversation — the hook and
-   the meta-analysis will often see the same moment.
-3. After every entry has a routing decision, **delete the queue file in the
-   same commit as the handoff.** A drained queue is empty. If the session ends
-   without archive, entries persist to the next drain — that is the design.
+   the encoding gate (3b′). `correction` entries are top priority; `preference`
+   entries usually route to CLAUDE.md or a memory-edit Grove task; `positive`
+   entries confirm patterns, usually "no encoding needed". A `kind: error` line
+   means the capture script crashed: report it in the Step 4 summary.
+2. Deduplicate against what 3a already caught in-conversation.
+3. After every entry has a routing decision, delete the file. It is git-ignored
+   (the hook adds it to `.git/info/exclude`), so never commit it; an undrained
+   queue dies with the container.
 
-Skip silently if the file doesn't exist or the surface is chat (no hooks).
+No file: skip silently. Multi-repo and chat sessions run no hooks; 3a is the capture.
 
 #### 3b′. Encoding gate (mandatory)
 

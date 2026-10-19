@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-19-03"
+  version: "2026-10-19-04"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -52,7 +52,7 @@ The client waits up to 600 s (pg_net's maximum). Price a run first:
 `doorway_estimate(...)` or `select llm.estimate(...)`, and say the total before
 starting.
 
-**Four rules, every surface:**
+**Five rules, every surface:**
 - **Loud fallback.** When the doorway refuses, cannot be reached, or the key is
   missing, stop that step and report the message. Substituting a model (Opus
   for Gemini) is Baylee's call at that moment, with the cost difference stated;
@@ -66,6 +66,9 @@ starting.
   to the Gemini app) when it fits better: the month's API allowance is spent,
   or the material is hard to send by API (Baylee, 2026-10-19). Log a manual
   review as `surface = 'manual'`, cost 0.
+- **Rejected findings ride along.** Every review prompt carries the findings already considered and rejected, each with its reason; the reviewer contests one only with a valid counterpoint the reason does not already answer, and otherwise does not raise it again (Baylee, 2026-10-19). `review_package.rejected_section()`
+  builds the block; `generate_constraints`, `single_pass_review` and
+  `multi_pass_review` take `rejected=[(finding, reason), …]`.
 
 **From chat** (no token): two connector calls per model call, single statements.
 `select llm.call('google', '<model>', convert_from(decode('<base64 body>', 'base64'), 'utf8')::jsonb, '<purpose>', 'chat', '<session url>') as r`

@@ -5,7 +5,7 @@ description: >
   "calibrate scores", "audit my vault". Auto-runs build Phase 7.
   Not for isolated checks (→ delegate-analytical/adversarial).
 metadata:
-  version: "2026-10-18-01"
+  version: "2026-10-19-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -48,7 +48,7 @@ reviewer must check). When the work changed a rule, every item is in scope,
 including the items the change did not touch. A reviewer's validator proposal
 becomes a validator rule in the script that gates the work, not prose. A
 reviewer sent to the web carries the global rule's search-first paragraph
-verbatim.
+verbatim. Every brief after the first round carries the findings already considered and rejected, each with its reason; the reviewer contests one only with a valid counterpoint the reason does not already answer, and otherwise does not raise it again (Baylee, 2026-10-19).
 
 ## Quality tiers (reference)
 

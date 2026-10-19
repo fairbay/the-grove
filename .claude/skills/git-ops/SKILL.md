@@ -5,7 +5,7 @@ description: >
   "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
   Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-19-01"
+  version: "2026-10-19-02"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -149,7 +149,7 @@ code, body = api("POST", "/user/repos", {
 **After creation — Claude infrastructure.** When a new repo will be used
 with Claude Code, push the `.claude/` infrastructure in the same session:
 `.claude/global.md` (from `fairbay/ops/global-CLAUDE.md`),
-`.claude/settings.json` (SessionStart hook template in CONVENTIONS.md), and
+`.claude/settings.json` (the managed hook entries, copied from `fairbay/ops/.claude/settings.json`), and
 all skills from `fairbay/ops/.claude/skills/`. Skills must land
 before the first Claude Code session — don't defer to `sync.py`.
 Same procedure as ship-it Phase 3 step 6.

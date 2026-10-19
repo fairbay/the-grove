@@ -5,7 +5,7 @@ description: >
   "add claude config". Auto-fires from ship-it when .claude/ is missing.
   Not for deployment (→ ship-it) or skill editing (→ skill-creator-b).
 metadata:
-  version: "2026-10-19-01"
+  version: "2026-10-19-02"
 ---
 
 # init-repo — bootstrap .claude/ infrastructure in a repository
@@ -51,25 +51,11 @@ Do not customize per repo.
 [One-line description of what this repo is.]
 ```
 
-**`.claude/settings.json`** — Create with the SessionStart hook from
-CONVENTIONS.md:
-
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh -c 'P=\"$HOME/.local/bin/session_handoff.py\"; if [ ! -f \"$P\" ]; then mkdir -p \"$(dirname \"$P\")\"; gh api repos/fairbay/ops/contents/scripts/session_handoff.py -H \"Accept: application/vnd.github.raw\" > \"$P.tmp\" 2>/dev/null || curl -fsSL -H \"Authorization: Bearer ${GH_TOKEN:-${GITHUB_TOKEN:-$GITHUB_PAT}}\" https://raw.githubusercontent.com/fairbay/ops/main/scripts/session_handoff.py -o \"$P.tmp\" 2>/dev/null; if [ -s \"$P.tmp\" ]; then mv \"$P.tmp\" \"$P\"; else rm -f \"$P.tmp\"; fi; fi; [ -f \"$P\" ] && exec python3 \"$P\" inject; exit 0'"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+**`.claude/settings.json`** — Copy the two managed hook groups verbatim from
+`fairbay/ops/.claude/settings.json`: the SessionStart entry marked
+`fairbay-managed:entry-gate` and the UserPromptSubmit entry marked
+`fairbay-managed:capture`. Never retype them; the sync keeps them current from
+then on (docs/hook-delivery/DESIGN.md §3.5).
 
 **`.claude/skills/`** — Read all files from `fairbay/ops/.claude/skills/`
 and push them to the target repo. Do this in the same commit as the other
@@ -90,9 +76,9 @@ Confirm the push succeeded. Report what was created vs. what already existed.
   Repo-specific instructions go in the root `CLAUDE.md`.
 - **Skills must land before the first Claude Code session.** A session that
   starts without skills discovers none of the workflows.
-- **The SessionStart hook needs `$GITHUB_PAT` at runtime.** It's available
-  in Claude Code cloud sessions via env vars. The hook self-bootstraps — no
-  setup script dependency.
+- **The hooks run scripts that ship with the skills** (session-start and
+  chat-archive `scripts/`): no download, no token. Skills and hooks land in the
+  same commit.
 
 ## Integration
 

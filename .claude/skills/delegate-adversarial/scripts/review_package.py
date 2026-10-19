@@ -124,10 +124,24 @@ def format_data_sample(
 ```{truncated}"""
 
 
+def rejected_section(rejected: list[tuple[str, str]] | None) -> str:
+    """The "considered and rejected" block every review brief carries (Baylee, 2026-10-19):
+    findings already weighed and turned down, each with its reason, so a reviewer does not
+    rehash them. It may contest one only with a counterpoint the reason does not answer."""
+    if not rejected:
+        return ''
+    items = '\n'.join(f"{i}. {finding}\n   Rejected because: {reason}"
+                      for i, (finding, reason) in enumerate(rejected, 1))
+    return ("\nCONSIDERED AND REJECTED (by earlier review rounds or the author). Do not raise these "
+            "again. Contest one only with a valid counterpoint its reason does not already answer: "
+            "name its number and give the counterpoint.\n" + items + "\n")
+
+
 def generate_constraints(
     review_type: str = 'full',
     scope: str = '',
     custom_rules: list[str] = None,
+    rejected: list[tuple[str, str]] = None,
 ) -> str:
     """
     Generate a constraints block for the review prompt.
@@ -141,6 +155,7 @@ def generate_constraints(
                      'methodology', or 'full'.
         scope: Human description of what's in scope.
         custom_rules: Additional rules specific to this review.
+        rejected: (finding, reason) pairs already considered and rejected.
     """
     # Severity ladder (consistent across all review types)
     severity_ladder = dedent("""\
@@ -222,7 +237,7 @@ def generate_constraints(
 
     return f"""{severity_ladder}
 {evidence_rule}
-{focus}{scope_block}{custom_block}
+{focus}{scope_block}{custom_block}{rejected_section(rejected)}
 OUTPUT FORMAT — one entry per finding:
 SEVERITY: CRITICAL | HIGH | MEDIUM | LOW | INFO
 LOCATION: [specific table/field/file/line or data record reference]

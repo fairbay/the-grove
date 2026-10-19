@@ -113,12 +113,14 @@ def _build_review_prompt(
     repo_urls: list[str] = None,
     scope: str = '',
     custom_rules: list[str] = None,
+    rejected: list[tuple[str, str]] = None,
 ) -> str:
     """Build the user prompt for a specific review pass."""
     constraints = generate_constraints(
         review_type=pass_config['constraint_type'],
         scope=scope,
         custom_rules=custom_rules,
+        rejected=rejected,
     )
 
     url_section = ''
@@ -147,6 +149,7 @@ def multi_pass_review(
     passes: list[str] = None,
     scope: str = '',
     custom_rules: list[str] = None,
+    rejected: list[tuple[str, str]] = None,
     model: str = MODEL_PRO,
     cache_ttl: int = 1800,
     max_tokens_per_pass: int = 16384,
@@ -163,6 +166,7 @@ def multi_pass_review(
         passes: List of pass keys from REVIEW_PASSES. Default: all passes.
         scope: Human description of what's in scope.
         custom_rules: Extra rules applied to every pass.
+        rejected: (finding, reason) pairs already considered and rejected; every pass carries them.
         model: Gemini model to use.
         cache_ttl: Cache lifetime in seconds (default 30 min).
         max_tokens_per_pass: Max output tokens per review pass.
@@ -213,6 +217,7 @@ def multi_pass_review(
                 repo_urls=repo_urls,
                 scope=scope,
                 custom_rules=custom_rules,
+                rejected=rejected,
             )
 
             # First pass: include URL Context for repo access
@@ -283,6 +288,7 @@ def single_pass_review(
     repo_urls: list[str] = None,
     review_type: str = 'full',
     scope: str = '',
+    rejected: list[tuple[str, str]] = None,
     model: str = MODEL_PRO,
     max_tokens: int = 16384,
 ) -> tuple[list[dict], dict]:
@@ -293,7 +299,7 @@ def single_pass_review(
     Uses URL Context if repo_urls are provided.
     """
     config = REVIEW_PASSES.get(review_type, REVIEW_PASSES['full'])
-    prompt = _build_review_prompt(config, repo_urls=repo_urls, scope=scope)
+    prompt = _build_review_prompt(config, repo_urls=repo_urls, scope=scope, rejected=rejected)
     full_prompt = f"{package}\n\n{prompt}"
 
     if repo_urls:
