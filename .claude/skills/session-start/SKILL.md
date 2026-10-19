@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-18-01"
+  version: "2026-10-18-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -395,9 +395,10 @@ ordering:
 4. **High-confidence** — omit from orientation unless Baylee asks
 
 For flagged decisions (categories 1-2), include the `alternatives` field so
-Baylee can redirect without researching from scratch. Wait for Baylee to
-acknowledge or override before proceeding with work that depends on these
-decisions.
+Baylee can redirect without researching from scratch. Category 1 (low-
+confidence and irreversible) waits: ask once, in the briefing, before work
+that depends on it. Category 2 (reversible) does not wait: proceed and say
+what was assumed; he overrides by a note (2026-10-18, MBN audit d092e356).
 
 **Stale-artifact check.** Before recommending that Baylee spend time on a review
 artifact, ruling page, adjudication set or screenshots, check that it postdates

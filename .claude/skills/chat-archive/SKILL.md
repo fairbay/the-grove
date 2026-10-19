@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-18-02"
+  version: "2026-10-18-03"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -176,9 +176,10 @@ routing decision. See `references/encoding-gate.md` for the routing tree.
   `routine:skill-worker` with contractor-grade notes (file path, exact
   change, rationale)
 - **Grove task** → create now
-- **Adjudication item** → a source conflict, unreachable/blocked-content gap,
-  or medium/low-confidence call surfaced this session that needs Baylee's
-  judgment: file via `grove_create_adjudication` (question, context,
+- **Adjudication item** → a source conflict no rule settles, an unreachable/
+  blocked-content gap, or a medium/low-confidence call that is also expensive
+  to reverse or needs Baylee's context (a cheap-to-reverse medium call is a
+  Grove decision, never a card): file via `grove_create_adjudication` (question, context,
   discriminator, options[] each with `explanation` + `evidence_urls`) — not
   buried as prose in task notes. Each option must stand alone, with enough
   context to judge without chat history.
