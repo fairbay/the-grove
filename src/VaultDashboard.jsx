@@ -102,7 +102,8 @@ export default function VaultDashboard() {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.json();
       })
-      .then(setVault)
+      // Only portfolio-visible ideas are public (Baylee, Grove card f2e06613).
+      .then((v) => setVault({ ...v, ideas: v.ideas.filter((i) => i.portfolio_visible) }))
       .catch((e) => setError(e.message));
   }, []);
 

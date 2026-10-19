@@ -19,12 +19,12 @@
       "verdict": "Pass",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
-      "key_insight": "Existing birthday apps focus on individual trivia. The relational cross-date magic \u2014 connecting your dates to people and history \u2014 is the unique angle.",
+      "key_insight": "Existing birthday apps focus on individual trivia. The relational cross-date magic — connecting your dates to people and history — is the unique angle.",
       "pivot_chosen": "",
       "deploy_url": "https://dateweave.vercel.app",
       "portfolio_visible": true,
-      "notes": "Built as first test of the Claude \u2192 PushCraft \u2192 Vercel pipeline.",
-      "hero_description": "Enter your birthday, add the people who matter, pick historical eras \u2014 and DateWeave weaves them together into surprising connections you never noticed."
+      "notes": "Built as first test of the Claude → PushCraft → Vercel pipeline.",
+      "hero_description": "Enter your birthday, add the people who matter, pick historical eras — and DateWeave weaves them together into surprising connections you never noticed."
     },
     {
       "title": "PushCraft",
@@ -43,12 +43,12 @@
       "verdict": "Public good",
       "date_added": "2026-03-05",
       "date_updated": "2026-03-09",
-      "key_insight": "GitHub API supports CORS for authenticated requests \u2014 no backend needed.",
+      "key_insight": "GitHub API supports CORS for authenticated requests — no backend needed.",
       "pivot_chosen": "",
       "deploy_url": "https://pushcraft.vercel.app",
       "portfolio_visible": true,
       "notes": "v4: multi-file atomic commit, quick push, token persistence.",
-      "hero_description": "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push \u2014 all from your phone."
+      "hero_description": "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push — all from your phone."
     },
     {
       "title": "RepairShield",
@@ -96,7 +96,7 @@
       "deploy_url": "",
       "portfolio_visible": true,
       "notes": "Highest impact score in the vault.",
-      "hero_description": "When you lose your job AND face eviction AND need medical care \u2014 the order you act in matters. This tool sequences the right moves for your specific jurisdiction."
+      "hero_description": "When you lose your job AND face eviction AND need medical care — the order you act in matters. This tool sequences the right moves for your specific jurisdiction."
     },
     {
       "title": "Shelf Life",
@@ -120,76 +120,6 @@
       "portfolio_visible": true,
       "notes": "Quick-scored: interesting concept but unclear demand signal.",
       "hero_description": "Watches for manufacturing errors, rapid branding changes, recalls, and cultural moments that turn ordinary products into tomorrow's treasures."
-    },
-    {
-      "title": "TC Relocation Guide",
-      "one_liner": "Hyperlocal housing intelligence for Traverse City.",
-      "status": "deployed",
-      "platform": "web",
-      "tags": [
-        "traverse city",
-        "housing",
-        "personal tool"
-      ],
-      "impact_pct": 50,
-      "business_pct": 39,
-      "sustainability_pct": 78,
-      "verdict": "Pass",
-      "date_added": "2026-03-01",
-      "date_updated": "2026-03-09",
-      "key_insight": "TC-specific buyer intelligence is the gap.",
-      "pivot_chosen": "Pivot C: TC-specific relocation guide",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Personal tool for summer 2026 move.",
-      "hero_description": ""
-    },
-    {
-      "title": "Map Mosaic",
-      "one_liner": "Paint on a world map canvas using historical, artistic, and data maps.",
-      "status": "raw",
-      "platform": "web",
-      "tags": [
-        "creative",
-        "maps",
-        "art",
-        "consumer"
-      ],
-      "impact_pct": 44,
-      "business_pct": 41,
-      "sustainability_pct": 57,
-      "verdict": "Pass",
-      "date_added": "2026-02-02",
-      "date_updated": "2026-03-09",
-      "key_insight": "Leaflet.js or Mapbox GL JS recommended.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Quick-scored: creative and novel but unclear demand.",
-      "hero_description": ""
-    },
-    {
-      "title": "Dice Party Game",
-      "one_liner": "A party guessing game with 12 dice that constrain how you give clues.",
-      "status": "raw",
-      "platform": "undecided",
-      "tags": [
-        "game",
-        "party",
-        "physical product"
-      ],
-      "impact_pct": 43,
-      "business_pct": 44,
-      "sustainability_pct": 70,
-      "verdict": "Pass",
-      "date_added": "2026-01-31",
-      "date_updated": "2026-03-09",
-      "key_insight": "12 dice covering communication mode, word restrictions, perspective, etc.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Physical game concept.",
-      "hero_description": ""
     },
     {
       "title": "Storyweaver",
@@ -216,124 +146,6 @@
       "hero_description": "AI-powered interactive fiction with procedural art, voice input, and 16 genre engines."
     },
     {
-      "title": "Shadowrun Story App",
-      "one_liner": "Interactive narrative app set in the Shadowrun universe.",
-      "status": "raw",
-      "platform": "undecided",
-      "tags": [
-        "creative",
-        "game",
-        "storytelling",
-        "sci-fi"
-      ],
-      "impact_pct": null,
-      "business_pct": null,
-      "sustainability_pct": 39,
-      "verdict": "Blocked",
-      "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
-      "key_insight": "IP licensing is a dealbreaker until resolved.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Not scored \u2014 IP question must be answered first.",
-      "hero_description": ""
-    },
-    {
-      "title": "Arboreal Sentience (Sci-Fi Worldbuild)",
-      "one_liner": "A story set on a planet where trees evolved to human-level intelligence.",
-      "status": "building",
-      "platform": "undecided",
-      "tags": [
-        "creative",
-        "writing",
-        "sci-fi",
-        "worldbuilding"
-      ],
-      "impact_pct": null,
-      "business_pct": null,
-      "sustainability_pct": 93,
-      "verdict": "Creative project",
-      "date_added": "2026-02-27",
-      "date_updated": "2026-03-09",
-      "key_insight": "Five evolutionary pathways developed.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Creative writing project.",
-      "hero_description": ""
-    },
-    {
-      "title": "Parking Incentive Inversion",
-      "one_liner": "Credit patients who arrive early for appointments.",
-      "status": "parked",
-      "platform": "undecided",
-      "tags": [
-        "healthcare",
-        "Cleveland Clinic",
-        "operations"
-      ],
-      "impact_pct": 41,
-      "business_pct": 30,
-      "sustainability_pct": null,
-      "verdict": "Pass",
-      "date_added": "2026-02-25",
-      "date_updated": "2026-03-09",
-      "key_insight": "Interesting concept but depends on institutional partnerships.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "IDF drafted. Correctly parked.",
-      "hero_description": ""
-    },
-    {
-      "title": "Bluetooth Busy Light",
-      "one_liner": "Office availability indicator with separate controller and remote light.",
-      "status": "killed",
-      "platform": "undecided",
-      "tags": [
-        "hardware",
-        "office",
-        "productivity"
-      ],
-      "impact_pct": 22,
-      "business_pct": 17,
-      "sustainability_pct": null,
-      "verdict": "Pass",
-      "date_added": "2026-02-27",
-      "date_updated": "2026-03-09",
-      "key_insight": "Luxafor Switch Pro is this exact product.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Pass. Killed.",
-      "hero_description": ""
-    },
-    {
-      "title": "The Unsolvable Conversations",
-      "one_liner": "An AI companion designed to hold philosophical questions open.",
-      "status": "scouted",
-      "platform": "web",
-      "tags": [
-        "philosophy",
-        "AI",
-        "existential",
-        "consumer"
-      ],
-      "impact_pct": 52,
-      "business_pct": 43,
-      "sustainability_pct": 50,
-      "verdict": "Pass",
-      "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
-      "key_insight": "Most AI products try to answer questions \u2014 this one deliberately doesn't.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Quick-scored: impact close to threshold but not there.",
-      "hero_description": ""
-    },
-    {
       "title": "Process Navigator",
       "one_liner": "Interactive branching flow editor for navigating real-world processes.",
       "status": "building",
@@ -358,147 +170,6 @@
       "hero_description": "Visual flow editor for building and sharing step-by-step processes."
     },
     {
-      "title": "The Grove",
-      "one_liner": "Nature-themed portfolio site showing ideas at every stage of growth.",
-      "status": "deployed",
-      "platform": "web",
-      "tags": [
-        "portfolio",
-        "personal",
-        "infrastructure"
-      ],
-      "impact_pct": null,
-      "business_pct": null,
-      "sustainability_pct": 83,
-      "verdict": "Infrastructure",
-      "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
-      "key_insight": "Each idea's maturity depicted as a stage of plant growth.",
-      "pivot_chosen": "",
-      "deploy_url": "https://bayleemiller.org",
-      "portfolio_visible": false,
-      "notes": "Portfolio site \u2014 scoring framework doesn't apply.",
-      "hero_description": ""
-    },
-    {
-      "title": "ShadowScale",
-      "one_liner": "Tactical roguelike heist game in a cyberpunk-fantasy noir setting.",
-      "status": "scouted",
-      "platform": "web",
-      "tags": [
-        "game",
-        "tactical",
-        "roguelike",
-        "cyberpunk"
-      ],
-      "impact_pct": 56,
-      "business_pct": 48,
-      "sustainability_pct": 89,
-      "verdict": "Public good",
-      "date_added": "2026-03-09",
-      "date_updated": "2026-03-09",
-      "key_insight": "Pure client-side browser game. Ship & Shelve track.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Ship & Shelve track.",
-      "hero_description": ""
-    },
-    {
-      "title": "Traffic-Aware Road Repair Scheduler",
-      "one_liner": "Optimize road repair scheduling using traffic pattern data.",
-      "status": "killed",
-      "platform": "web",
-      "tags": [
-        "public good",
-        "infrastructure",
-        "civic tech"
-      ],
-      "impact_pct": 63,
-      "business_pct": 52,
-      "sustainability_pct": null,
-      "verdict": "Public good",
-      "date_added": "2026-03-09",
-      "date_updated": "2026-03-09",
-      "key_insight": "Best pivot was TMP Generator but effort too high.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Killed.",
-      "hero_description": ""
-    },
-    {
-      "title": "Variant Forge",
-      "one_liner": "Generate image variants using Gemini and Imagen 4.",
-      "status": "deployed",
-      "platform": "web",
-      "tags": [
-        "tools",
-        "AI",
-        "images",
-        "Gemini"
-      ],
-      "impact_pct": null,
-      "business_pct": null,
-      "sustainability_pct": 57,
-      "verdict": "Infrastructure",
-      "date_added": "2026-03-08",
-      "date_updated": "2026-03-09",
-      "key_insight": "First tool built on Gemini/Imagen 4 API.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Infrastructure tool for the pipeline.",
-      "hero_description": ""
-    },
-    {
-      "title": "Neon Sorcery RPG",
-      "one_liner": "Cyberpunk-fantasy RPG with six-episode season structure.",
-      "status": "deployed",
-      "platform": "web",
-      "tags": [
-        "game",
-        "RPG",
-        "cyberpunk",
-        "creative"
-      ],
-      "impact_pct": null,
-      "business_pct": null,
-      "sustainability_pct": 87,
-      "verdict": "Creative project",
-      "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
-      "key_insight": "Single React component/PWA.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Deployed to Netlify.",
-      "hero_description": ""
-    },
-    {
-      "title": "Colored Pencil Bandolier",
-      "one_liner": "Wearable colored pencil organizer for artists.",
-      "status": "killed",
-      "platform": "undecided",
-      "tags": [
-        "physical product",
-        "art",
-        "accessories"
-      ],
-      "impact_pct": 37,
-      "business_pct": 35,
-      "sustainability_pct": null,
-      "verdict": "Pass",
-      "date_added": "2026-03-07",
-      "date_updated": "2026-03-09",
-      "key_insight": "Scores too low. Existing products cover the space.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "Killed. Clear pass.",
-      "hero_description": ""
-    },
-    {
       "title": "Stage Directions",
       "one_liner": "A self-help ebook using theatre concepts as the lens, written by AI with full disclosure.",
       "status": "deployed",
@@ -521,31 +192,7 @@
       "deploy_url": "https://bayleemill.gumroad.com/l/stage-directions",
       "portfolio_visible": true,
       "notes": "Published on Gumroad as pay-what-you-want. 14 chapters, ~11,700 words. Written by Claude, directed by Baylee Miller. Sustainability 96%: pure text, zero dependencies.",
-      "hero_description": "14 theatre concepts \u2014 from stage fright to improv \u2014 mapped to practical life skills. 30+ human experts. One honest AI."
-    },
-    {
-      "title": "Worldview Compass",
-      "one_liner": "Comprehensive worldview/philosophy-of-life quiz with flower visualization.",
-      "status": "building",
-      "platform": "web",
-      "tags": [
-        "philosophy",
-        "quiz",
-        "visualization",
-        "consumer"
-      ],
-      "impact_pct": 69,
-      "business_pct": 61,
-      "sustainability_pct": null,
-      "verdict": "Unicorn",
-      "date_added": "2026-03-09",
-      "date_updated": "2026-03-09",
-      "key_insight": "6 domains, 20 axes, 60 questions. Flower visualization where petal shape/color represents worldview dimensions.",
-      "pivot_chosen": "",
-      "deploy_url": "",
-      "portfolio_visible": false,
-      "notes": "React artifact v0.1 built. Track: Discovery.",
-      "hero_description": ""
+      "hero_description": "14 theatre concepts — from stage fright to improv — mapped to practical life skills. 30+ human experts. One honest AI."
     }
   ]
 }
