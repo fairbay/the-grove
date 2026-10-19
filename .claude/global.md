@@ -408,8 +408,8 @@ Otherwise: finish an item → verify → log the decision → pull the next item
 
 ## About This File
 
-**This is the single source of truth for cross-project preferences.** It lives in `fairbay/ops/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md`.
+**This is the single source of truth for cross-project preferences.** It lives in `fairbay/ops/global-CLAUDE.md` and is synced to `.claude/global.md` in every active repo. Each repo's root `CLAUDE.md` imports it via `@.claude/global.md` — except `fairbay/ops` itself, whose `CLAUDE.md` imports `@global-CLAUDE.md` directly, because `sync.py` excludes the source repo and its copy went stale (found 2026-10-19).
 
 **To update cross-project preferences:** Edit this file and push to `main` — the `sync.yml` Action in `fairbay/ops` runs `scripts/sync.py` to push it to all repos. Never edit `.claude/global.md` in individual repos directly — sync overwrites it.
 
-**Why repo-committed, not just `~/.claude/CLAUDE.md`:** Cloud Claude Code web sessions run in ephemeral VMs cloned from GitHub. `~/.claude/` does not persist between web sessions. The repo-committed file is the only reliable persistence layer. `~/.claude/CLAUDE.md` is placed additionally on local machines for Desktop/CLI/VS Code coverage.
+**Why repo-committed, not just `~/.claude/CLAUDE.md`:** Cloud Claude Code web sessions run in ephemeral VMs cloned from GitHub. `~/.claude/` does not persist between web sessions. The repo-committed file is the only reliable persistence layer. A `~/.claude/CLAUDE.md` on a local machine is read only when Claude Code runs on that machine (CLI, VS Code, desktop local mode); cloud sessions never read it (Claude Code docs, "Configure cloud environments", checked 2026-10-19). Baylee runs everything in the cloud, so any local copy is a breadcrumb, not a rule source. Not yet evaluated: a cloud-environment setup script can write `~/.claude/CLAUDE.md` inside the VM and Claude Code loads it as user instructions, which would deliver these rules to cloud sessions that have no repo attached.
