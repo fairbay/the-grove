@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-18-03"
+  version: "2026-10-19-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -335,13 +335,12 @@ push response — read it back.
 - Don't ask Baylee to paste secrets into chat; redirect to paste into the
   destination field.
 
-### 7. (Removed — telemetry)
+### 7. Cost shape
 
-Session metadata is captured via the Grove project row update (Step 9b:
-`last_session`, `next_actions`, `phase`) and decisions via `grove_log_decision`.
-The per-session `ops/telemetry/skill-usage.yaml` append was dropped 2026-06-29 —
-the self-graded compliance tally was never systematically audited and the ops
-push ceremony it required didn't earn its keep.
+One line in the Step 4 summary and the Grove session line (9b): sub-agents by model, full
+regenerations, review passes, outside-model calls/refusals/dollars. The last from Supabase
+`execute_sql` (project `mqbnsjkeucvumdoqdeww`): `llm.spend_by_session` where `session` contains
+this session's id, `llm.spend_by_run` per `run_id` used; none → "no outside calls".
 
 ### 8. Watchlist
 
@@ -479,6 +478,7 @@ fails, say so explicitly.
 - [ ] **"Next step:" line in response body?** (mandatory, even if nothing)
 - [ ] Outstanding items (if >1) verified before listing?
 - [ ] Permissions audit done (3d, chat only)? Setup gaps surfaced in summary?
+- [ ] Cost shape line (7) in the summary and the Grove session line?
 - [ ] Watchlist items checked (only the ones whose condition fired)? Code: repo copy committed + merge-back line in `next:`?
 - [ ] Standing rules: every ruling this session is in CLAUDE.md "Baylee's standing rules" with a superseding Grove decision?
 - [ ] Chat rename suggested?

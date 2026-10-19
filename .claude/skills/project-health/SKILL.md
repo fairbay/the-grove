@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-17-01"
+  version: "2026-10-19-01"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -163,6 +163,10 @@ unit model makes those lists projections.
   `last_applied`.
 - **Data gate:** `validate-data.mjs --gate` exits 0.
 - **Database size** (Q9) under 400 MB (the free tier allows 500 MB).
+- **Outside-model spend** (Q11): every provider and `all` at or under its
+  `weekly_calls` and `monthly_usd`, and none tripped (`tripped_until` in the
+  future). Report calls, refusals, errors and dollars as numbers too; a rise
+  in refusals or errors is a finding even while the caps hold.
 - **Queues:** open adjudications; untriaged feedback (Q7; above zero sends it to
   the weekly triage, Grove c0c2d6e3); ready PRs; drafts older than 14 days.
 

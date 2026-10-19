@@ -5,7 +5,7 @@ description: >
   "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
   Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-17-01"
+  version: "2026-10-19-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -170,6 +170,7 @@ For deleting **files** (not repos), push with `sha: null` in the tree entry — 
 The full push-time discipline (test → present → push → diff URL → optional verify) lives in `references/push-protocol.md` — other skills load that file when they push inside their workflows. When the user calls git-ops directly, these still apply:
 
 - **Push to `main`** from chat. Code web sessions: `claude/*` branch, draft PR with an owner task, ready only via close-at-land (`references/push-protocol.md` §5).
+- **Size gate before any PR goes ready:** no regenerable output, records one per line, a file over ~2,000 added lines or a binary over 1 MB only with a stated reason (chat-archive `references/close-at-land.md` step 5).
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit.
 - **Regenerate `package-lock.json`** (`npm install`) if `dependencies` / `devDependencies` changed, before committing.
 - **Reply with the commit diff URL** — that's Baylee's review surface.
@@ -186,6 +187,9 @@ Placed near the operations above, summarized here:
 - For binary or > 1MB reads, the contents endpoint returns base64 — `read_file` only handles UTF-8 text.
 - **Egress proxy auth flap (claude.ai containers).** Symptom: valid PAT + bursty 401 "Requires authentication" + GitHub request-ids present in response. Cause: transparent egress proxy intermittently drops the Authorization header. This is NOT a PAT expiry — don't tell Baylee to regenerate a healthy token. `api()` retries 8 times with backoff; `push_files()` falls back to native git transport (shallow clone with `x-access-token:PAT@github.com`) on 401 exhaustion. If the flap persists across sessions, Baylee may want to report to Anthropic.
 - **Cloud session limits: `gh api --paginate` fails through the session proxy.** The second page is requested by numeric repository id and the proxy answers 403 "Numeric-ID repository paths (repositories/{id}/...) are not supported through this proxy." The first page returns, so counts silently cover only the newest 100 rows. Page by hand instead: add `per_page=100&page=N` to the path and loop until a page comes back empty (or its last row is older than the window you need).
+
+- **Cloud Code sessions refuse force-pushes**, `--force-with-lease` included, even to the session's own branch after its PR squash-merged. Without rewriting history: restart the branch from `origin/main`, then `git merge -s ours --no-edit origin/<branch>`, so the push is a fast-forward.
+- **Mass removals need Baylee's explicit yes first** (the classifier refused a 246-file deletion until he approved in chat). Before pushing one, build from a `git archive HEAD` copy: files left on disk hide a missing input.
 
 ## Secret hygiene
 

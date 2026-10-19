@@ -104,6 +104,17 @@ Order matters: draft first, then the owner task, so the line names a real number
    `node scripts/batch/strip-working-files.mjs --apply`, then `npm run test:v4`;
    plus the suites MBN CLAUDE.md names for app, test or data changes). Any
    failure: stop, the PR stays a draft, fix it.
+
+   **Size gate, every repo, policy or not** (2026-10-13: MBN #361 went up at
+   14,686 added lines, 13,687 of them two JSON files of working output). Read
+   `git diff --shortstat origin/main...HEAD` and the largest added files
+   (`git diff --numstat origin/main...HEAD | sort -rn | head`):
+   - Output a script regenerates is never committed: gitignore it, and the
+     plan or handoff names the command that rebuilds it.
+   - A record that must land is written one record per line (no pretty-printed
+     JSON arrays).
+   - A file over about 2,000 added lines, or a binary over 1 MB, lands only
+     with its reason stated in the PR body.
 6. **The close-at-land commit.** Stage what remains (`git add -A`: the index
    changes strip-working-files made; it moved working files to
    `.git/info/exclude`). Check: `git status --porcelain` is empty, and

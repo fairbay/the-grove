@@ -5,7 +5,7 @@ description: >
   "add claude config". Auto-fires from ship-it when .claude/ is missing.
   Not for deployment (→ ship-it) or skill editing (→ skill-creator-b).
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-10-19-01"
 ---
 
 # init-repo — bootstrap .claude/ infrastructure in a repository
@@ -62,7 +62,7 @@ CONVENTIONS.md:
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'P=\"$HOME/.local/bin/session_handoff.py\"; if [ ! -f \"$P\" ]; then mkdir -p \"$(dirname \"$P\")\" && curl -fsSL -H \"Authorization: Bearer $GITHUB_PAT\" https://raw.githubusercontent.com/fairbay/ops/main/scripts/session_handoff.py -o \"$P\" 2>/dev/null; fi; [ -f \"$P\" ] && exec python3 \"$P\" inject; exit 0'"
+            "command": "sh -c 'P=\"$HOME/.local/bin/session_handoff.py\"; if [ ! -f \"$P\" ]; then mkdir -p \"$(dirname \"$P\")\"; gh api repos/fairbay/ops/contents/scripts/session_handoff.py -H \"Accept: application/vnd.github.raw\" > \"$P.tmp\" 2>/dev/null || curl -fsSL -H \"Authorization: Bearer ${GH_TOKEN:-${GITHUB_TOKEN:-$GITHUB_PAT}}\" https://raw.githubusercontent.com/fairbay/ops/main/scripts/session_handoff.py -o \"$P.tmp\" 2>/dev/null; if [ -s \"$P.tmp\" ]; then mv \"$P.tmp\" \"$P\"; else rm -f \"$P.tmp\"; fi; fi; [ -f \"$P\" ] && exec python3 \"$P\" inject; exit 0'"
           }
         ]
       }

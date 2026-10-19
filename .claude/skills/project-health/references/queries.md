@@ -10,7 +10,7 @@ the export's own filter (`scripts/generate-state-exports.mjs`), so these counts 
 serves. Q10 flags rows in any status other than active, exited and out_of_scope.
 
 Contents: Q1 guards · Q2 per state · Q3 handbook · Q4 provenance · Q5 freshness · Q6 reward units ·
-Q7 pipeline · Q8 structure · Q9 sizes · Q10 plan-row statuses
+Q7 pipeline · Q8 structure · Q9 sizes · Q10 plan-row statuses · Q11 outside-model spend
 
 ## Q1 — Regression guards
 
@@ -275,4 +275,28 @@ the last two) and needs a look.
 
 ```sql
 SELECT status, COUNT(*) FROM program_insurer_areas GROUP BY status ORDER BY 2 DESC;
+```
+
+## Q11 — Outside-model spend
+
+The doorway's ledger (`llm.calls`, ops docs/llm-doorway/DESIGN.md) against `llm.limits`. Calls and
+errors over the last 7 days, dollars month to date. `calls` excludes refusals; a refusal is the
+limits working, but a run of them means a session kept trying. Provider `*` is the all-provider cap.
+
+```sql
+WITH d AS (
+  SELECT provider,
+         SUM(calls) FILTER (WHERE day > current_date - 7)  AS calls_7d,
+         SUM(refused) FILTER (WHERE day > current_date - 7) AS refused_7d,
+         SUM(errors) FILTER (WHERE day > current_date - 7)  AS errors_7d,
+         SUM(usd) FILTER (WHERE day >= date_trunc('month', current_date)) AS usd_mtd
+  FROM llm.spend_by_day GROUP BY provider)
+SELECT d.provider, d.calls_7d, l.weekly_calls, d.refused_7d, d.errors_7d,
+       round(d.usd_mtd, 4) AS usd_mtd, l.monthly_usd, l.tripped_until, l.tripped_class
+FROM d LEFT JOIN llm.limits l ON l.provider = d.provider
+UNION ALL
+SELECT 'all', SUM(calls) FILTER (WHERE day > current_date - 7), (SELECT weekly_calls FROM llm.limits WHERE provider = '*'),
+       SUM(refused) FILTER (WHERE day > current_date - 7), SUM(errors) FILTER (WHERE day > current_date - 7),
+       round(SUM(usd) FILTER (WHERE day >= date_trunc('month', current_date)), 4), (SELECT monthly_usd FROM llm.limits WHERE provider = '*'), NULL, NULL
+FROM llm.spend_by_day;
 ```

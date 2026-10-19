@@ -47,6 +47,7 @@ def _token() -> str:
             "connector (delegate-adversarial SKILL.md, \"From chat\"). Otherwise stop and tell Baylee; "
             "do not call a provider directly and do not substitute a model."
         )
+    return tok
 
 
 def _query(sql: str, timeout: int = 60) -> list:
@@ -103,17 +104,48 @@ def estimate(provider: str, model: str, body: dict, n_calls: int = 1) -> dict:
     return rows[0]['r']
 
 
+TIMEOUT_MS = 600000  # pg_net's maximum. A review-sized Pro call (16K output cap) runs ~2 min at the
+                     # ~150 tokens/s measured 2026-10-19; one call that day stalled past 300 s.
+
+
+def finish_reason(response: dict | None) -> str | None:
+    """The provider's finish reason (Gemini: candidates[0].finishReason), or None if absent."""
+    try:
+        return (response or {}).get('candidates', [{}])[0].get('finishReason')
+    except (AttributeError, IndexError, TypeError):
+        return None
+
+
+def _mark_finish(res: dict) -> dict:
+    """A `done` call whose answer did not finish normally is not done: MAX_TOKENS -> `truncated`,
+    any other non-STOP reason (SAFETY, RECITATION, ...) -> `blocked`. Gemini counts thinking tokens
+    against maxOutputTokens, so a cap sized for the answer alone truncates it (2026-10-19)."""
+    reason = finish_reason(res.get('response'))
+    res['finish_reason'] = reason
+    if res.get('status') == 'done' and reason not in (None, 'STOP'):
+        res['status'] = 'truncated' if reason == 'MAX_TOKENS' else 'blocked'
+        res['message'] = (
+            f"finishReason {reason}: the answer is incomplete and must not be used as a full result. "
+            + ("Thinking counts toward maxOutputTokens: raise the cap or lower the thinking level, then make one new call."
+               if reason == 'MAX_TOKENS' else "Report it; do not retry unchanged.")
+        )
+    return res
+
+
 def call(provider: str, model: str, body: dict, purpose: str, surface: str = 'code',
          session: str | None = None, run_id: str | None = None, run_budget_usd: float | None = None,
-         timeout_ms: int = 120000, wait_seconds: int = 180, text_only: bool = False) -> dict:
+         timeout_ms: int = TIMEOUT_MS, wait_seconds: int | None = None, text_only: bool = False) -> dict:
     """
     One outside-model call through the doorway. Returns the `llm.result` row as a dict:
-    status (done | error | refused | lost | queued), text, response (when text_only is False),
-    usage, cost_usd, est_cost_usd, error, error_class, message (on a refusal).
+    status (done | truncated | blocked | error | refused | lost | queued), text, response (when
+    text_only is False), finish_reason, usage, cost_usd, est_cost_usd, error, error_class, message.
 
-    `refused` and `error` are returned, not raised: the caller reports them and stops;
-    a retry is a new, explicit call. Only transport failures raise DoorwayError.
+    `refused`, `error`, `truncated` and `blocked` are returned, not raised: the caller reports them
+    and stops; a retry is a new, explicit call that changes something. Only transport failures raise
+    DoorwayError.
     """
+    if wait_seconds is None:
+        wait_seconds = timeout_ms // 1000 + 30
     session = session or session_url()
     budget = 'NULL' if run_budget_usd is None else repr(float(run_budget_usd))
     rows = _query(
@@ -128,9 +160,13 @@ def call(provider: str, model: str, body: dict, purpose: str, surface: str = 'co
     while True:
         remaining = deadline - time.monotonic()
         wait = int(min(25, max(0, remaining)))
-        rows = _query(f"select llm.result('{call_id}'::uuid, {wait}, {'true' if text_only else 'false'}) as r", timeout=wait + 30)
+        # Always fetch the full response: the finish reason lives there.
+        rows = _query(f"select llm.result('{call_id}'::uuid, {wait}, false) as r", timeout=wait + 30)
         res = rows[0]['r']
         if res.get('status') != 'queued' or remaining <= 0:
+            res = _mark_finish(res)
+            if text_only:
+                res.pop('response', None)
             return res
 
 
@@ -142,3 +178,4 @@ def report_line(res: dict, what: str) -> str:
             f"{u.get('candidatesTokenCount', '?')} out ({u.get('thoughtsTokenCount', 0)} thinking), "
             f"${cost if cost is not None else res.get('est_cost_usd')}"
             + (f" — {res.get('message') or res.get('error')}" if res.get('status') != 'done' else ''))
+
