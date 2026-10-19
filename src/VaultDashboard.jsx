@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 
-const VAULT_URL = "https://script.google.com/macros/s/AKfycbwuseoPyb3kt1lajUFWgwwQJ9FZQo7tZY5Vt7U0-qZds8e_hJpAy9jP22QaKSWp-8BW/exec?format=json";
+// Portfolio-visible ideas only, served with the site (the VaultSync Apps Script feed is retired).
+export const VAULT_URL = "/vault.json";
 
 const STATUS_COLORS = {
   deployed: { bg: "#1a3a1a", text: "#6ee06e", border: "#2d5a2d" },

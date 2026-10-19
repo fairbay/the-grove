@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import VaultDashboard from "./VaultDashboard";
+import VaultDashboard, { VAULT_URL } from "./VaultDashboard";
 import Garden from "./App";
 import BookPage from "./BookPage";
 import ArticlePage from "./ArticlePage";
@@ -13,10 +13,9 @@ import ArticlePage from "./ArticlePage";
  * - /works/:slug → ArticlePage
  * - / (default) → The Grove walking garden
  *
- * Vault data fetched from VaultSync (Google Apps Script).
+ * Vault data: public/vault.json (portfolio-visible ideas only; VaultSync is retired).
  */
 
-const VAULT_URL = "https://script.google.com/macros/s/AKfycbwuseoPyb3kt1lajUFWgwwQJ9FZQo7tZY5Vt7U0-qZds8e_hJpAy9jP22QaKSWp-8BW/exec?format=json";
 
 function vaultToProjects(ideas) {
   return ideas
