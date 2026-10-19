@@ -24,7 +24,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'P=\"$HOME/.local/bin/session_handoff.py\"; if [ ! -f \"$P\" ]; then mkdir -p \"$(dirname \"$P\")\" && curl -fsSL -H \"Authorization: Bearer $GITHUB_PAT\" https://raw.githubusercontent.com/fairbay/ops/main/scripts/session_handoff.py -o \"$P\" 2>/dev/null; fi; [ -f \"$P\" ] && exec python3 \"$P\" inject; exit 0'"
+            "command": "sh -c ': fairbay-managed:entry-gate; R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; S=\"$R/.claude/skills/session-start/scripts/session_handoff.py\"; if ! command -v python3 >/dev/null 2>&1; then echo \"Entry and capture gates did not run: python3 not found.\"; elif [ ! -f \"$S\" ]; then echo \"Entry gate did not run: $S missing (skills not synced?).\"; else python3 \"$S\" inject || echo \"Entry gate failed (exit $?).\"; fi; exit 0'",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c ': fairbay-managed:capture; R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; S=\"$R/.claude/skills/chat-archive/scripts/capture_corrections.py\"; [ -f \"$S\" ] && command -v python3 >/dev/null 2>&1 && python3 \"$S\" >/dev/null 2>&1; exit 0'",
+            "timeout": 10
           }
         ]
       }
