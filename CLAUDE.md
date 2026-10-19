@@ -14,7 +14,7 @@ Nature-themed walking portfolio where each idea grows from seed to fruit-bearing
 - **Garden** (`src/App.jsx`) — Walking perspective with SVG plants, perspective projection, click-to-modal details.
 - **Vault Dashboard** (`/vault`) — Table view of all ideas with filters, sort, search.
 - **Router** (`src/GroveRouter.jsx`) — Routes between garden and vault, fetches data, maps vault fields to garden props.
-- **Data** (`public/vault.json`) — Only `portfolio_visible: true` entries appear in the garden. ⚠️ **Stale / v3 pending (2026-06-12):** the deployed code actually fetches a legacy Google Apps Script endpoint (Sheets-era), and `public/vault.json` is vestigial (last updated March). Both are two migrations behind Grove. Decision `fc99d106` replaces this data path wholesale in grove-site v3 with the anonymous Grove public-read API (`fairbay/grove` `docs/PLATFORM-SPEC.md` §8.2). No interim fix — the live site renders frozen data until v3 lands.
+- **Data** (`public/vault.json`) — Only `portfolio_visible: true` entries appear in the garden. ⚠️ **Stale / v3 pending (2026-06-12):** since 2026-10-19 the site reads `public/vault.json`, which holds only portfolio-visible ideas (Grove ruling f2e06613: nothing else may be public); the legacy VaultSync Apps Script feed is retired. Decision `fc99d106` replaces this data path wholesale in grove-site v3 with the anonymous Grove public-read API (`fairbay/grove` `docs/PLATFORM-SPEC.md` §8.2). No interim fix — the live site renders frozen data until v3 lands.
 
 ## Plant growth stages
 
@@ -33,7 +33,7 @@ Pink flowers = impact score. Red fruit = business score. Counts relative to the 
 
 ## Updating the portfolio
 
-⚠️ **Editing `public/vault.json` no longer affects the live site** — the deployed build fetches a legacy Apps Script endpoint, and v3 will replace the data path entirely. Until grove-site v3 ships, treat content updates as blocked-by-v3.
+**`public/vault.json` is the live data** (2026-10-19): only `portfolio_visible: true` ideas may go in it. v3 will replace the data path entirely.
 
 **v3 (planned, decision `fc99d106`):** the portfolio becomes data-driven from Grove's anonymous public-read API (`GET /api/public/portfolio`, spec'd in `fairbay/grove` `docs/PLATFORM-SPEC.md` §8.2) over category paths (`/apps`, `/papers`, …). Publishing an item = flip `portfolio_visible` in Grove. Architecture pass pending (idea `f5598938`).
 

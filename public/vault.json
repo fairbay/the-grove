@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "last_updated": "2026-03-10",
+  "version": 21,
+  "last_updated": "2026-04-15",
   "ideas": [
     {
       "title": "DateWeave",
@@ -13,18 +13,19 @@
         "PWA",
         "fun"
       ],
-      "impact_pct": 50,
-      "business_pct": 46,
+      "impact_pct": 54,
+      "business_pct": 33,
       "sustainability_pct": 78,
       "verdict": "Pass",
       "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-03-24",
       "key_insight": "Existing birthday apps focus on individual trivia. The relational cross-date magic — connecting your dates to people and history — is the unique angle.",
       "pivot_chosen": "",
       "deploy_url": "https://dateweave.vercel.app",
       "portfolio_visible": true,
-      "notes": "Built as first test of the Claude → PushCraft → Vercel pipeline.",
-      "hero_description": "Enter your birthday, add the people who matter, pick historical eras — and DateWeave weaves them together into surprising connections you never noticed."
+      "notes": "v5 re-score (2026-03-24). Built as first pipeline test. Deployment boosts impact but no business path.",
+      "hero_description": "Enter your birthday, add the people who matter, pick historical eras — and DateWeave weaves them together into surprising connections you never noticed.",
+      "id": "idea_badd0bea"
     },
     {
       "title": "PushCraft",
@@ -37,18 +38,23 @@
         "GitHub",
         "infrastructure"
       ],
-      "impact_pct": 61,
-      "business_pct": 50,
+      "impact_pct": 67,
+      "business_pct": 39,
       "sustainability_pct": 69,
       "verdict": "Public good",
       "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-04-08",
       "key_insight": "GitHub API supports CORS for authenticated requests — no backend needed.",
       "pivot_chosen": "",
       "deploy_url": "https://pushcraft.vercel.app",
       "portfolio_visible": true,
-      "notes": "v4: multi-file atomic commit, quick push, token persistence.",
-      "hero_description": "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push — all from your phone."
+      "notes": "v6.3: Multi-action stash. Vault-push proxy verified. PC+Chrome: autonomous code+vault. Phone: one-tap stash combining both.",
+      "hero_description": "The missing bridge between AI-generated code and production deployment. Scaffold, stage, push — all from your phone.",
+      "id": "idea_8a7f2ddd",
+      "op": "update",
+      "fields": {
+        "date_updated": "2026-03-22"
+      }
     },
     {
       "title": "RepairShield",
@@ -61,18 +67,19 @@
         "nonprofit",
         "traverse city"
       ],
-      "impact_pct": 76,
-      "business_pct": 59,
+      "impact_pct": 72,
+      "business_pct": 44,
       "sustainability_pct": 44,
-      "verdict": "Unicorn",
+      "verdict": "Public good",
       "date_added": "2026-02-24",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-03-24",
       "key_insight": "Habitat for Humanity Grand Traverse Region and Northwest Michigan Community Action Agency identified as local launch partners.",
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Scored Unicorn. Prioritizes repairs, connects homeowners with assistance programs.",
-      "hero_description": "Prioritizes which repairs matter most, connects homeowners with the right assistance programs, and helps nonprofits allocate limited repair budgets effectively."
+      "notes": "v5 re-score (2026-03-24). Biz floor-capped (avg 2.3). High impact, grant-funded space with no solo-builder revenue path.",
+      "hero_description": "Prioritizes which repairs matter most, connects homeowners with the right assistance programs, and helps nonprofits allocate limited repair budgets effectively.",
+      "id": "idea_9e37b35c"
     },
     {
       "title": "Crisis Cascade Navigator",
@@ -85,18 +92,19 @@
         "crisis",
         "public good"
       ],
-      "impact_pct": 81,
-      "business_pct": 38,
+      "impact_pct": 70,
+      "business_pct": 43,
       "sustainability_pct": 67,
       "verdict": "Public good",
       "date_added": "2026-02-24",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-03-24",
       "key_insight": "When you lose your job AND face eviction AND need medical care, the order you act in matters.",
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Highest impact score in the vault.",
-      "hero_description": "When you lose your job AND face eviction AND need medical care — the order you act in matters. This tool sequences the right moves for your specific jurisdiction."
+      "notes": "v5 re-score (2026-03-24). Biz floor-capped (avg 2.0). Highest depth in vault (8). Zero revenue path.",
+      "hero_description": "When you lose your job AND face eviction AND need medical care — the order you act in matters. This tool sequences the right moves for your specific jurisdiction.",
+      "id": "idea_aa852c81"
     },
     {
       "title": "Shelf Life",
@@ -108,18 +116,19 @@
         "prediction",
         "collectibles"
       ],
-      "impact_pct": 43,
-      "business_pct": 43,
+      "impact_pct": 41,
+      "business_pct": 35,
       "sustainability_pct": 37,
       "verdict": "Pass",
       "date_added": "2026-02-25",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-03-24",
       "key_insight": "Manufacturing errors, rapid branding changes, recalls, and discontinuations all leave digital footprints.",
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
       "notes": "Quick-scored: interesting concept but unclear demand signal.",
-      "hero_description": "Watches for manufacturing errors, rapid branding changes, recalls, and cultural moments that turn ordinary products into tomorrow's treasures."
+      "hero_description": "Watches for manufacturing errors, rapid branding changes, recalls, and cultural moments that turn ordinary products into tomorrow's treasures.",
+      "id": "idea_8cf76966"
     },
     {
       "title": "Storyweaver",
@@ -132,18 +141,19 @@
         "AI",
         "storytelling"
       ],
-      "impact_pct": 50,
-      "business_pct": 43,
+      "impact_pct": 56,
+      "business_pct": 35,
       "sustainability_pct": 50,
-      "verdict": "Pass",
+      "verdict": "Public good",
       "date_added": "2026-03-05",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-03-24",
       "key_insight": "The interactive fiction space is extremely crowded.",
       "pivot_chosen": "",
       "deploy_url": "https://story-lemon-iota.vercel.app",
       "portfolio_visible": true,
-      "notes": "Deployed. Quick-scored: crowded space.",
-      "hero_description": "AI-powered interactive fiction with procedural art, voice input, and 16 genre engines."
+      "notes": "v5 re-score (2026-03-24). Biz floor-capped (avg 2.3). Impact at exactly 56% — entirely deployment-driven. Pre-build baseline: 39%.",
+      "hero_description": "AI-powered interactive fiction with procedural art, voice input, and 16 genre engines.",
+      "id": "idea_b7a09ac8"
     },
     {
       "title": "Process Navigator",
@@ -156,18 +166,19 @@
         "processes",
         "public good"
       ],
-      "impact_pct": 61,
-      "business_pct": 52,
+      "impact_pct": 59,
+      "business_pct": 46,
       "sustainability_pct": 67,
       "verdict": "Public good",
       "date_added": "2026-02-25",
-      "date_updated": "2026-03-09",
+      "date_updated": "2026-03-24",
       "key_insight": "No tool combines interactive branching with community content for everyday process navigation.",
       "pivot_chosen": "",
       "deploy_url": "",
       "portfolio_visible": true,
-      "notes": "Could be the platform layer for Crisis Cascade Navigator.",
-      "hero_description": "Visual flow editor for building and sharing step-by-step processes."
+      "notes": "v5 re-score (2026-03-24). Biz floor passes (avg 3.0 exactly). Could be platform layer for Crisis Cascade Navigator.",
+      "hero_description": "Visual flow editor for building and sharing step-by-step processes.",
+      "id": "idea_da6fbad3"
     },
     {
       "title": "Stage Directions",
@@ -186,13 +197,20 @@
       "sustainability_pct": 96,
       "verdict": "Creative project",
       "date_added": "2026-03-09",
-      "date_updated": "2026-03-10",
+      "date_updated": "2026-03-23",
       "key_insight": "14 theatre concepts mapped to life skills, 30+ human expert voices curated by Claude. Burkeman-influenced style.",
       "pivot_chosen": "",
-      "deploy_url": "https://bayleemill.gumroad.com/l/stage-directions",
+      "deploy_url": "https://bayleemiller.org/books/stage-directions",
       "portfolio_visible": true,
-      "notes": "Published on Gumroad as pay-what-you-want. 14 chapters, ~11,700 words. Written by Claude, directed by Baylee Miller. Sustainability 96%: pure text, zero dependencies.",
-      "hero_description": "14 theatre concepts — from stage fright to improv — mapped to practical life skills. 30+ human experts. One honest AI."
+      "notes": "Published on Gumroad (pay-what-you-want) and bayleemiller.org. 14 chapters, ~11,700 words. Written by Claude, directed by Baylee Miller. Sustainability 96%. Epub download served from Vercel.",
+      "hero_description": "14 theatre concepts — from stage fright to improv — mapped to practical life skills. 30+ human experts. One honest AI.",
+      "id": "idea_a65172a7",
+      "op": "update",
+      "fields": {
+        "deploy_url": "https://bayleemiller.org/books/stage-directions",
+        "date_updated": "2026-03-22",
+        "notes": "Published on Gumroad (pay-what-you-want) and bayleemiller.org. 14 chapters, ~11,700 words. Written by Claude, directed by Baylee Miller. Sustainability 96%. Epub download served from Vercel."
+      }
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 **This file is intentionally thin.** State for this repo lives in Grove and the platform spec, not here:
 
-- **Current data-path status** — ⚠️ the live site renders frozen pre-migration data (deployed code fetches a legacy Google Apps Script endpoint; `public/vault.json` is vestigial). See CLAUDE.md.
+- **Current data-path status** — ⚠️ the live site reads `public/vault.json` (portfolio-visible ideas only, frozen data; VaultSync retired 2026-10-19). See CLAUDE.md.
 - **v3 plan** — grove-site v3 makes the portfolio data-driven from Grove's anonymous public-read API. Decision `fc99d106`; surface spec in `fairbay/grove` `docs/PLATFORM-SPEC.md` §8.2; architecture idea `f5598938` (category paths). Architect pass pending.
 - **Session handoffs** — `fairbay/ops/handoffs/` (the grove-site arc: `2026-06-12-grove-ecosystem-sequencing.yaml`).
 
