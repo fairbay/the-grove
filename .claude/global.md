@@ -334,6 +334,9 @@ MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add
 - **Repo tools** (`add_repo`, `list_repos`, `list_environments`) are unavoidable when needed — use them.
 - **Timers/triggers reserved** for the rare case Baylee explicitly asks for one.
 - **Vercel MCP connector token is read-only and returns 403 when listing a project's env vars.** It cannot confirm whether Baylee has added a secret. Ask Baylee in chat (one yes/no) instead of having a session probe for it.
+- **The Vercel connector cannot change a project** (`pause_project`, env vars: 403, observed 2026-10-19). What it can do: `get_project_deletion_link` gives Baylee a deep link to a project's Delete section, and `web_fetch_vercel_url` reads SSO-protected preview deployments, so a session can check a preview before merging. To take a dormant app's API offline without him, a `vercel.json` `redirects` entry for `/api/(.*)` stops every function before it runs (story#13, listing-lens-api#13).
+- **Routines created through the HTTP API cannot be fired by a session** (`fire_trigger` refuses them), and `create_trigger` here takes no `connectors`, so a session-made trigger cannot test a connector. To test a routine, ask Baylee to press Run now on claude.ai/code/routines; don't spend taps on trigger calls (2026-10-19).
+- **Moving an Apps Script project to Drive Trash does not stop its deployed web app** (it kept serving for at least 3 minutes, observed 2026-10-19). Remove the deployment or delete the project permanently.
 
 ## Web Fetches in Repo Sessions
 
