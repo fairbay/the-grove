@@ -14,10 +14,13 @@ Environment auto-detection:
   uses native git CLI through the authenticated git proxy — 1 network call.
   Otherwise, it falls back to the Git Data API — 6 network calls.
 
-Token resolution order (API path only):
-  1. $GITHUB_PAT env var — set from Claude memory edit in chat sessions
+Auth resolution (API path only):
+  1. $GITHUB_PAT env var (Routines that set one)
   2. $GITHUB_PAT_PATH env var (path to file holding token)
   3. /home/claude/github-pat.txt (dev fallback)
+  4. The session's agent proxy ($HTTPS_PROXY set): a placeholder token; the
+     proxy injects real credentials for repos attached with add_repo. This is
+     the chat path — no session reads the Vault PAT.
   In Routines, read_file/list_files/push_files auto-detect the local clone
   and read from disk — no token needed.
 """
@@ -182,8 +185,14 @@ def remote_url_to_owner_repo(clone_path):
 # Token + API (chat / non-clone path)
 # ---------------------------------------------------------------------------
 
+# Placeholder sent when the session's agent proxy injects real GitHub
+# credentials itself (claude.ai containers, attached repos). It is not a
+# secret and authorizes nothing on its own. Same value as scripts/sync.py.
+PROXY_TOKEN = "proxy-auth"
+
+
 def _token():
-    """Resolve GitHub PAT. In chat: set from memory edit via $GITHUB_PAT."""
+    """Resolve GitHub auth: an explicit PAT if one is set, else the session proxy."""
     if os.environ.get("GITHUB_PAT"):
         return os.environ["GITHUB_PAT"].strip()
     path = os.environ.get("GITHUB_PAT_PATH")
@@ -192,9 +201,11 @@ def _token():
     if os.path.exists(path):
         with open(path) as f:
             return f.read().strip()
+    if os.environ.get("HTTPS_PROXY"):
+        return PROXY_TOKEN
     raise RuntimeError(
-        "No GitHub PAT found. Set $GITHUB_PAT env var (from memory edit) "
-        "or $GITHUB_PAT_PATH. In Routines, use clone-aware functions instead."
+        "No GitHub auth: no agent proxy and no $GITHUB_PAT. In a claude.ai "
+        "container, attach the repo with add_repo first; never read the Vault PAT."
     )
 
 def api(method, path, body=None, _retries=8):

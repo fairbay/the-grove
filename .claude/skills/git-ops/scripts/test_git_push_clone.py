@@ -44,5 +44,31 @@ class CloneTests(unittest.TestCase):
         self.assertIn("not the target", str(cm.exception))
 
 
+class TokenTests(unittest.TestCase):
+    """2026-10-19: chat sessions read a write-scoped PAT from Vault; the proxy makes that unnecessary."""
+    KEYS = ("GITHUB_PAT", "GITHUB_PAT_PATH", "HTTPS_PROXY")
+
+    def _token(self, **env):
+        saved = {k: os.environ.pop(k, None) for k in self.KEYS}
+        os.environ.update(env)
+        try:
+            return git_push._token()
+        finally:
+            for k in self.KEYS:
+                os.environ.pop(k, None)
+                if saved[k] is not None:
+                    os.environ[k] = saved[k]
+
+    def test_explicit_pat_wins(self):
+        self.assertEqual(self._token(GITHUB_PAT=" ghp_x\n", HTTPS_PROXY="http://p"), "ghp_x")
+
+    def test_proxy_placeholder_without_pat(self):
+        self.assertEqual(self._token(GITHUB_PAT_PATH="/nonexistent", HTTPS_PROXY="http://p"), git_push.PROXY_TOKEN)
+
+    def test_no_auth_raises(self):
+        with self.assertRaises(RuntimeError):
+            self._token(GITHUB_PAT_PATH="/nonexistent")
+
+
 if __name__ == "__main__":
     unittest.main()

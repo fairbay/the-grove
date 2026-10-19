@@ -5,13 +5,13 @@ description: >
   "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
   Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-19-02"
+  version: "2026-10-19-03"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # git-ops — push, read, list, create, delete on GitHub
 
-Direct GitHub access via Git Data API or native git CLI. One commit per push, atomic. Works identically in Claude.ai chat (PAT-authenticated) and Claude Code (proxy-authenticated) — `scripts/git_push.py` auto-detects.
+Direct GitHub access via Git Data API or native git CLI. One commit per push, atomic. Works identically in Claude.ai chat and Claude Code (both proxy-authenticated for attached repos) — `scripts/git_push.py` auto-detects.
 
 ## When this fires
 
@@ -44,24 +44,19 @@ The diff URL is Baylee's review mechanism. Never push before presenting — `pre
 
 ### Claude.ai chat
 
-**PAT bootstrap (once per session).** The PAT is stored encrypted in
-Supabase Vault on the Grove project (`rhaueykqbtftaeosfldz`). Before the
-first git-ops call, bootstrap it:
+**No PAT.** The session's proxy authenticates GitHub for every repo attached
+to the session. **If you are about to read `GITHUB_PAT` from Supabase Vault
+(`vault.decrypted_secrets`), stop:** it puts a write-scoped token in the
+transcript, which the "never read a key" rule forbids, and the proxy makes it
+unnecessary.
 
-```python
-# Step 1 — Read PAT from Vault via Supabase MCP
-# Call: Supabase:execute_sql(project_id="rhaueykqbtftaeosfldz",
-#   query="SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'GITHUB_PAT';")
-# The result contains the decrypted PAT value.
-
-# Step 2 — Write to file (git_push.py reads this as fallback)
-import os
-with open("/home/claude/github-pat.txt", "w") as f:
-    f.write("<pat_value_from_step_1>")
-os.environ["GITHUB_PAT"] = "<pat_value_from_step_1>"
-```
-
-Then import the helper:
+1. Attach the repo: `add_repo(owner="fairbay", repo=<repo>, access="push")`
+   (`access="read"` for read-only work). Skip if it's already attached.
+2. For repeated reads or multi-file work, clone it shallow as the `add_repo`
+   result says, then `register_repo_root`. `push_files`/`read_file`/
+   `list_files` detect the clone and use native git through the proxy.
+   Without a clone they use the API with the proxy's credentials.
+3. Import the helper:
 
 ```python
 import sys
@@ -70,16 +65,15 @@ for _p in [".claude/skills/git-ops/scripts", "/mnt/skills/user/git-ops/scripts"]
 from git_push import push_files, read_file, list_files, delete_repo, api
 ```
 
-**Do NOT store the PAT in memory edits, chat messages, or committed
-files.** Vault is the single source of truth. To rotate, update the
-secret in the Supabase Dashboard (Settings → Vault) — no skill or
-memory edit changes needed.
+If `add_repo` is refused or missing, use the GitHub connector's tools if the
+session has them; otherwise tell Baylee which repo needs attaching. Never
+fall back to a stored token.
 
 ### Claude Code / Routines
 
 The repo is cloned and the git proxy handles auth. `push_files`, `read_file`, and `list_files` auto-detect the local clone and use the native git CLI — no PAT setup needed. The interface is identical to the chat path.
 
-Token resolution order (chat path only): `$GITHUB_PAT` env var → `$GITHUB_PAT_PATH` → `/home/claude/github-pat.txt`.
+API-path auth order: `$GITHUB_PAT` env var → `$GITHUB_PAT_PATH` → `/home/claude/github-pat.txt` → the session proxy (placeholder token; the proxy injects credentials for attached repos).
 
 ## The five operations
 
@@ -193,9 +187,8 @@ Placed near the operations above, summarized here:
 
 ## Secret hygiene
 
-- The PAT lives in **Supabase Vault** (Grove project, `rhaueykqbtftaeosfldz`, secret name `GITHUB_PAT`). Encrypted at rest via pgsodium. NOT in memory edits, NOT in this skill, NOT in commits, NOT in user-visible output.
-- If it leaks, rotate at https://github.com/settings/personal-access-tokens and update the Vault secret in the Supabase Dashboard (Settings → Vault). No skill rebuild needed. Also update the `GH_PAT` GitHub Actions secret on `fairbay/ops`.
-- In Claude Code / Routines, the proxy handles auth — no token is stored or transmitted by the skill.
+- No session handles the GitHub PAT. Chat and Code go through the session proxy (attached repos); Routines use their clone. The PAT's remaining homes are the `GH_PAT` Actions secret on `fairbay/ops` (the sync workflow) and any Routine environment that sets `GITHUB_PAT`.
+- To rotate it, make a new token at https://github.com/settings/personal-access-tokens, update `GH_PAT` (https://github.com/fairbay/ops/settings/secrets/actions) and the Routine environments, then revoke the old one.
 
 ## Integration
 

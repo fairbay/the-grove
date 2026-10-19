@@ -82,12 +82,21 @@ def _body_sql(body: dict) -> str:
 
 
 def session_url() -> str | None:
-    """The session's address when the harness provides one; otherwise None."""
-    for k in ('CLAUDE_SESSION_URL', 'CLAUDE_SESSION', 'CLAUDE_CODE_SESSION_ID'):
+    """The session's address when the harness provides one; otherwise None.
+
+    A cloud Code session exposes its id as CLAUDE_CODE_REMOTE_SESSION_ID=cse_<x>; its URL is
+    https://claude.ai/code/session_<x>, the form llm.spend_by_session lookups match (Grove 005d19e7).
+    CLAUDE_CODE_SESSION_ID is only the local transcript id, so it is the last resort.
+    """
+    for k in ('CLAUDE_SESSION_URL', 'CLAUDE_SESSION'):
         v = os.environ.get(k)
         if v:
             return v if v.startswith('http') else f'session:{v}'
-    return None
+    remote = os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID', '').strip()
+    if remote:
+        return f"https://claude.ai/code/session_{remote.removeprefix('cse_').removeprefix('session_')}"
+    local = os.environ.get('CLAUDE_CODE_SESSION_ID')
+    return f'session:{local}' if local else None
 
 
 def default_model(job: str = 'review') -> str:

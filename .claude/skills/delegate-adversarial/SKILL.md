@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-19-04"
+  version: "2026-10-19-05"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
