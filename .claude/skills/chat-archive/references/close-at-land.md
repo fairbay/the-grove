@@ -147,12 +147,13 @@ Order matters: draft first, then the owner task, so the line names a real number
    `.claude/policy.json` carries a `harness` note (a Code data session's
    apply, publish and merge are refused by the auto-mode classifier until a
    user message names the exact action), the archive writes the next session's
-   Go sentence into the Next-step line verbatim, as the policy's note states it
-   (MBN: *"Go: live-check, apply and publish mNNNN if the independent check
-   passes; open the code-half PR from main and squash-merge it when its checks
-   are green; archive."*), with the batch id filled in. Baylee's opening
-   message then carries his consent and the next session asks no blocking
-   question at start. What the Go covers changes only by his ruling; a refusal
+   Go sentence into the Next-step line verbatim, as the policy's `harness.go`
+   states it (MBN: *"Go: live-check, apply and publish mNNNN if the independent
+   check passes; open the code-half PR from main and squash-merge it when its
+   checks are green; archive."*), the batch id filled in; when the next session
+   is not a data batch (a library session, a build), the line names that work
+   and no Go. Baylee's opening message then carries his consent and the next
+   session asks no blocking question at start. What the Go covers changes only by his ruling; a refusal
    after it falls back to the tap and is counted (S2).
 
 ## Merge request (§7.2)
@@ -171,8 +172,10 @@ Order matters: draft first, then the owner task, so the line names a real number
    platform allows it; a refused merge call falls back to the tap.
 
    **Ruled upkeep merges without a tap** (Baylee, 2026-10-19, adjudication
-   ffea5247; `policy: upkeep` in the repo's `.claude/policy.json`), in any
-   repo, when all three hold:
+   ffea5247; `policy: upkeep` in the repo's `.claude/policy.json`) in a
+   `merge_policy: policy` or `self` repo, when all three hold; a `tap` repo, or
+   one whose policy file is missing (pr_state reports the fallback), keeps the
+   tap for every PR:
    1. The PR only carries out a ruling Baylee already made, or is upkeep: a fix,
       cleanup or follow-up to what already shipped, with no change of direction.
    2. It was verified: row G3 with the checks green, and in a `deploy_check:
@@ -183,7 +186,8 @@ Order matters: draft first, then the owner task, so the line names a real number
 
    Then skip the question and go to step 3, and name the ruling (card ID) or the
    upkeep in the report line. A new design, a new feature, a change of direction,
-   or a ruling read past its plain words keeps the tap (`policy: direction`).
+   or a ruling read past its plain words keeps the tap (`policy: direction`,
+   `policy: owner_context`).
    When the session has nothing else ongoing or planned, ask "Archive now?"
    after the merge instead. In a Code session the auto-mode classifier may
    refuse the merge call: the refusal falls back to the tap, is counted in the

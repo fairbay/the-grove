@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-20-01"
+  version: "2026-10-20-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -429,8 +429,10 @@ confirmation.
 Proceeding means the briefing message and the first work step are in the same
 turn: after the briefing text, make the first tool call of the work (branch,
 first read) before ending the turn. Never end a turn on "starting now". If the
-work needs a go for a live or outward step (a repo rule such as MBN DATA-WORK
-"Ask for the go once, at the start"), ask it in that same turn with
+work needs a Go for a live or outward step (a repo whose `.claude/policy.json`
+has a `harness` note, such as MBN), the Go arrived in Baylee's opening message:
+the previous archive wrote it into its Next-step line (close-at-land step 8).
+Only when the opening message carries no Go, ask it once in that same turn with
 AskUserQuestion and continue on the answer.
 
 ## Anti-patterns

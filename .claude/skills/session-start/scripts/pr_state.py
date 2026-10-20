@@ -195,11 +195,18 @@ def resolve_merge_policy(policy: dict, routing: dict | None, routing_error: str 
         return policy
     if declared == "policy":
         policy["merge_policy_declared"] = "policy"
-        if isinstance(routing, dict) and routing.get("classes"):
+        classes = routing.get("classes") if isinstance(routing, dict) else None
+        if isinstance(classes, dict) and "upkeep" in classes and "direction" in classes:
             policy["routing"] = routing
         else:
             policy["merge_policy"] = "tap"
-            policy["merge_policy_fallback"] = routing_error or ".claude/policy.json missing; merge_policy: policy falls back to tap"
+            if routing_error:
+                reason = routing_error
+            elif routing is None:
+                reason = ".claude/policy.json missing"
+            else:
+                reason = ".claude/policy.json has no upkeep and direction classes"
+            policy["merge_policy_fallback"] = reason
     return policy
 
 
@@ -207,14 +214,14 @@ def load_routing_policy(c: Client, default_branch: str):
     """The repo's .claude/policy.json as a dict, or (None, reason)."""
     meta = c.get_404_ok(f"/repos/{c.repo}/contents/.claude/policy.json?ref={default_branch}")
     if not meta or "content" not in meta:
-        return None, ".claude/policy.json missing; merge_policy: policy falls back to tap"
+        return None, ".claude/policy.json missing"
     text = base64.b64decode(meta["content"]).decode("utf-8", "replace")
     try:
         data = json.loads(text)
     except ValueError as e:
-        return None, f".claude/policy.json does not parse ({e}); merge_policy: policy falls back to tap"
+        return None, f".claude/policy.json does not parse ({e})"
     if not isinstance(data, dict) or not isinstance(data.get("classes"), dict):
-        return None, ".claude/policy.json has no classes map; merge_policy: policy falls back to tap"
+        return None, ".claude/policy.json has no classes map"
     return data, None
 
 
@@ -570,7 +577,7 @@ def to_table(rep: dict) -> str:
         lines.append("- Policy: unconfigured (no .claude/landing.yaml; defaults)")
     pol = rep.get("policy") or {}
     if pol.get("merge_policy_fallback"):
-        lines.append(f"- Policy: merge_policy falls back to tap — {pol['merge_policy_fallback']}")
+        lines.append(f"- Policy: merge_policy {pol.get('merge_policy_declared')!r} falls back to tap: {pol['merge_policy_fallback']}")
     elif pol.get("merge_policy") == "policy":
         ver = (pol.get("routing") or {}).get("version")
         lines.append(f"- Policy: merge_policy policy (.claude/policy.json v{ver}; ruled upkeep merges itself, direction keeps the tap)")

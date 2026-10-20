@@ -95,9 +95,9 @@ and can be manually merged.
 - `self` (ops): `push_and_merge()` for small infrastructure changes, as above.
 - `policy` (MBN): the repo's `.claude/policy.json` decides — ruled upkeep
   merges itself under close-at-land's three conditions (`policy: upkeep`), a
-  change of direction keeps the tap (`policy: direction`); the file missing
-  falls back to `tap`.
-- `tap` (product repos without a policy file), or any work spanning more than one turn: a
+  change of direction keeps the tap (`policy: direction`); with the file
+  missing pr_state reports the fallback and every PR keeps the tap.
+- `tap` (a product repo without a policy file; every PR keeps the tap), or any work spanning more than one turn: a
   draft PR plus an owner task when the work starts, and close-at-land to hand it
   off (chat-archive `references/close-at-land.md`). Never mark such a PR ready
   any other way.
