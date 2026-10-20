@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-20-03"
+  version: "2026-10-20-05"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -381,7 +381,8 @@ Two paths depending on what this session touched:
 
 - **Build handoff** — session involved code changes in a product repo.
   Write `HANDOFF.yaml` at the repo root. Work in a PR: the handoff rides the
-  close-at-land commit (`references/close-at-land.md`), not a later push. See `references/handoff-schema.md`
+  close-at-land commit (`references/close-at-land.md`), not a later push, and is not
+  pushed while `session_handoff.py measure` fails (S8). See `references/handoff-schema.md`
   for the YAML schema, CLAUDE.md maintenance, and the no-blurb convention.
 - **Session-only work** (audits, skill updates, research, architectural
   decisions not tied to a single build) — no separate handoff file. The

@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-20-02"
+  version: "2026-10-20-03"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -487,8 +487,8 @@ AskUserQuestion and continue on the answer.
   are the briefing's data source — the store of record for project memory.
 - **↔ Claude Code:** On the Claude Code surface the entry gate is a SessionStart
   hook (this skill's `scripts/session_handoff.py inject`, an entry managed by
-  fairbay/ops) that injects the same handoffs as
-  `additionalContext` before the first turn. Handoffs flow either direction;
+  fairbay/ops) that injects the same handoffs, and the decision table of
+  `.claude/policy.json`, as `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
 - **← pr_state.py:** Phase 0 runs this skill's `scripts/pr_state.py report` (land-and-leave
   entry gate, `ops/docs/land-and-leave-SPEC.md` §7.5, §10).

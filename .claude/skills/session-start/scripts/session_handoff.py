@@ -13,15 +13,26 @@ Commands:
                  (pr_state.py report --table, at most 15 rows), and HANDOFF.yaml's
                  meta, next and carried_forward;
                compact / resume: notes and next + carried_forward, no network.
+             Every source also gets the decision table from .claude/policy.json
+             (fairbay/ops docs/decision-routing/DESIGN.md §2), placed under the
+             handoff; its room is reserved first, so the handoff is what gets cut.
              The whole payload stays under Claude Code's 10,000-character cap,
              measured on the serialized JSON. It never blocks: a failure becomes
              a note line ("PR gate unavailable", "Entry gate error", ...) and the
              command exits 0. It also makes sure the capture queue is git-ignored
              (chat-archive's capture_corrections.ensure_excluded).
 
+    measure  Signal S8 (DESIGN.md §4): composes the startup payload with a
+             synthetic worst-case PR table (PR_TABLE_ROWS rows) and the repo's own
+             HANDOFF.yaml and policy.json, and prints one JSON line: payload size,
+             the sections and characters cut. Exit 1 when anything is cut, else 0.
+             policy-check.mjs runs it; the archive's handoff write runs it too.
+
     write    EXIT-gate helper. Reads a handoff body as JSON on stdin, stamps
              meta.surface / meta.generated / meta.project, carries unfinished
-             `next:` items forward, and writes <repo>/HANDOFF.yaml. Session state
+             `next:` items forward (a parked item counts as accounted for; a body
+             without `parked:` keeps the prior list), and writes <repo>/HANDOFF.yaml.
+             Exit 1 after writing when `measure` fails: the S8 backstop. Session state
              lives in Grove; there is no session-handoff path any more.
 
 Stdlib only, except that `write` uses PyYAML when present (JSON otherwise, which
@@ -43,8 +54,10 @@ RESERVE = 300              # room for the closing line and JSON overhead drift
 GIT_TIMEOUT = 5
 PR_STATE_TIMEOUT = 20
 PR_TABLE_ROWS = 15
+NOTE_RESERVE = "Note: " + "n" * 294  # S8's allowance for entry notes (measure only)
 PR_STATE = Path(".claude/skills/session-start/scripts/pr_state.py")
 CAPTURE = Path(".claude/skills/chat-archive/scripts/capture_corrections.py")
+POLICY = Path(".claude/policy.json")
 FULL_SOURCES = (None, "startup", "clear", "fork")
 INJECTED_KEYS = ("meta", "next", "carried_forward")
 SECTION_START = re.compile(r"^([a-z_]+):")
@@ -135,6 +148,29 @@ def _capture_note(root: Path):
     return None if ok else f"Capture queue could not be excluded: {reason}"
 
 
+def _decision_table(root: Path):
+    """(text or None, note or None) for the decision table in .claude/policy.json.
+    No file: (None, None); the repo has no routing policy yet."""
+    path = root / POLICY
+    if not path.is_file():
+        return None, None
+    try:
+        pol = json.loads(path.read_text(encoding="utf-8"))
+        rows = pol["decision_table"]
+        lines = [f"Decision table ({POLICY} v{pol.get('version', '?')}; first yes routes the change; "
+                 f"classes and routes in the file):"]
+        n = 0
+        for r in rows:
+            if "else" in r:
+                lines.append(f"- else: {r['else']}")
+            else:
+                n += 1
+                lines.append(f"{n}. {r['q']} → {r['then']}")
+        return "\n".join(lines), None
+    except Exception as e:
+        return None, f"Decision table unavailable: {POLICY} does not parse ({type(e).__name__})"
+
+
 def _sections(text: str) -> dict:
     """Top-level sections of a YAML handoff, by column-0 `key:` lines. Comments,
     the `# Handoff:` title and column-0 `- ` items stay with the current section."""
@@ -183,8 +219,17 @@ def _fit(parts: list[str], extra: str, limit: int) -> tuple[str, bool]:
     return "", True
 
 
-def _compose(slug: str, source, notes: list[str], table, handoff) -> str:
+def _compose(slug: str, source, notes: list[str], table, handoff, decision=None) -> str:
+    return _compose_stats(slug, source, notes, table, handoff, decision)[0]
+
+
+def _compose_stats(slug: str, source, notes: list[str], table, handoff, decision=None):
+    """(payload text, stats). stats: cut (sections cut short), omitted (sections
+    left out), chars_cut (characters of handoff text that did not make it in)."""
     limit = MAX_CONTEXT_CHARS - RESERVE
+    if decision:  # its room comes first: the table is never the part that is cut
+        limit -= _size("\n\n" + decision) - 2
+    stats = {"cut": [], "omitted": [], "chars_cut": 0}
     full = source in FULL_SOURCES
     if full:
         head = (
@@ -209,6 +254,8 @@ def _compose(slug: str, source, notes: list[str], table, handoff) -> str:
             while block and _size("\n\n".join(parts + [block])) > limit:
                 block = block[: int(len(block) * 0.9)]
             if block != f"### {name}\n{text}":
+                stats["cut"].append(name)
+                stats["chars_cut"] += len(f"### {name}\n{text}") - len(block)
                 block += "\n[truncated: read the file]"
             parts.append(block)
         else:
@@ -217,6 +264,10 @@ def _compose(slug: str, source, notes: list[str], table, handoff) -> str:
                 if k not in secs:
                     continue
                 added, cut = _fit(parts, secs[k], limit)
+                if cut:
+                    kept = added[: -len("\n  (cut; read HANDOFF.yaml)")] if added else ""
+                    stats["chars_cut"] += len(secs[k]) - len(kept)
+                    (stats["cut"] if added else stats["omitted"]).append(k)
                 if added:
                     parts.append(added)
                 else:
@@ -227,7 +278,9 @@ def _compose(slug: str, source, notes: list[str], table, handoff) -> str:
         parts.append("No HANDOFF.yaml in this repo.")
     if omitted:
         parts.append(f"Omitted for space: {', '.join(omitted)}; read the handoff file.")
-    return "\n\n".join(parts)
+    if decision:
+        parts.append(decision)
+    return "\n\n".join(parts), stats
 
 
 def _emit(context: str) -> None:
@@ -265,11 +318,57 @@ def cmd_inject() -> int:
             table, note = _pr_gate_table(root, slug)
             if note:
                 notes.append(note)
-        context = _compose(slug, source, notes, table, _read_handoff(root))
+        decision, note = _decision_table(root)
+        if note:
+            notes.append(note)
+        context = _compose(slug, source, notes, table, _read_handoff(root), decision)
     except Exception as e:
         context = f"Note: Entry gate error: {type(e).__name__}. Run the session-start skill."
     _emit(context)
     return 0
+
+
+def _worst_case_table(root: Path, slug: str) -> str:
+    """A PR_TABLE_ROWS-row table in pr_state.py's own format, every row as long as
+    a real row gets: an owned draft (the longest extra), a 60-character title, the
+    policy line and a G2 line above it."""
+    spec = importlib.util.spec_from_file_location("pr_state", root / PR_STATE)
+    ps = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ps)
+    longest = max(ps.ROW_TEXT, key=lambda k: len(k) + len(ps.ROW_TEXT[k]))
+    pr = {"number": 9999, "row": longest, "state": "D-owned", "checks": "Billing-failed",
+          "head_age_days": 999.9, "recommendation": "close_and_upgrade_task", "owner_required": True,
+          "majors": ["@playwright/test 1.99.0→2.0.0", "@supabase/supabase-js 2.99.0→3.0.0"],
+          "title": "W" * 80}
+    rep = {"repo": f"fairbay/{slug}", "checked_at": "2026-01-01T00:00:00Z", "reachable": True,
+           "policy_source": "landing.yaml",
+           "policy": {"merge_policy_declared": "policy", "merge_policy_fallback": "x" * 160},
+           "default_head": {"row": "G2", "sha": "0" * 40, "deploy_state": "failure",
+                            "redeploy": "npm run site:publish"},
+           "prs": [dict(pr) for _ in range(PR_TABLE_ROWS + 1)]}
+    return _cap_table(ps.to_table(rep))
+
+
+def _measure(root: Path) -> dict:
+    slug = _repo_slug(root)
+    try:
+        table = _worst_case_table(root, slug)
+    except Exception as e:
+        return {"ok": False, "error": f"worst-case table: {type(e).__name__}: {e}"}
+    decision, note = _decision_table(root)
+    notes = [note] if note else []
+    notes += [NOTE_RESERVE]  # the entry gate's own notes (capture, PR gate) take about this much
+    text, stats = _compose_stats(slug, "startup", notes, table, _read_handoff(root), decision)
+    size = _size(text)
+    ok = not stats["cut"] and not stats["omitted"] and size <= MAX_CONTEXT_CHARS - RESERVE
+    return {"ok": ok, "size": size, "limit": MAX_CONTEXT_CHARS - RESERVE,
+            "decision_table": bool(decision), **stats}
+
+
+def cmd_measure() -> int:
+    res = _measure(_repo_root())
+    print(json.dumps(res, ensure_ascii=False))
+    return 0 if res["ok"] else 1
 
 
 def _to_yaml(obj) -> str:
@@ -335,6 +434,11 @@ def _carry_forward(body: dict, dest: Path) -> dict:
     if not prior:
         return body
 
+    # `parked:` is a list the schema keeps until a session clears it: a body that
+    # omits the key keeps the prior list (an empty list clears it).
+    if "parked" not in body and isinstance(prior.get("parked"), list) and prior["parked"]:
+        body["parked"] = prior["parked"]
+
     # Prior `next:` AND prior `carried_forward:` are both live queues — an item
     # already carried once must keep surviving until it's done or dropped.
     prior_next = []
@@ -347,11 +451,11 @@ def _carry_forward(body: dict, dest: Path) -> dict:
 
     # Everything the incoming handoff accounts for.
     resolved = set()
-    for key in ("done", "dropped", "next", "carried_forward"):
+    for key in ("done", "dropped", "next", "carried_forward", "parked"):
         vals = body.get(key) or []
         if isinstance(vals, list):
             for v in vals:
-                resolved.add(_norm(v))
+                resolved.add(_norm(v))  # a parked {item, location} normalizes by its item
 
     # Words too common to signal that two items are the same work.
     _STOP = {
@@ -450,6 +554,14 @@ def cmd_write() -> int:
 
     dest.write_text(text, encoding="utf-8")
     print(str(dest))
+    # S8 backstop (decision routing): the file is written, but the exit says not to push it
+    # while the entry hook would cut it. Repos without a PR gate script skip the check.
+    if (root / PR_STATE).is_file():
+        res = _measure(root)
+        if not res["ok"]:
+            sys.stderr.write(f"S8: do not push this handoff: {json.dumps(res, ensure_ascii=False)}. "
+                             "Keep 3-5 next: items and park the rest with a location.\n")
+            return 1
     return 0
 
 
@@ -459,7 +571,9 @@ def main(argv: list[str]) -> int:
         return cmd_inject()
     if cmd == "write":
         return cmd_write()
-    sys.stderr.write("usage: session_handoff.py <inject|write>\n")
+    if cmd == "measure":
+        return cmd_measure()
+    sys.stderr.write("usage: session_handoff.py <inject|measure|write>\n")
     return 0  # never non-zero — callable from a hook context
 
 
