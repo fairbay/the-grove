@@ -54,6 +54,10 @@ Rung 3 is the expected operating mode for most decisions. The ladder exists to e
 
 **Low-confidence surfacing:** Whenever presenting work that rests on a low-confidence decision (inline plan, briefing, chat-status, review output, or mid-build), flag it inline with its alternatives as a non-blocking FYI. Don't bury low-confidence calls inside otherwise-confident output — surface them where the reader encounters the dependent work. This applies in every skill's output, not just session-start orientation.
 
+## Design Inside an Existing Rule Set
+
+**Design inside an existing rule set (Baylee, 2026-10-11; decision 4fc29627; wording approved 2026-10-20).** Applies to any design or redesign — a product feature, a workflow, a skill, a schema, a rule section — on any surface. (1) **Design clean.** Start from the task's needs, what already exists, and the tools at hand, as if no rule or earlier ruling existed. (2) **Pass the whole rule set over it**, read in full by a reviewer who did not write the design (a fresh-context sub-agent by default; an outside model only where the review gates call for one). Sort each rule that bears: *enforce* (the design changes), *adjust* (the rule changes — say what it was for and why that no longer holds), *met*, *unclear*. List the gaps and weaknesses the rules expose. (3) **Work the side with the most glaring open item** — design or rules — and switch sides when the next one is on the other. (4) **Repeat until the package holds together**, then present it as one proposal with its pass counts. Earlier rulings are evidence of a problem that once existed, not constraints: never apply one unexamined, never drop one silently; departures are stated in the proposal, not held one at a time. Rules stay binding for execution work that is not a design or redesign, and what a user of a live product sees still waits for Baylee's OK.
+
 ## Delegation Routing
 
 Before escalating any question to Baylee, determine if it can be routed to a specialist:
