@@ -178,6 +178,46 @@ def parse_policy_yaml(text: str) -> dict:
     return data
 
 
+MERGE_POLICIES = ("tap", "self", "policy")
+# tap: Baylee's tap merges every PR. self: the session merges its own PRs. policy: the repo's
+# .claude/policy.json decides (fairbay/ops docs/decision-routing/DESIGN.md §2): the session merges
+# ruled upkeep itself and keeps the tap for a change of direction. When that file is missing or
+# does not parse, `policy` falls back to `tap` and the report says so.
+
+
+def resolve_merge_policy(policy: dict, routing: dict | None, routing_error: str | None = None) -> dict:
+    """Normalise merge_policy against MERGE_POLICIES and attach the routing policy (or the fallback reason)."""
+    declared = policy.get("merge_policy")
+    if declared not in MERGE_POLICIES:
+        policy["merge_policy_declared"] = declared
+        policy["merge_policy"] = "tap"
+        policy["merge_policy_fallback"] = f"unknown merge_policy {declared!r}; one of {', '.join(MERGE_POLICIES)}"
+        return policy
+    if declared == "policy":
+        policy["merge_policy_declared"] = "policy"
+        if isinstance(routing, dict) and routing.get("classes"):
+            policy["routing"] = routing
+        else:
+            policy["merge_policy"] = "tap"
+            policy["merge_policy_fallback"] = routing_error or ".claude/policy.json missing; merge_policy: policy falls back to tap"
+    return policy
+
+
+def load_routing_policy(c: Client, default_branch: str):
+    """The repo's .claude/policy.json as a dict, or (None, reason)."""
+    meta = c.get_404_ok(f"/repos/{c.repo}/contents/.claude/policy.json?ref={default_branch}")
+    if not meta or "content" not in meta:
+        return None, ".claude/policy.json missing; merge_policy: policy falls back to tap"
+    text = base64.b64decode(meta["content"]).decode("utf-8", "replace")
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        return None, f".claude/policy.json does not parse ({e}); merge_policy: policy falls back to tap"
+    if not isinstance(data, dict) or not isinstance(data.get("classes"), dict):
+        return None, ".claude/policy.json has no classes map; merge_policy: policy falls back to tap"
+    return data, None
+
+
 def load_policy(c: Client, default_branch: str):
     meta = c.get_404_ok(f"/repos/{c.repo}/contents/.claude/landing.yaml?ref={default_branch}")
     if not meta or "content" not in meta:
@@ -188,7 +228,10 @@ def load_policy(c: Client, default_branch: str):
     policy["bot_prs"] = {**DEFAULT_POLICY["bot_prs"], **(policy.get("bot_prs") or {})}
     for k in ("pre_ready", "ci_checks"):
         policy[k] = policy.get(k) or []
-    return policy, "file"
+    routing, err = (None, None)
+    if policy.get("merge_policy") == "policy":
+        routing, err = load_routing_policy(c, default_branch)
+    return resolve_merge_policy(policy, routing, err), "file"
 
 
 # --- facts per commit / PR -----------------------------------------------------
@@ -525,6 +568,12 @@ def to_table(rep: dict) -> str:
         return "\n".join(lines)
     if rep["policy_source"] == "default":
         lines.append("- Policy: unconfigured (no .claude/landing.yaml; defaults)")
+    pol = rep.get("policy") or {}
+    if pol.get("merge_policy_fallback"):
+        lines.append(f"- Policy: merge_policy falls back to tap — {pol['merge_policy_fallback']}")
+    elif pol.get("merge_policy") == "policy":
+        ver = (pol.get("routing") or {}).get("version")
+        lines.append(f"- Policy: merge_policy policy (.claude/policy.json v{ver}; ruled upkeep merges itself, direction keeps the tap)")
     dh = rep["default_head"]
     if dh and dh["row"]:
         lines.append(f"- G2 {ROW_TEXT['G2']}: {dh['sha'][:7]} Vercel {dh['deploy_state']}; remedy `{dh['redeploy']}`")

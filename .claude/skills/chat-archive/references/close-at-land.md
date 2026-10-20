@@ -143,6 +143,18 @@ Order matters: draft first, then the owner task, so the line names a real number
 8. **Next-step line:** "#n is ready. Merge to land it: <link>." From here the chat
    can be dropped. Then go to the merge request below; the session itself goes on.
 
+   **The Go sentence rides in the Next-step line.** When the repo's
+   `.claude/policy.json` carries a `harness` note (a Code data session's
+   apply, publish and merge are refused by the auto-mode classifier until a
+   user message names the exact action), the archive writes the next session's
+   Go sentence into the Next-step line verbatim, as the policy's note states it
+   (MBN: *"Go: live-check, apply and publish mNNNN if the independent check
+   passes; open the code-half PR from main and squash-merge it when its checks
+   are green; archive."*), with the batch id filled in. Baylee's opening
+   message then carries his consent and the next session asks no blocking
+   question at start. What the Go covers changes only by his ruling; a refusal
+   after it falls back to the tap and is counted (S2).
+
 ## Merge request (§7.2)
 
 1. Read the PR's row: `pr_state.py report --repo fairbay/<repo>` (row for #n).
@@ -159,7 +171,8 @@ Order matters: draft first, then the owner task, so the line names a real number
    platform allows it; a refused merge call falls back to the tap.
 
    **Ruled upkeep merges without a tap** (Baylee, 2026-10-19, adjudication
-   ffea5247), in any repo, when all three hold:
+   ffea5247; `policy: upkeep` in the repo's `.claude/policy.json`), in any
+   repo, when all three hold:
    1. The PR only carries out a ruling Baylee already made, or is upkeep: a fix,
       cleanup or follow-up to what already shipped, with no change of direction.
    2. It was verified: row G3 with the checks green, and in a `deploy_check:
@@ -170,8 +183,17 @@ Order matters: draft first, then the owner task, so the line names a real number
 
    Then skip the question and go to step 3, and name the ruling (card ID) or the
    upkeep in the report line. A new design, a new feature, a change of direction,
-   or a ruling read past its plain words keeps the tap. When the session has
-   nothing else ongoing or planned, ask "Archive now?" after the merge instead.
+   or a ruling read past its plain words keeps the tap (`policy: direction`).
+   When the session has nothing else ongoing or planned, ask "Archive now?"
+   after the merge instead. In a Code session the auto-mode classifier may
+   refuse the merge call: the refusal falls back to the tap, is counted in the
+   session record (signal S2), and is never re-worded mid-session.
+
+   **A green non-major bot PR rides in the same question.** When the gate shows
+   a G9 row (Dependabot, green, no major bump), fold it into this session's one
+   merge question ("Merge #n and Dependabot #m?") or into the ruled-upkeep merge
+   above; never a separate offer or a separate tap. G10–G12 keep their own
+   gate rows.
 
    **Merge and archive** (Baylee, 2026-10-18). When the session has no other
    work ongoing or planned once this PR lands (it was the last item, or the
