@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-20-06"
+  version: "2026-10-20-07"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -233,6 +233,15 @@ found, skip — don't mention permissions in the summary.
 `conversation_search`), create a memory edit or Grove task to track it.
 One-time grants don't need encoding — the summary is sufficient.
 
+#### 3e. Session record (refusal: no close without it)
+
+Before the summary, log the session-record decision (`references/session-record.md`,
+"The record"): asks, refusals, merges (Code with `report.py --routing`, else
+self-reported), the rung-3 call ids, the random fifth picked from them (printed
+in Step 4 and 9b), cards and tasks for Baylee. **No summary or Next-step line
+until its id is in hand.** If Grove refuses twice, the record JSON goes into
+the handoff's `pending_record:` (Phase 0 logs it) and the archive says so.
+
 ### 4. Session summary
 
 **Gate: read back before summarizing.** Verify via tool calls what actually
@@ -253,7 +262,7 @@ Concise, scannable:
 - **Key decisions** — architectural choices, ideas shelved/killed, strategy
   shifts. These feed `decisions_made:` in the handoff (Step 9).
 - **What didn't work** — failed approaches worth remembering
-- **Calls to check (random fifth)** — from Step 7b, one line each with
+- **Calls to check (random fifth)** — from Step 3e, one line each with
   "reply 'reverse <id>' to undo"
 - **Permissions & setup gaps** (from 3d, only if any) — what Claude
   requested permission for, what was missing, and the specific settings
@@ -331,14 +340,6 @@ One line in the Step 4 summary and the Grove session line (9b): sub-agents by mo
 regenerations, review passes, outside-model calls/refusals/dollars. The last from Supabase
 `execute_sql` (project `mqbnsjkeucvumdoqdeww`): `llm.spend_by_session` where `session` contains
 this session's id, `llm.spend_by_run` per `run_id` used; none → "no outside calls".
-
-### 7b. Session record (refusal: no close without it)
-
-Log the session-record decision (`references/session-record.md`, "The record"):
-asks, refusals, merges (Code with `report.py --routing`, else self-reported),
-the rung-3 call ids, the random fifth picked from them (printed in Step 4 and
-9b), cards and tasks for Baylee. **Without its id in hand the archive stops
-here** and says "Not closed: session record not written".
 
 ### 8. Watchlist
 
@@ -438,12 +439,10 @@ from concluding the artifact doesn't exist because the repo search returned empt
    to stop.
 
 Skip only if the session touched no project (pure Q&A). If Grove MCP fails,
-report the error, retry once, and note the gap in the handoff — never
-silently skip.
+report the error, retry once, and note the gap in the handoff (with the
+session record as `pending_record:`, Step 3e) — never silently skip.
 
-### 10. Rename chat (chat only)
-
-**Skip in Code / Routines** — no chat to rename.
+### 10. Rename chat (chat only; skip in Code / Routines)
 
 Format: `-----[keyword1] [keyword2] [keyword3] [keyword4]`
 
@@ -478,7 +477,7 @@ fails, say so explicitly.
 - [ ] Outstanding items (if >1) verified before listing?
 - [ ] Permissions audit done (3d, chat only)? Setup gaps surfaced in summary?
 - [ ] Cost shape line (7) in the summary and the Grove session line?
-- [ ] Session-record decision logged (7b), random fifth printed with "reverse <id>"?
+- [ ] Session-record decision logged (3e), random fifth printed with "reverse <id>"?
 - [ ] MBN data session: guard-record appended, guard.mjs verdict in `progress:` and the batch decision, Go in Next-step?
 - [ ] Agent states checked against their output files before naming them?
 - [ ] Watchlist items checked (only the ones whose condition fired)? Code: repo copy committed + merge-back line in `next:`?

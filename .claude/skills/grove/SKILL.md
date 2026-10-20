@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-10-20-01"
+  version: "2026-10-20-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -110,12 +110,14 @@ rule, and the pointer.**
 
 **Count before the call.** Run `scripts/decision_fit.py` on the decision text
 first (in chat: the installed skill's own `scripts/` folder; target 1,500), and pass what it returns: its `decision`, and its
-`overflow` in `context` (or in the task notes when that would pass the target
-too). One call, never a retry loop of shortened texts:
+`context` (the overflow prepended); when `context_fits` is false, put the long
+form in the task or project notes instead. One call, never a retry loop of
+shortened texts:
 
 ```bash
 python3 .claude/skills/grove/scripts/decision_fit.py --json '{"decision": "…", "context": "…"}'
 ```
+
 Decisions are **append-only** — to correct one, log a new decision with
 `supersedes` set to the old ID. There is no update tool for decisions.
 

@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-20-01"
+  version: "2026-10-20-02"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -250,13 +250,15 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
      compact=false, limit=100)` for `fairbay/ops`, `ops`,
      `fairbay/medicaid-benefits-navigator` and any repo with a
      `.claude/policy.json`, concatenated (the script keeps the `session-record`
-     and `reversal` tags).
+     and `reversal` tags). A list that comes back with 100 rows hit the cap:
+     say S4's window may be truncated for that repo.
    - `cards.json`: `grove_list_tasks(tag="wrong_question", compact=false,
      limit=100)` (adjudication listings carry no tags; the task read does).
-   - `activity.json`: `{repo, date, kind, ref}` rows from
+   - `activity.json`: `{repo, date, kind, ref, message}` rows from
      `gh api "repos/fairbay/<repo>/commits?since=<ISO>&per_page=100"` (commits)
      and `grove_events` in the window (Grove writes, repo from the entity's
-     `project_ref`).
+     `project_ref`); keep each commit's first message line (the script drops
+     sync.py's `sync …` mirror commits).
    - `runs.json`: the newest run of `sync.yml` (ops) and `rules.yml` (each repo
      that has it): `gh api "repos/fairbay/<repo>/actions/workflows/<file>/runs?per_page=1"`.
    - Each repo's `.claude/policy.json` (from a clone or `contents/.claude/policy.json`).
@@ -266,7 +268,8 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    (`--json` for the actions). Thresholds come from each policy; a "not judged"
    line is reported as is, never filled with a default.
 3. **File what it lists**, searching each action's `dedup_key` first
-   (`grove_list_tasks(q=<dedup_key>)`; never a duplicate): one Grove task per
+   (`grove_list_tasks(q=<dedup_key>)`; never a duplicate) and filing its body
+   unchanged, so the `dedup:` line it ends with is in the notes next week: one Grove task per
    S1/S2 breach (list `ops`, tags `decision-routing`, `ops-read-YYYY-MM-DD`;
    after one design round on an edge, the edge goes to Baylee as a ruling);
    one adjudication card per S4/S5 breach with the script's recommendation and

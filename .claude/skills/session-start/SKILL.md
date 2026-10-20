@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-20-04"
+  version: "2026-10-20-05"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -103,11 +103,12 @@ by hand, never handed off; recommendation: hand off now").
 - **Another session's PR** (a ready PR opened today, a draft in progress) is
   information for Baylee, not work for this session. Don't touch it.
 - **Session record for the previous session** (once the project row and the
-  handoff are known; code and non-code projects alike): no `session-record`
-  decision dated the handoff's day or later → write one from its transcript
-  when it is on disk, else a stub tagged by `source: no-transcript`. Steps:
-  chat-archive `references/session-record.md`, "At entry". One line in the
-  briefing: "Session record: present | written | stub".
+  handoff are known): none whose `context.session` is the handoff's
+  `meta.session` (else created after `meta.generated`) → log the handoff's
+  `pending_record:` if it has one, else count the transcript when on disk,
+  else a `no-transcript` stub. Steps: chat-archive
+  `references/session-record.md`, "At entry". Briefing line: "Session record:
+  present | written | stub".
 
 ## Phase 1 — Resolve project (Grove first)
 
@@ -115,8 +116,11 @@ Grove's `project` table is the universal project index — code and non-code
 projects alike. Resolve against it first; a repo is a code-specific detail
 the project row carries, not the identity.
 
-**Loading Grove tools (chat):** one exact-name query loads them all:
-`select:` + `grove_list_projects,grove_get,grove_list_decisions,grove_list_tasks,grove_list_adjudications,grove_create_task,grove_update_task,grove_update_project,grove_log_decision` (prefixed as the session names them). Never search piecemeal.
+**Loading Grove tools (chat):** the tool_search registry matches fuzzily on
+Grove tool names — descriptive queries take 2-3 attempts. Load first-try with
+the exact-name query: `grove_list_projects grove_create_task grove_update_task
+grove_update_project grove_log_decision`. Then load `grove_list_decisions grove_get grove_list_tasks`
+in one follow-up call. Two calls total — do not search piecemeal.
 
 Resolution order:
 
@@ -257,8 +261,9 @@ Flag, in one briefing line, a repo with no root `SPEC.md`, 20 or more commits
 (page 1 of `/repos/{r}/commits` returns 20) and a database schema, a `docs/`
 directory or 5+ source files: "⚠️ [N commits] and no SPEC.md — consider a
 retroactive spec pass (architect interview mode) before public launch."
-Informational, not blocking: express-mode plans are ephemeral by design, and a
-project past prototype scope needs interview mode's quality contract.
+Informational, not blocking: Baylee decides whether and when to run the spec
+pass. Express-mode plans are ephemeral by design, and a project past prototype
+scope needs interview mode's quality contract.
 
 ## Phase 4c — Synthesize work queue
 
@@ -447,8 +452,7 @@ AskUserQuestion and continue on the answer.
   similar pointer, that IS a breadcrumb — follow it to the noted location
   before concluding the artifact is absent.
 
-- **Skipping the stale check.** A 3-day-old handoff may be overridden by
-  yesterday's work. Always run Phase 3.
+- **Skipping the stale check.** A 3-day-old handoff may be stale: run Phase 3.
 - **Using conversation_search as a handoff substitute.** If no handoff is
   found, present "no handoff found" and ask — don't run multiple search calls
   to reconstruct context from chat fragments. That's slower, noisier, and
@@ -457,12 +461,10 @@ AskUserQuestion and continue on the answer.
   in context.** The hook then covers the PR gate and the handoff; this skill
   adds Phase 4-5 on top. No injected block (several repos attached, or the
   hook failed): run Phases 0–2 yourself.
-- **Dumping the entire PLAN.md.** Load it into context; don't narrate it.
-  Downstream skills extract the step they need.
+- **Dumping the entire PLAN.md.** Load it; don't narrate it.
 - **Re-deriving the plan.** If PLAN.md exists, the approach is settled. Don't
   second-guess during orientation.
-- **Asking which repo when it's obvious.** "Work on Listing Lens" maps to one
-  repo. Don't ask.
+- **Asking which repo when it's obvious.** "Work on Listing Lens" is one repo.
 - **Auto-starting work.** Orientation first, confirmation second, work third —
   except the singular-unambiguous-task carve-out.
 

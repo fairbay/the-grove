@@ -38,6 +38,8 @@ class InputError(Exception):
 
 # ---------------------------------------------------------------- input helpers
 
+SYNC_PREFIX = "sync "  # scripts/sync.py SYNC_COMMIT_PREFIX
+
 def load_json(path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -126,6 +128,10 @@ def parse_records(decisions):
     records, unreadable = [], []
     for d in decisions:
         if "session-record" not in tags_of(d):
+            continue
+        # a record restated by a later record (supersedes) counts once: the newer one
+        if d.get("superseded_by") or any(same_id(str(o.get("supersedes") or ""), str(d.get("id"))) for o in decisions
+                                         if "session-record" in tags_of(o) and o.get("supersedes")):
             continue
         did = d.get("id")
         title = d.get("decision") or ""
@@ -265,7 +271,7 @@ def signal_s1(repo, pol, recs, until, actions):
             f"- {s['date']} {s['session']}: asks {s['asks']}" + (" (over)" if s["asks"] > mx else "") for s in sessions
         ) + "\n\nName the edge that produced the asks. Cap: one design round per edge; after that the edge is a ruling for Baylee."
         actions.append({"type": "task", "signal": "S1", "repo": repo,
-                        "dedup_key": f"routing-breach S1 {repo} {newest['date'].isoformat()}",
+                        "dedup_key": f"routing-breach S1 {repo} {newest['session']}",
                         "title": f"S1 {repo}: policy asks above {fmt_num(mx)} in an upkeep session (newest {newest['date'].isoformat()})",
                         "body": body})
     res["line"] = line
@@ -321,7 +327,7 @@ def signal_s4(repo, pol, recs, until, targets, actions):
     if breach:
         res["line"] += "; reversed: " + ", ".join(short(c) for c in reversed_ids)
         actions.append({"type": "card", "signal": "S4", "repo": repo,
-                        "dedup_key": f"routing-card S4 {repo} {until.isoformat()}",
+                        "dedup_key": f"routing-card S4 {repo} rev-{short(sorted(reversed_ids)[-1])}-{len(reversed_ids)}",
                         "title": f"S4 {repo}: {len(reversed_ids)} of {len(shown)} shown upkeep calls reversed (limit {fmt_num(mx)})",
                         "body": f"Reversals over calls shown: {len(reversed_ids)}/{len(shown)} = {rate:.2f}, above {fmt_num(mx)}. Reversed calls:\n"
                                 + "\n".join(f"- {c}" for c in reversed_ids),
@@ -357,14 +363,23 @@ def signal_s5(repo, pol, cards, since, until, days, actions):
     if in_week:
         res["status"] = "postmortem"
     wd = sig.get("window_days")
-    wd = wd if (isinstance(wd, int) and not isinstance(wd, bool) and wd >= 1) else days
+    if sig.get("same_row_card") is None:
+        lines.append("same-row card not judged: policy has no S5 same_row_card")
+        head = f"S5 wrong-question cards this week (any): {len(in_week)} -> {res['status']}"
+        res["line"], res["detail"] = head, lines
+        return res
+    if not (isinstance(wd, int) and not isinstance(wd, bool) and wd >= 1):
+        lines.append(f"same-row card not judged: {repo} policy lacks signals.{K_S5}.window_days")
+        head = f"S5 wrong-question cards this week (any): {len(in_week)} -> {res['status']}"
+        res["line"], res["detail"] = head, lines
+        return res
     counts = {}
     for c in cards:
         if c["day"] and until - timedelta(days=wd) < c["day"] <= until:
             counts.setdefault(c["row"], []).append(c)
     res["row_counts"] = {str(k): len(v) for k, v in counts.items()}
     per_row = ", ".join(f"row {k}: {len(v)}" for k, v in sorted(counts.items(), key=lambda kv: (kv[0] == "unknown", kv[0] if kv[0] != "unknown" else 0))) or "none"
-    scope = f"{wd} days" if sig.get("window_days") is not None else "the week"
+    scope = f"{wd} days"
     lines.append(f"wrong-question cards per decision-table row over {scope}: {per_row}")
     srow = sig.get("same_row_card")
     if srow is None:
@@ -377,7 +392,7 @@ def signal_s5(repo, pol, cards, since, until, days, actions):
                 res["status"] = "breach"
                 lines.append(f"row {row}: {len(cs)} wrong-question cards (card at {fmt_num(srow)}) -> breach")
                 actions.append({"type": "card", "signal": "S5", "repo": repo,
-                                "dedup_key": f"routing-card S5 {repo} row-{row}",
+                                "dedup_key": f"routing-card S5 {repo} row-{row} {short(max(cs, key=lambda c: (c['day'], str(c['id'])))['id'])}",
                                 "title": f"S5 {repo}: {len(cs)} wrong-question cards on decision-table row {row} in {scope}",
                                 "body": f"Cards resolved by note with no option, all from decision-table row {row}:\n"
                                         + "\n".join(f"- {short(c['id'])} {c['title']} ({c['day'].isoformat()})" for c in sorted(cs, key=lambda c: c["day"])),
@@ -412,20 +427,20 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
         if repo is None:
             unreadable.append({"kind": "card", "id": c.get("id"), "title": c.get("title") or "", "reason": "no project_ref"})
             continue
-        # The day it was resolved, not the day it was tagged: tagging a card later must not
-        # move an old verdict into this week (grove_list_adjudications carries `resolution`;
-        # a task read carries it under metadata.adjudication).
+        # The day it was tagged (updated_at): the wrong_question tag is added by the session that
+        # consumes the card, so a card consumed late still gets its postmortem in that week.
+        # resolved_at (top-level `resolution`, or metadata.adjudication) only when updated_at is absent.
         res = c.get("resolution") or ((c.get("metadata") or {}).get("adjudication") or {}).get("resolution") or {}
         when = res.get("resolved_at") if isinstance(res, dict) else None
         wq.append({"id": c.get("id"), "title": c.get("title") or c.get("question") or "", "repo": repo,
-                   "row": card_row(c), "day": day_of(when or c.get("updated_at"))})
+                   "row": card_row(c), "day": day_of(c.get("updated_at") or when)})
 
     act = []
     for a in activity:
         d = parse_day(a.get("date"))
         repo = norm_repo(a.get("repo"))
         if d and repo:
-            act.append({"repo": repo, "date": d, "kind": a.get("kind"), "ref": str(a.get("ref", ""))})
+            act.append({"repo": repo, "date": d, "kind": a.get("kind"), "ref": str(a.get("ref", "")), "message": a.get("message")})
 
     repos = set(policies) | {r["repo"] for r in records} | {c["repo"] for c in wq} | {a["repo"] for a in act}
     actions = []
@@ -472,18 +487,21 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
         entry["interactions"] = inter
         out_repos[repo] = entry
 
-    # activity with no session record (any record of that repo within a day, any kind)
+    # activity with no session record (a record of that repo dated the same day, any kind)
     rec_days = {}
     for r in records:
         rec_days.setdefault(r["repo"], set()).add(r["date"])
     groups = {}
     for a in act:
+        # sync.py's mirror commits ("sync … from ops") land in every repo on every ops push: not a session's work
+        if a["kind"] == "commit" and str(a.get("message") or "").startswith(SYNC_PREFIX):
+            continue
         if in_week(a["date"]):
             groups.setdefault((a["repo"], a["date"]), []).append(a)
     no_record = []
     for (repo, d), items in sorted(groups.items()):
         have = rec_days.get(repo, set())
-        if any(d + timedelta(days=k) in have for k in (-1, 0, 1)):
+        if d in have:  # same UTC day only: a neighbour day's record would mask an unrecorded session
             continue
         commits = [i for i in items if i["kind"] == "commit"]
         groves = [i for i in items if i["kind"] == "grove"]
@@ -509,6 +527,8 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
     for a in actions:
         if a["dedup_key"] not in seen_keys:
             seen_keys.add(a["dedup_key"])
+            # the key rides in the filed text, so next week's search by key finds it (never a duplicate)
+            a["body"] = a["body"].rstrip() + f"\n\ndedup: {a['dedup_key']}"
             uniq_actions.append(a)
 
     return {"window": {"since": since.isoformat(), "until": until.isoformat(), "days": days, "quiet_week": quiet},

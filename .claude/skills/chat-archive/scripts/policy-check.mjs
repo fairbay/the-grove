@@ -12,13 +12,12 @@
 //               his OK; for logging and shipping; for filing a line; for stopping).
 //   (c) S7      a rule sentence that routes work to Baylee (Baylee, him, his OK/go/…, with a
 //               routing verb) carries a `policy:` token. Attributions are not routing: quoted
-//               words and dated parentheticals ("Baylee's yes, 2026-10-06") are set aside first,
-//               and so are two shapes that route nothing (ops S7 pass, Grove dd1e9787):
-//               Baylee as the one asking ("when Baylee explicitly asks for one") and a
-//               platform as the one asking ("the fetch service asks Baylee to approve").
-//               A sentence the lint flags that still routes nothing is listed in
-//               signals.S7_uncited_routing_sentences.not_routing with its reason; an entry
-//               that matches no sentence fails, so the list cannot go stale silently.
+//               words and dated parentheticals ("Baylee's yes, 2026-10-06") are set aside first.
+//               A flagged sentence that routes nothing is listed, whole and verbatim, in
+//               signals.S7_uncited_routing_sentences.not_routing with its reason (ops S7 pass,
+//               Grove dd1e9787). The match is the whole sentence (list marker and ** stripped),
+//               so a later edit to an exempt sentence makes it fail again, and an entry that
+//               matches no flagged sentence fails, so the list cannot go stale silently.
 //   (d) S8      session_handoff.py measure: the entry hook, given a worst-case PR table, cuts
 //               no character of the handoff.
 // The rule files are signals.S7_uncited_routing_sentences.files in policy.json. .claude/global.md
@@ -70,12 +69,6 @@ const HISTORY_RE =
   /\bBaylee (approved|asked|decided|ruled|sent|said|picked|answered|chose|wrote|withdrew|confirmed|reframed|gave|named|agreed|reversed|reframed) (the|a|an|this|that|these|those|it|them|how|what|whether|why|for (the|a)|earlier|\d)\b|\bhe (approved|asked|decided|ruled|said|reframed|picked|answered|chose|withdrew|confirmed) (the|a|an|this|that|it|how|what)\b/g;
 const VERB_RE =
   /\b(ask|asks|asked|asking|approve|approves|approved|approval|rules? on|ruled|ruling on|decide|decides|decided|screenshots?|wait|waits|waiting|hold|holds|held|escalate|escalates|escalated|show|shows|shown|showing|reach|reaches|reached|send|sends|sent|file|files|filed|taps?|cards?|adjudications?|say so|says so|needs?|needed|go(es)? to|bring|brings|check with|hands?|surface|surfaces|sign(s|ed)? off|sign-off|reviews|reviewed|judges?|last word|sees?|put to|ping)\b|\bOK\b/i;
-// Baylee as the one asking for something routes nothing to him.
-const REQUESTER_RE = /\b(when |until |unless )?(Baylee|he) (explicitly |specifically )?asks?( (for|to)\b)?/g;
-// A platform asking him (an approval card, a permission prompt) is the harness, not policy: S2's
-// business, never S7's.
-const PLATFORM_RE =
-  /\b(service|classifier|platform|harness|call|prompt|tool)s? (asks|costs|prompts|refuses|shows) (Baylee|him)\b/g;
 const POINTER_RE = /(?<![\w-])policy:\s*([a-z][a-z0-9_]*)/g;
 
 function args(argv) {
@@ -192,7 +185,6 @@ export function routingText(s) {
   const unquote = (m) => (/\b(Baylee|him|his|he)\b/.test(m) ? m : " ");
   let t = s.replace(/“[^”]*”/g, unquote).replace(/"[^"]*"/g, unquote).replace(/`[^`]*`/g, (m) => (m.includes("policy:") ? " " : m));
   t = t.replace(HISTORY_RE, " ");
-  t = t.replace(REQUESTER_RE, " ").replace(PLATFORM_RE, " ");
   t = t.replace(/\bBaylee(['’]s (yes|go|call|ruling|rulings|note|pick|words|OK))?[,:]? \d{4}-\d{2}-\d{2}\b/g, " ");
   t = t.replace(/\b(Grove|decision|card|adjudication|ruling) [0-9a-f]{8}\b/g, " ");
   // A parenthetical is set aside only when it is an attribution: it opens with Baylee, a
@@ -217,7 +209,7 @@ export function isRouting(s) {
 }
 
 // (b) and (c) over one file's text
-// A sentence as a not_routing entry's `starts` matches it: list marker and bold stripped.
+// A sentence as a not_routing entry's `sentence` matches it: list marker and bold stripped.
 const bare = (text) => text.replace(/^([-*+]|\d+[.)])\s+/, "").replace(/\*\*/g, "").trim();
 
 export function lintText(file, md, classes, exempt = []) {
@@ -242,14 +234,14 @@ export function lintText(file, md, classes, exempt = []) {
     if (kinds.length && kinds.every((k) => k === "proceed_log") && SEND_MARK.test(routingText(text)))
       fails.push(`pointer ${file}:${line}: cited only as proceed_log, but the sentence sends it to Baylee: ${text}`);
     if (!pointers.length && isRouting(text)) {
-      const hit = mine.find((e) => typeof e.starts === "string" && bare(text).startsWith(e.starts));
+      const hit = mine.find((e) => typeof e.sentence === "string" && bare(text) === e.sentence.trim());
       if (hit) used.add(hit);
       else fails.push(`S7 ${file}:${line}: routes work to Baylee with no policy: pointer: ${text}`);
     }
   }
   for (const e of mine)
     if (!used.has(e))
-      fails.push(`S7 ${file}: not_routing entry matches no flagged sentence (stale; remove it): "${e.starts}"`);
+      fails.push(`S7 ${file}: not_routing entry matches no flagged sentence (stale or edited; remove or update it): "${e.sentence}"`);
   return fails;
 }
 
@@ -291,8 +283,8 @@ export function run(root, { s8 = true } = {}) {
     if (!p.includes("*") && !files.includes(p) && !NEVER_LINTED.has(p)) fails.push(`S7: rule file ${p} is missing`);
   const exempt = sig && Array.isArray(sig.not_routing) ? sig.not_routing : [];
   for (const e of exempt)
-    if (!e || typeof e.file !== "string" || typeof e.starts !== "string" || typeof e.why !== "string" || !e.why.trim())
-      fails.push(`${POLICY} signals.S7_uncited_routing_sentences.not_routing entry needs file, starts and why: ${JSON.stringify(e)}`);
+    if (!e || typeof e.file !== "string" || typeof e.sentence !== "string" || typeof e.why !== "string" || !e.why.trim())
+      fails.push(`${POLICY} signals.S7_uncited_routing_sentences.not_routing entry needs file, sentence and why: ${JSON.stringify(e)}`);
     else if (!files.includes(e.file)) fails.push(`S7: not_routing entry names ${e.file}, which is not a linted rule file`);
   for (const f of files) fails.push(...lintText(f, readFileSync(join(root, f), "utf8"), classes, exempt));
   if (s8) fails.push(...checkS8(root));

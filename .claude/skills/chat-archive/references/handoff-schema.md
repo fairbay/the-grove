@@ -46,6 +46,7 @@ meta:
   project: "repo-or-topic-name"
   type: build  # "build" or "session"
   session_chat_id: null  # include if available
+  session: "<session id or URL>"  # the same value as this session's session-record `session` (references/session-record.md)
   landing: "fairbay/<repo>#<n>"  # only when the handoff rides a PR (close-at-land); omit for direct-to-main
 
 done:
@@ -207,6 +208,12 @@ Grove task and remove. Only open, relevant bugs belong here.
 
 Each item needs a `location:` (Grove task ID, PLAN.md section, etc.) so it can
 be found. Items without a location are orphans. Clean up before pushing.
+
+### `pending_record:` — only when Grove refused the session record
+
+The session-record JSON (references/session-record.md) when `grove_log_decision`
+failed twice at archive. The next session's entry logs it and drops the field.
+Absent otherwise.
 
 ### `context:` — optional ambient state
 

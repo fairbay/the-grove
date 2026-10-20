@@ -6,14 +6,14 @@ docs/decision-routing/DESIGN.md §3–§5 (Baylee's ruling 7fd4b24e). The weekly
 that consumes the records is `scripts/ops_read.py` (project-health, "Ops read").
 
 ## Contents
-- The record (Step 7b) — fields, sources, the decision call, no close without it
+- The record (Step 3e) — fields, sources, the decision call, no close without it
 - The random fifth — which calls Baylee sees, and how he reverses one
 - Reversals and wrong questions — the two tags
 - At entry (session-start Phase 0) — a missing record for the previous session
 - MBN data-batch close — guard-record.json, guard.mjs, the verdict line, the Go
 - Agent state — the output-file check before any report about an agent
 
-## The record (Step 7b)
+## The record (Step 3e)
 
 One Grove decision per session, tagged `session-record`, `project_ref` set, the
 numbers as JSON in its `context` field (decisions have no metadata; the project
@@ -30,6 +30,7 @@ row's metadata is overwritten each session, so it cannot hold a series).
 
 | Field | Source |
 |---|---|
+| `session` | this session's id or URL; the archive also writes it as the handoff's `meta.session`, which is how the next entry finds this record |
 | `date` | UTC date of the archive |
 | `kind` | a data batch: its `ops.change_batches.kind`; else the goal line: a ledger item is `upkeep` unless the goal marked it `direction` |
 | `asks` | questions put to Baylee after his opening message (AskUserQuestion, `ask_user_input_v0`, a question in prose) |
@@ -40,8 +41,10 @@ row's metadata is overwritten each session, so it cannot hold a series).
 | `source` | `transcript` when counted from the transcript; `self-reported` when counted by recall; `no-transcript` for an entry stub |
 
 **Counting.** In a Code session whose repo has `scripts/session-usage/report.py`
-(MBN), run it with `--routing` on this session's transcript: it prints
-`{"asks","refusals","merges","source":"transcript"}`. Anywhere else (chat, ops,
+(MBN), run `python3 scripts/session-usage/report.py <session-dir-prefix>
+<out.json> <out.md> --routing`: stdout prints `{"asks","refusals","merges",
+"source":"transcript"}`, and the refused commands for `refused` are in the
+out.json's `routing` section. Anywhere else (chat, ops,
 a repo without the script) count the three from the conversation and set
 `source: self-reported`. Never grade the asks (no "needed" field: a session
 cannot judge its own asks).
@@ -51,10 +54,13 @@ asks A, refusals R, merges M, calls L (shown S), cards C", project_ref=…,
 context=<the JSON>, tags=["session-record"], confidence="high", reversible="yes",
 rung=3)`. Then read it back once (`grove_get`) and check `context` parses.
 
-**No close without it.** The archive does not reach Step 9's write-back, the
-summary or the Next-step line until the record's id is in hand. If Grove refuses
-twice, the archive ends with "Not closed: session record not written (<error>)"
-and the record JSON in the response, so the next session's entry writes it.
+**No close without it.** The archive does not write the summary (Step 4), the
+Next-step line or Step 9's write-back until the record's id is in hand. If
+Grove refuses twice, the git handoff still goes out (it is the baton that does
+not depend on Grove) with the record JSON in a top-level `pending_record:`
+field, the summary says "Session record pending: Grove refused (<error>)", and
+the next session's entry logs it. A session-only chat with no handoff file
+puts the JSON in the response and says the next entry will write a stub.
 
 ## The random fifth
 
@@ -95,14 +101,21 @@ Land-and-leave lets a session end without archiving, so the next session's
 entry closes the gap once the project row is known:
 
 1. The previous session is the one that wrote the handoff session-start loaded
-   (`meta.generated`, `meta.surface`, `meta.landing`).
-2. `grove_list_decisions(project_ref=<repo or slug>, limit=20, compact=false)`;
-   a decision tagged `session-record` whose `context.date` is the handoff's date
-   or later covers it.
-3. None: when that session's transcript is on disk (a resumed Code container),
-   count it as at Step 7b with `source: transcript`; otherwise log a stub with
-   `asks`, `refusals`, `merges` null, the lists empty, `source: no-transcript`
-   and the decision text "session-record <date> <repo>: stub, no transcript".
+   (`meta.session`, `meta.generated`). For a project with no handoff file, it
+   is the project row's `last_session` day.
+2. `grove_list_decisions(project_ref=<repo or slug>, current_only=false,
+   compact=false, limit=100)`, keeping those tagged `session-record`. One
+   covers it when its `context.session` equals `meta.session`; when the handoff
+   has no `meta.session` (written before this step existed), when its
+   `created_at` is after `meta.generated`; for a project with no handoff, when
+   its `context.date` is `last_session`. A record with no `session` field
+   (written by hand before this format) covers only by `created_at`.
+3. None: the handoff's `pending_record:` (a record Grove refused at archive) is
+   logged as written. Else, when that session's transcript is on disk (a resumed
+   Code container), count it as at Step 3e with `source: transcript`. Else log a
+   stub: `asks`, `refusals`, `merges` null, the lists empty, `source:
+   no-transcript`, the decision text "session-record <date> <repo>: stub, no
+   transcript". Never a second stub for the same `meta.session`.
 4. Then consume verdicts: tag wrong-question cards and log reversals as above.
 
 ## MBN data-batch close
@@ -118,10 +131,15 @@ applied and published this session), before the handoff is written:
    `from-mNNNN` tasks, each with its one class tag and status). Unknown → `null`,
    never a guess.
 2. **Run the guard:** `node scripts/batch/guard.mjs --batch mNNNN`, adding
-   `--tasks <file>` when a Grove dump of the batch's tasks is at hand
-   (`grove_list_tasks(tag="from-mNNNN", compact=false)` saved as JSON) and
-   `--pairs <file>` when the pairs output is. Exit 2 is an input error: fix the
-   record or the tags and run again; never write a verdict from a failed run.
+   `--pairs <file>` when the pairs output is at hand, and `--tasks <file>` only
+   with a dump of **every** batch in the record: `--tasks` replaces the
+   follow-ups of all batches, so a dump of the new batch alone erases older
+   leaks and can turn a pause into `continue`. Build it with one
+   `grove_list_tasks(tag="from-<id>", compact=false, limit=100)` per batch id in
+   guard-record.json, concatenated into one JSON array; without that, run
+   without `--tasks` (the record's snapshot). Exit 0, 3 and 4 are verdicts
+   (continue, pause-and-repair, escalate); exit 2 is an input error: fix the
+   record or the tags and run again, never write a verdict from an exit 2.
 3. **Write the verdict line** verbatim into HANDOFF `progress:` and into the
    batch's Grove decision: in its `context` when 9b logs it now; when it was
    logged earlier (decisions are append-only), a superseding decision that
@@ -134,8 +152,10 @@ applied and published this session), before the handoff is written:
 
 **The Go in the Next-step line.** When the next session is a data batch, the
 Step 5 line carries `.claude/policy.json` `harness.go` verbatim with `mNNNN`
-replaced by the next batch's migration number (the next free number in
-`supabase/migrations/` as the plan names it). Read the sentence from the file,
+replaced by the next batch's migration number: the highest `mNNNN` across
+`scripts/m*/` and `db/migrations/*_m*.sql`, plus one, or the number the plan
+names for the next batch. When the two disagree, write no Go: name the
+mismatch in the Next-step line for Baylee to settle. Read the sentence from the file,
 never from memory: what it covers is Baylee's consent and changes only by his
 ruling.
 

@@ -10,9 +10,9 @@ call's `context` (or in task notes when the context would pass the target too).
     python3 decision_fit.py [--target 1500] < text.txt
     python3 decision_fit.py --json '{"decision": "...", "context": "..."}'
 
-Prints one JSON object: {"chars", "target", "fits", "decision", "overflow",
-"context"}; with --json input, `context` is the input context with the overflow
-prepended under "Detail: ". Exit 0 always on valid input, 2 on bad input.
+Prints one JSON object: {"chars", "target", "fits", "decision", "overflow"};
+with --json input also "context" (the input context with the overflow prepended
+under "Detail: ") and "context_fits" (false: put the long form in notes instead). Exit 0 always on valid input, 2 on bad input.
 Stdlib only.
 """
 from __future__ import annotations
@@ -27,25 +27,22 @@ SENTENCE_END = re.compile(r"(?<=[.;!?])\s+(?=\S)")
 
 
 def fit(text: str, target: int) -> tuple[str, str]:
-    """Whole sentences up to `target` characters, and the rest."""
+    """Whole sentences up to `target` characters, and the rest, sliced from the original text
+    (never re-joined, so nothing is lost or repeated whatever the whitespace)."""
     text = text.strip()
     if len(text) <= target:
         return text, ""
-    parts = SENTENCE_END.split(text)
-    kept: list[str] = []
-    size = 0
-    for p in parts:
-        extra = len(p) + (1 if kept else 0)
-        if size + extra > target:
+    cut = 0
+    for m in SENTENCE_END.finditer(text):
+        if m.start() > target:
             break
-        kept.append(p)
-        size += extra
-    if not kept:  # one sentence longer than the target: cut at the last space before it
-        cut = text.rfind(" ", 0, target - 1)
-        cut = cut if cut > 0 else target - 1
-        return text[:cut].rstrip() + "…", text[cut:].strip()
-    head = " ".join(kept)
-    return head, text[len(head):].strip()
+        cut = m.start()
+    if cut:
+        return text[:cut].rstrip(), text[cut:].strip()
+    # no sentence ends inside the target: cut at the last space before it
+    sp = text.rfind(" ", 0, target - 1)
+    sp = sp if sp > 0 else target - 1
+    return text[:sp].rstrip() + "…", text[sp:].strip()
 
 
 def main(argv: list[str]) -> int:
@@ -75,6 +72,8 @@ def main(argv: list[str]) -> int:
            "decision": decision, "overflow": overflow}
     if context is not None:
         out["context"] = (f"Detail: {overflow}\n\n{context}" if overflow else context).strip()
+        # past the target, the long form belongs in the task or project notes, not the decision row
+        out["context_fits"] = len(out["context"]) <= a.target
     print(json.dumps(out, ensure_ascii=False))
     return 0
 
