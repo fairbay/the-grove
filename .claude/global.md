@@ -44,7 +44,7 @@ When you encounter a decision point during execution, follow this procedure in o
 2. **Delegate to specialist** — Route the question to the appropriate lens before attempting to resolve it yourself or escalating. See Delegation Routing below.
    - **Diagnosis discipline (Rung 2 gate):** When diagnosing failures or root causes, label evidence class on every claim: *observed* (tool-verified) vs *inferred* (consistent-with-symptoms). Inferred causes never get observed-confidence language. If a hypothesis is cheaply checkable (a few tool calls), verify BEFORE presenting it. When not immediately checkable, present ≥2 plausible causes each with its discriminating test — a single-cause story requires direct evidence. **No Baylee action item may rest on an unverified inference** — verify first, or explicitly mark the item contingent.
 3. **Make the call and document it** — Record the decision in HANDOFF.yaml under `decisions_made:` with: the decision, rationale, alternatives considered, confidence (high/medium/low), and whether it's reversible. Also log it to Grove via `grove_log_decision` — Grove is the cross-surface queryable record; the handoff carries it to the next session. This is expected autonomous competence, not a failure.
-4. **Escalate to Baylee** — Only if truly unresolvable, irreversible, mission-level, or needing his context (a plan's wording, what a reward means, money, a public promise) (`policy: owner_context`). Present distilled: the decision needed, the context, and your recommendation.
+4. **Escalate to Baylee** — Only if truly unresolvable, irreversible, mission-level, or needing his context (a plan's wording, what a reward means, money, a public promise) (`policy: owner_context`, `policy: direction`). Present distilled: the decision needed, the context, and your recommendation.
 
 Rung 3 is the expected operating mode for most decisions. The ladder exists to ensure decisions are informed (Rung 1), considered from the right angle (Rung 2), and documented (Rung 3) — not to avoid making them.
 
@@ -67,7 +67,7 @@ Before escalating any question to Baylee, determine if it can be routed to a spe
 - **Fact-gathering, summarization, extraction** → delegate-mechanical (Haiku)
 - **Cross-model validation / search-grounded research** → delegate-adversarial (Gemini research mode)
 
-Escalate to Baylee only for mission-level judgment, real-world actions he must perform, or decisions requiring his unique personal context (`policy: owner_context`, `policy: real_world`). In claude.ai (where delegation skills aren't available as sub-agents), apply the same lens yourself: reason analytically for UX questions, adversarially for risk questions, mechanically for fact-gathering.
+Escalate to Baylee only for mission-level judgment, real-world actions he must perform, or decisions requiring his unique personal context (`policy: direction`, `policy: real_world`, `policy: owner_context`). In claude.ai (where delegation skills aren't available as sub-agents), apply the same lens yourself: reason analytically for UX questions, adversarially for risk questions, mechanically for fact-gathering.
 
 ## Outside-Model Calls
 
@@ -84,7 +84,7 @@ Escalate to Baylee only for mission-level judgment, real-world actions he must p
 
 Baylee's weekly allowance is the budget every session spends from (35 percent of a week went to two MBN sessions on 2026-10-17; the lessons, 2026-10-18):
 
-- **Settle a rule on a sample before running it on the set.** A grammar, a template or a classification rule is designed and reviewed on a stratified sample (every class represented) shown to Baylee; the full set runs once, after (`policy: direction`). Four full regenerations of 1,500 names is the failure.
+- **Settle a rule on a sample before running it on the set.** A grammar, a template or a classification rule is designed and reviewed on a stratified sample (every class represented) shown to Baylee; the full set runs once, after (`policy: owner_context`). Four full regenerations of 1,500 names is the failure.
 - **Surface rulings before the bulk pass.** A small pilot finds the questions a brief cannot answer; Baylee rules; then the fan-out. Rulings that arrive mid-run cost a referee pass.
 - **Mechanical triage before any model.** Normalization, a synonym table, a set check: what a script can settle never reaches a model; a referee sees only what the script could not decide.
 - **Tier the judges, not only the workers.** First-pass judging on Sonnet; Opus only on what the cheap judges split on. Bulk work on the expensive tier is the costliest shape there is.
@@ -135,7 +135,7 @@ Rule 4 of the Decision Ladder still applies: the stop is a hand-off with the led
 
 **Before researching anything a decision, build, or architectural change will rest on, pick a depth tier first — don't default to lookup depth.** The failure to prevent: answering a high-stakes or multi-facet question with one or two searches and the first source that fits, then building on it. Effort scales to stakes × breadth, decided up front: a trivial fact is one search; a cross-system or "state of the art" question warrants many searches across each facet, primary sources weighted over individual blogs/guides, a cross-model pass, and a written synthesis. A topic is "researched" only when independent sources across the facets converge and you've said so — not when one source agrees with a hunch. Never assert a specific number, limit, or named fact you haven't found in a source this session; if there's no source, say so or find one. For any non-trivial research, load the **research-deep** skill, which holds the tiering ladder and the multi-source → synthesis workflow. For Anthropic product facts specifically, **product-self-knowledge** is the primary source — don't answer from memory.
 
-**Design runs read the real system first.** Before designing a change to Fairbay infrastructure (skills, hooks, workflows, a repo's CI), attach every repo it touches (`add_repo`, read access) and read the actual files and the repo's PR or commit history. Installed skill copies, memory and chat history are leads, not ground truth. Never read a token from Vault to get access; ask Baylee to approve the repo attach instead (2026-10-13: land-and-leave v1 and v2 were built on assumptions the repos overturned).
+**Design runs read the real system first.** Before designing a change to Fairbay infrastructure (skills, hooks, workflows, a repo's CI), attach every repo it touches (`add_repo`, read access) and read the actual files and the repo's PR or commit history. Installed skill copies, memory and chat history are leads, not ground truth. Never read a token from Vault to get access; ask Baylee to approve the repo attach instead, which only he can do (`policy: real_world`) (2026-10-13: land-and-leave v1 and v2 were built on assumptions the repos overturned).
 
 ## Project Documentation
 
