@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-19-01"
+  version: "2026-10-20-01"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -236,6 +236,44 @@ Each finding gives the metric, what members see because of it, its scope
 - **Two tracks:** a finding that needs Baylee in the real world (an account, a
   lawyer, an outside service) goes as one line to Grove project `mbn-launch-ops`
   and isn't discussed (MBN PLAN.md "Tracks").
+
+## Ops read — decision routing (outside this charter)
+
+A section of its own, after the health report, on every run (the run Baylee
+already schedules; no new timer) and whenever he asks for "the ops read". It
+is not a member-facing metric: its filings sit outside the five-task cap and
+the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4–§5.
+
+1. **Gather** (window: the 7 days ending today, UTC), saving each as JSON in the
+   working directory:
+   - `decisions.json`: `grove_list_decisions(project_ref=…, current_only=false,
+     compact=false, limit=100)` for `fairbay/ops`, `ops`,
+     `fairbay/medicaid-benefits-navigator` and any repo with a
+     `.claude/policy.json`, concatenated (the script keeps the `session-record`
+     and `reversal` tags).
+   - `cards.json`: `grove_list_tasks(tag="wrong_question", compact=false,
+     limit=100)` (adjudication listings carry no tags; the task read does).
+   - `activity.json`: `{repo, date, kind, ref}` rows from
+     `gh api "repos/fairbay/<repo>/commits?since=<ISO>&per_page=100"` (commits)
+     and `grove_events` in the window (Grove writes, repo from the entity's
+     `project_ref`).
+   - `runs.json`: the newest run of `sync.yml` (ops) and `rules.yml` (each repo
+     that has it): `gh api "repos/fairbay/<repo>/actions/workflows/<file>/runs?per_page=1"`.
+   - Each repo's `.claude/policy.json` (from a clone or `contents/.claude/policy.json`).
+2. **Run** `python3 .claude/skills/chat-archive/scripts/ops_read.py --decisions
+   decisions.json --cards cards.json --activity activity.json --runs runs.json
+   --policy fairbay/ops=<path> --policy fairbay/medicaid-benefits-navigator=<path>`
+   (`--json` for the actions). Thresholds come from each policy; a "not judged"
+   line is reported as is, never filled with a default.
+3. **File what it lists**, searching each action's `dedup_key` first
+   (`grove_list_tasks(q=<dedup_key>)`; never a duplicate): one Grove task per
+   S1/S2 breach (list `ops`, tags `decision-routing`, `ops-read-YYYY-MM-DD`;
+   after one design round on an edge, the edge goes to Baylee as a ruling);
+   one adjudication card per S4/S5 breach with the script's recommendation and
+   stakes; each S5 postmortem as one line in the repo's project `next_actions`.
+   "Activity with no record" is reported, never read as a quiet week.
+4. **Print** the script's section verbatim under the health report, including
+   the interactions and the last sync.yml and rules.yml conclusions.
 
 ## Integration
 

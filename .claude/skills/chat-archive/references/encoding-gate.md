@@ -18,6 +18,29 @@ that prevents real errors across all sessions. Anything that's a procedure goes
 to a skill — skills trigger at the right moment; memory edits don't trigger,
 they're always-on context that may not be consulted.
 
+## Batch follow-ups: exactly one class tag (refusal)
+
+A Grove task filed from a data batch carries a `from-mNNNN` tag, and **the gate
+refuses to file it without exactly one class tag** from the repo's
+`.claude/policy.json` `loop_guard.classes` (MBN: `leak`, `scope`, `gap`,
+`owner`, `date`; design `fairbay/ops` docs/decision-routing/LOOP-GUARD.md):
+
+| Tag | The follow-up is |
+|---|---|
+| `leak` | inside the batch's scope, and its method should have caught it (a correction Baylee reverses by note counts) |
+| `scope` | new work the reads exposed outside the batch's scope |
+| `gap` | a library or tooling prerequisite |
+| `owner` | Baylee's call |
+| `date` | a real-world date |
+
+Before each `grove_create_task` or `grove_update_task` whose tags include a
+batch tag (`from-m` and digits, e.g. `from-m1307`; not `from-audit-…` or a task id),
+count the class tags in the list: zero or two or more → do not call;
+pick the one class (ask "would the batch's own method have caught it?" first:
+yes is `leak`). After the batch's tasks are filed, the guard re-checks the whole
+set: `node scripts/batch/guard.mjs --tasks <dump>` exits 2 naming any task
+without exactly one. The same holds for a task retagged later.
+
 ## Memory edit design principles
 
 Use whichever form is shorter:

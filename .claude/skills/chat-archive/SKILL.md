@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-20-05"
+  version: "2026-10-20-06"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -27,6 +27,7 @@ References used by this skill (one hop):
 - `references/handoff-schema.md` — YAML schema, build vs session, delivery
 - `references/encoding-gate.md` — memory edit principles, finding routing
 - `references/close-at-land.md` — PR hand-off: markers, owner tasks, ready, merge tap
+- `references/session-record.md` — session record, random fifth, MBN batch close, agent state
 
 **Surface-specific steps in this skill:**
 - Step 1: skill install check + confirmation batch differ by surface
@@ -97,6 +98,11 @@ context — this is a conversation scan only.
 
 If anything is open: resolve it before continuing.
 
+**Agent state.** Before naming any background agent as running, finished,
+stopped or lost, run the output-file check in `references/session-record.md`
+("Agent state": `stat` and the last line of its `tasks/<id>.output`); relaunch a
+stopped one, take a lost notification's report from the file.
+
 #### 2a. Doc-drift check
 
 If this session changed data or metrics that external-facing docs reference
@@ -106,9 +112,7 @@ accurate. Common drift targets: `README.md` key numbers, `docs/API.md`
 column references, any "Key Numbers" or "Data Scope" section. If stale,
 update in the same commit as other session artifacts.
 
-This is not a full audit — just the docs that reference quantities or facts
-this session changed. Skip if the session was planning-only with no data or
-code changes.
+Only the docs that cite what this session changed; skip for planning-only sessions.
 
 ### 3. Gather and apply learnings
 
@@ -148,15 +152,11 @@ If `.claude/learnings-queue.jsonl` exists at the repo root (`$CLAUDE_PROJECT_DIR
 else `git rev-parse --show-toplevel`), the capture hook queued correction /
 preference / positive signals from Baylee's prompts in this container. Read it:
 
-1. Each entry is a raw finding — merge with the 3a/3b list and route through
-   the encoding gate (3b′). `correction` entries are top priority; `preference`
-   entries usually route to CLAUDE.md or a memory-edit Grove task; `positive`
-   entries confirm patterns, usually "no encoding needed". A `kind: error` line
-   means the capture script crashed: report it in the Step 4 summary.
-2. Deduplicate against what 3a already caught in-conversation.
-3. After every entry has a routing decision, delete the file. It is git-ignored
-   (the hook adds it to `.git/info/exclude`), so never commit it; an undrained
-   queue dies with the container.
+1. Each entry is a raw finding: merge with 3a/3b (dedupe) and route through the
+   encoding gate (3b′); `correction` first. A `kind: error` line means the
+   capture script crashed: report it in the Step 4 summary.
+2. After every entry has a routing decision, delete the file (git-ignored, never
+   committed; an undrained queue dies with the container).
 
 No file: skip silently. Multi-repo and chat sessions run no hooks; 3a is the capture.
 
@@ -173,7 +173,8 @@ routing decision. See `references/encoding-gate.md` for the routing tree.
 - **Skill update** → push now, or create a Grove task tagged
   `routine:skill-worker` with contractor-grade notes (file path, exact
   change, rationale)
-- **Grove task** → create now
+- **Grove task** → create now; a batch follow-up (`from-mNNNN`) is refused
+  without exactly one class tag (`references/encoding-gate.md`)
 - **Adjudication item** → a source conflict no rule settles, an unreachable/
   blocked-content gap, or a medium/low-confidence call that is also expensive
   to reverse or needs Baylee's context (a cheap-to-reverse medium call is a
@@ -241,11 +242,8 @@ Do not summarize from memory of what you did. This prevents
 narration-as-completion at the most dangerous moment (wrap-up, when
 attention to process is lowest).
 
-**Delegation for verification reads:** If verifying multiple large files
-(>3K tokens each), delegate each read-back to haiku via
-`delegate-mechanical`: "Read this file and confirm: (1) does it contain
-[expected content]? (2) any obvious issues?" Keeps raw file contents out of
-the archive context, which is already budget-constrained.
+Verifying several large files (>3K tokens each)? Delegate each read-back to
+haiku (`delegate-mechanical`) and keep only its yes/no and issues.
 
 Concise, scannable:
 
@@ -255,6 +253,8 @@ Concise, scannable:
 - **Key decisions** — architectural choices, ideas shelved/killed, strategy
   shifts. These feed `decisions_made:` in the handoff (Step 9).
 - **What didn't work** — failed approaches worth remembering
+- **Calls to check (random fifth)** — from Step 7b, one line each with
+  "reply 'reverse <id>' to undo"
 - **Permissions & setup gaps** (from 3d, only if any) — what Claude
   requested permission for, what was missing, and the specific settings
   path or connector name to prevent it next time. Format each as:
@@ -285,15 +285,12 @@ Good examples:
 
 - `**Next step:** Install the updated chat-archive skill (presented above), then this workstream is closed.`
 - `**Next step:** When ready, start a new chat and say "work on grove-web" — session-start picks up from HANDOFF.yaml.`
-- `**Next step:** Apply migrations/0004_rpc.sql in the Supabase SQL Editor, then hand back for the smoke test.`
-- `**Next step:** Nothing — everything handled this session.`
 
-What this section is meant to prevent:
-
-- A handoff doc is pushed and the response body ends with "Done." — Baylee
-  has to open the handoff to learn what's next.
-- Three paragraphs of summary with the next step implied via context.
-- "See outstanding action items below" when there's exactly one item.
+**MBN data sessions: the ruled Go rides in this line.** When the next session
+is a data batch (guard verdict `continue`), the line carries the repo's
+`.claude/policy.json` `harness.go` read from the file, `mNNNN` filled with the
+next migration number (`references/session-record.md`, "MBN data-batch close").
+Pause, escalate or a library session: the line names that work and no Go.
 
 ### 6. Outstanding action items (only when there are >1)
 
@@ -324,14 +321,9 @@ push response — read it back.
 **Action item formatting** (applies anywhere action items appear — Step 5's
 "Next step:" line, this list, and ship-it Mode C handoffs):
 
-- Numbered steps, one action per step.
-- Clickable URLs inline — the actual deep-link, not "go to Vercel".
-- Group by destination when more than 3 steps touch multiple sites.
-- State what Claude already completed *before* listing what Baylee needs to do.
-- Before listing any item, confirm Claude can't do it directly.
-- One-step handoffs don't need a list — say it in a sentence with the URL inline.
-- Don't ask Baylee to paste secrets into chat; redirect to paste into the
-  destination field.
+- Numbered steps, one action each, with the deep link inline; group by site past 3 steps.
+- State what Claude already did first; confirm Claude can't do an item before listing it.
+- One step → one sentence with the URL. Secrets go into the destination field, never chat.
 
 ### 7. Cost shape
 
@@ -339,6 +331,14 @@ One line in the Step 4 summary and the Grove session line (9b): sub-agents by mo
 regenerations, review passes, outside-model calls/refusals/dollars. The last from Supabase
 `execute_sql` (project `mqbnsjkeucvumdoqdeww`): `llm.spend_by_session` where `session` contains
 this session's id, `llm.spend_by_run` per `run_id` used; none → "no outside calls".
+
+### 7b. Session record (refusal: no close without it)
+
+Log the session-record decision (`references/session-record.md`, "The record"):
+asks, refusals, merges (Code with `report.py --routing`, else self-reported),
+the rung-3 call ids, the random fifth picked from them (printed in Step 4 and
+9b), cards and tasks for Baylee. **Without its id in hand the archive stops
+here** and says "Not closed: session record not written".
 
 ### 8. Watchlist
 
@@ -367,13 +367,8 @@ If items matched:
 - **Code:** commit the edited copy in the same commit as the handoff. In a
   non-ops repo, also add one line to the handoff `next:` list:
   "Merge `.claude/watchlist.md` observations into `fairbay/ops/watchlist.md`
-  (chat session, git-ops)." That is the merge-back route — repo copy → next
-  chat session → ops source — chosen over a sync-side merge because the
-  observation stays a human-readable diff and nothing merges unattended.
-  `sync.py` holds (prints, does not overwrite) a repo copy whose last commit
-  is not a sync commit and that has lines the ops source lacks, and exits 2,
-  so an observation cannot be clobbered before it is merged. Merge the lines
-  verbatim — once they are in the source, the next sync releases the copy.
+  (chat session, git-ops)." `sync.py` holds (exit 2, no overwrite) a repo copy
+  with lines the ops source lacks until they are merged verbatim.
 
 ### 9. Handoff + Grove write-back
 
@@ -388,6 +383,11 @@ Two paths depending on what this session touched:
   decisions not tied to a single build) — no separate handoff file. The
   Grove write-back (9b below) IS the handoff. session-start reads Grove
   project rows as a primary source.
+
+**MBN data session first:** append the batch to `scripts/batch/guard-record.json`,
+run `node scripts/batch/guard.mjs` (with `--tasks` when a Grove dump is at hand)
+and write its verdict line into HANDOFF `progress:` and the batch's Grove
+decision (`references/session-record.md`, "MBN data-batch close").
 
 #### 9a. Populate `decisions_made:` (build handoffs only)
 
@@ -478,6 +478,9 @@ fails, say so explicitly.
 - [ ] Outstanding items (if >1) verified before listing?
 - [ ] Permissions audit done (3d, chat only)? Setup gaps surfaced in summary?
 - [ ] Cost shape line (7) in the summary and the Grove session line?
+- [ ] Session-record decision logged (7b), random fifth printed with "reverse <id>"?
+- [ ] MBN data session: guard-record appended, guard.mjs verdict in `progress:` and the batch decision, Go in Next-step?
+- [ ] Agent states checked against their output files before naming them?
 - [ ] Watchlist items checked (only the ones whose condition fired)? Code: repo copy committed + merge-back line in `next:`?
 - [ ] Standing rules: every ruling this session is in CLAUDE.md "Baylee's standing rules" with a superseding Grove decision?
 - [ ] Chat rename suggested?
@@ -488,11 +491,9 @@ fails, say so explicitly.
   end-of-session only. If invoked mid-session with no close intent, defer to
   chat-status instead.
 - **← session-start:** Reads the handoff this skill pushes.
-- **→ session-start:** The session-start blurb produced by this skill is
-  designed to trigger session-start in the next chat. The blurb must
-  include the project name (so session-start can resolve the repo) and
-  reference the handoff location — either the repo path or "paste this
-  blurb" if the handoff itself is inline.
+- **→ session-start:** The blurb names the project and the handoff location
+  (repo path, or "paste this blurb"); Phase 0 writes the session record if
+  this archive did not.
 - **→ skill-creator-b:** Route any skill creates/edits through that skill's
   install ceremony.
 - **→ grove:** Park anything that won't ship this session. Step 9b writes the

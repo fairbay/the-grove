@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-20-03"
+  version: "2026-10-20-04"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -102,6 +102,12 @@ by hand, never handed off; recommendation: hand off now").
   table. Report what was promoted in one line.
 - **Another session's PR** (a ready PR opened today, a draft in progress) is
   information for Baylee, not work for this session. Don't touch it.
+- **Session record for the previous session** (once the project row and the
+  handoff are known; code and non-code projects alike): no `session-record`
+  decision dated the handoff's day or later → write one from its transcript
+  when it is on disk, else a stub tagged by `source: no-transcript`. Steps:
+  chat-archive `references/session-record.md`, "At entry". One line in the
+  briefing: "Session record: present | written | stub".
 
 ## Phase 1 — Resolve project (Grove first)
 
@@ -109,11 +115,8 @@ Grove's `project` table is the universal project index — code and non-code
 projects alike. Resolve against it first; a repo is a code-specific detail
 the project row carries, not the identity.
 
-**Loading Grove tools (chat):** the tool_search registry matches fuzzily on
-Grove tool names — descriptive queries take 2-3 attempts. Load first-try with
-the exact-name query: `grove_list_projects grove_create_task grove_update_task
-grove_update_project grove_log_decision`. Then load `grove_list_decisions grove_get grove_list_tasks`
-in one follow-up call. Two calls total — do not search piecemeal.
+**Loading Grove tools (chat):** one exact-name query loads them all:
+`select:` + `grove_list_projects,grove_get,grove_list_decisions,grove_list_tasks,grove_list_adjudications,grove_create_task,grove_update_task,grove_update_project,grove_log_decision` (prefixed as the session names them). Never search piecemeal.
 
 Resolution order:
 
@@ -250,27 +253,12 @@ the session's first push. Elsewhere, file a one-line skill-worker work order
 
 ## Phase 4b — Maturity checkpoint
 
-After loading CLAUDE.md and PLAN.md (or noting their absence), run a quick
-heuristic to detect when a project has outgrown its planning level.
-
-**Flag when ALL of the following are true:**
-- The repo has no `SPEC.md` at the root
-- The repo has ≥20 commits (check via git-ops `api("GET", "/repos/{r}/commits?per_page=1")` and read the `Link` header for total pages, or just check if page 1 returns 20+ results)
-- The repo has a database schema, a `docs/` directory, or ≥5 source files
-
-When flagged, include a one-line note in the Phase 5 orientation:
-
-```
-⚠️ This repo has [N commits] and no SPEC.md — consider a retroactive
-spec pass (architect interview mode) to establish a quality contract
-before public launch.
-```
-
-This is informational, not blocking. Baylee decides whether and when to run
-the spec pass. The flag exists because express-mode plans are ephemeral by
-design (see architect skill), and projects that grow past prototype scope
-need the quality contract (acceptance criteria, success metrics, out-of-scope
-list) that only interview mode produces.
+Flag, in one briefing line, a repo with no root `SPEC.md`, 20 or more commits
+(page 1 of `/repos/{r}/commits` returns 20) and a database schema, a `docs/`
+directory or 5+ source files: "⚠️ [N commits] and no SPEC.md — consider a
+retroactive spec pass (architect interview mode) before public launch."
+Informational, not blocking: express-mode plans are ephemeral by design, and a
+project past prototype scope needs interview mode's quality contract.
 
 ## Phase 4c — Synthesize work queue
 
@@ -386,7 +374,12 @@ Merge `grove_list_decisions` results with the handoff's `decisions_made:`
 resolved adjudications relevant to the project's next actions —
 `grove_list_adjudications(list=<project slug>, status="done")` — a
 `resolution` (`option_id` + `notes`) is a verdict the session must consume
-before re-deciding anything previously sent to adjudication. Surface all of
+before re-deciding anything previously sent to adjudication. A card resolved
+by note with no option (`option_id` null) was the wrong question: tag it
+`wrong_question` plus `table-row-<n>` and put one postmortem line in the plan;
+a "reverse <id>" note on a rung-3 call is logged as a superseding decision
+tagged `reversal`, then undone (chat-archive `references/session-record.md`,
+"Reversals and wrong questions"). Surface all of
 this in the briefing between "where we left off" and "next up." Priority
 ordering:
 
@@ -472,6 +465,11 @@ AskUserQuestion and continue on the answer.
   repo. Don't ask.
 - **Auto-starting work.** Orientation first, confirmation second, work third —
   except the singular-unambiguous-task carve-out.
+
+- **Naming an agent's state from memory.** A resumed session that launched
+  background agents checks each output file first (chat-archive
+  `references/session-record.md`, "Agent state"), then says running, finished
+  or stopped.
 
 - **Chasing referenced artifacts during orientation.** Don't read other
   handoffs, task bodies, plan doc contents, or linked decision chains during
