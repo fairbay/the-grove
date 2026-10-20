@@ -158,6 +158,21 @@ Order matters: draft first, then the owner task, so the line names a real number
    In a `merge_policy: self` repo the session may merge without a tap where the
    platform allows it; a refused merge call falls back to the tap.
 
+   **Ruled upkeep merges without a tap** (Baylee, 2026-10-19, adjudication
+   ffea5247), in any repo, when all three hold:
+   1. The PR only carries out a ruling Baylee already made, or is upkeep: a fix,
+      cleanup or follow-up to what already shipped, with no change of direction.
+   2. It was verified: row G3 with the checks green, and in a `deploy_check:
+      vercel` repo the preview checked as well. G4 waits for the checks; G5 and
+      G5b (no checks ran) keep the tap.
+   3. One revert undoes it: no data migration or deletion, no outward step (a
+      publish, an email, a payment).
+
+   Then skip the question and go to step 3, and name the ruling (card ID) or the
+   upkeep in the report line. A new design, a new feature, a change of direction,
+   or a ruling read past its plain words keeps the tap. When the session has
+   nothing else ongoing or planned, ask "Archive now?" after the merge instead.
+
    **Merge and archive** (Baylee, 2026-10-18). When the session has no other
    work ongoing or planned once this PR lands (it was the last item, or the
    repo's rules end the session after it, such as MBN's one data batch per
