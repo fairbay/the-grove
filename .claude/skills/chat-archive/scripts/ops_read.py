@@ -11,7 +11,11 @@ block, and a missing key is reported as "not judged: <repo> policy lacks signals
 Usage:
   python3 ops_read.py --decisions FILE [--cards FILE] [--activity FILE] [--runs FILE]
       --policy REPO=PATH [--policy REPO=PATH ...] [--default-policy PATH]
-      [--until YYYY-MM-DD] [--days 7] [--json]
+      [--minutes FILE] [--until YYYY-MM-DD] [--days 7] [--json]
+
+--minutes FILE: JSON array of {repo, date, minutes}, one row per Actions run in the billing month
+(minutes = the run's duration rounded up to whole minutes). It feeds S11, the account-wide Actions
+minutes line; S10 (cache-read tokens per day) reads the optional `cache_read_m` of the records.
 
 Exit 0 normally; 2 on an input error (unreadable file, bad JSON, --policy without '=').
 Python 3.11, stdlib only.
@@ -27,6 +31,9 @@ K_S1 = "S1_policy_asks_per_upkeep_session"
 K_S2 = "S2_harness_refusals_per_session"
 K_S4 = "S4_reversals_over_calls_shown"
 K_S5 = "S5_wrong_question_cards"
+K_S10 = "S10_cache_read_tokens_per_day"
+K_S11 = "S11_actions_minutes_month"
+BUDGET_REPO = "fairbay/ops"  # the two budget lines are account-wide; their thresholds live in ops's policy
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 ROW_RE = re.compile(r"^table-row-(\d+)$")
 WRAP_KEYS = ("decisions", "tasks", "items", "results", "data", "workflow_runs")
@@ -89,6 +96,16 @@ def parse_day(s):
         except ValueError:
             return None
     return None
+
+
+def load_minutes(path):
+    rows = []
+    for i, m in enumerate(load_list(path)):
+        n = m.get("minutes")
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise InputError(f"{path}: row {i} minutes is not a non-negative integer")
+        rows.append({"repo": norm_repo(m.get("repo")) or "?", "date": parse_day(m.get("date")), "minutes": n})
+    return rows
 
 
 def tags_of(x):
@@ -171,6 +188,10 @@ def parse_records(decisions):
             counts[f] = v
         if not ok:
             continue
+        cache = ctx.get("cache_read_m")
+        if cache is not None and (not isinstance(cache, dict) or any(not is_num(v) or v < 0 for v in cache.values())):
+            bad("cache_read_m is not a model -> millions object or null")
+            continue
         shown = ctx.get("calls_shown") or []
         if not isinstance(shown, list):
             bad("calls_shown is not a list")
@@ -185,6 +206,7 @@ def parse_records(decisions):
             "repo": repo, "kind": ctx.get("kind") or "upkeep", "source": ctx.get("source"),
             "asks": counts["asks"], "refusals": counts["refusals"],
             "refused": [str(x) for x in refused], "calls_shown": [str(x) for x in shown],
+            "cache_read_m": cache,
         })
     return records, unreadable
 
@@ -405,7 +427,67 @@ def signal_s5(repo, pol, cards, since, until, days, actions):
 
 # ---------------------------------------------------------------- build
 
-def build(decisions, cards, activity, runs, policies, default_policy, until, days):
+def signal_s10(pol, records, since, until, actions):
+    """Cache-read tokens per day across every repo's session records, in millions (account-wide)."""
+    days = {}
+    week = [r for r in records if since < r["date"] <= until]
+    counted = [r for r in week if r["cache_read_m"] is not None]
+    for r in counted:
+        d = days.setdefault(r["date"].isoformat(), {"total": 0.0, "by_model": {}})
+        for model, m in r["cache_read_m"].items():
+            d["total"] += m
+            d["by_model"][model] = d["by_model"].get(model, 0.0) + m
+    observed = "no record carries a cache_read_m" if not counted else "; ".join(
+        f"{day} {fmt_num(round(v['total'], 1))}M ({', '.join(f'{m} {fmt_num(round(x, 1))}M' for m, x in sorted(v['by_model'].items()))})"
+        for day, v in sorted(days.items()))
+    coverage = f"{len(counted)} of {len(week)} records this week carry a cost"
+    res = {"days": {d: round(v["total"], 3) for d, v in sorted(days.items())}, "records_with_cost": len(counted), "records": len(week)}
+    vals, bad = thresholds(pol, BUDGET_REPO, K_S10, [("max_per_day", "num")]) if pol else ({}, [f"not judged: no {BUDGET_REPO} policy"])
+    if bad:
+        res.update(status="not_judged", reason="; ".join(bad))
+        res["line"] = f"S10 cache-read tokens per day, millions ({coverage}): {observed}. " + not_judged(bad)["line"]
+        return res
+    mx = vals["max_per_day"]
+    over = sorted(d for d, v in res["days"].items() if v > mx)
+    res.update(status="breach" if over else "ok", max_per_day=mx, over=over)
+    res["line"] = f"S10 cache-read tokens per day, millions (max {fmt_num(mx)}; {coverage}): {observed} -> {res['status']}"
+    for d in over:
+        actions.append({"type": "task", "signal": "S10", "repo": BUDGET_REPO, "dedup_key": f"budget-breach S10 {d}",
+                        "title": f"S10: cache-read tokens {fmt_num(res['days'][d])}M on {d}, above {fmt_num(mx)}M a day",
+                        "body": f"Session records dated {d} carry {fmt_num(res['days'][d])}M cache-read tokens against a flag of {fmt_num(mx)}M a day.\n\n"
+                                "Name the sessions behind it (batch size, review passes, sub-agents by model). Slowing the plan is Baylee's call."})
+    return res
+
+
+def signal_s11(pol, minutes, until, actions):
+    """GitHub Actions minutes used this billing month (UTC calendar month) against the plan's limit."""
+    vals, bad = thresholds(pol, BUDGET_REPO, K_S11, [("limit_per_month", "num"), ("flag_at_fraction", "num")]) if pol else ({}, [f"not judged: no {BUDGET_REPO} policy"])
+    if minutes is None:
+        bad = bad + ["not judged: no --minutes input (Actions runs of the month, one row per run)"]
+    if bad:
+        return not_judged(bad) | {"line": "S11 Actions minutes this month: " + not_judged(bad)["line"]}
+    start = until.replace(day=1)
+    rows = [m for m in minutes if m["date"] and start <= m["date"] <= until]
+    used = sum(m["minutes"] for m in rows)
+    by_repo = {}
+    for m in rows:
+        by_repo[m["repo"]] = by_repo.get(m["repo"], 0) + m["minutes"]
+    limit, frac = vals["limit_per_month"], vals["flag_at_fraction"]
+    breach = used >= frac * limit
+    top = ", ".join(f"{r} {n}" for r, n in sorted(by_repo.items(), key=lambda kv: (-kv[1], kv[0]))[:5]) or "no runs"
+    res = {"status": "breach" if breach else "ok", "used": used, "limit_per_month": limit, "flag_at_fraction": frac,
+           "month": start.strftime("%Y-%m"), "by_repo": by_repo, "runs": len(rows)}
+    res["line"] = (f"S11 Actions minutes {res['month']} (flag at {fmt_num(frac)} of {fmt_num(limit)}): {used} used over {len(rows)} runs "
+                   f"({top}) -> {res['status']}; run durations rounded up per run, so the plan's own count can differ")
+    if breach:
+        actions.append({"type": "task", "signal": "S11", "repo": BUDGET_REPO, "dedup_key": f"budget-breach S11 {res['month']}",
+                        "title": f"S11: Actions minutes {used} of {fmt_num(limit)} in {res['month']}",
+                        "body": f"{used} minutes over {len(rows)} runs in {res['month']} (by repo: {top}) against {fmt_num(limit)} a month; the flag is {fmt_num(frac)} of it.\n\n"
+                                "At the limit the backups, db-apply and the daily production check stop (2026-10-09). Name what to trim; a repo going public frees its minutes (Baylee's call)."})
+    return res
+
+
+def build(decisions, cards, activity, runs, policies, default_policy, until, days, minutes=None):
     since = until - timedelta(days=days)
     in_week = lambda d: since < d <= until
     records, unreadable = parse_records(decisions)
@@ -522,6 +604,10 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
     runs_out = [{"repo": k[0], "workflow": k[1], "conclusion": v[1].get("conclusion"), "created_at": v[1].get("created_at"), "url": v[1].get("url")}
                 for k, v in sorted(newest.items())]
 
+    budget_pol = (policies[BUDGET_REPO][0] if BUDGET_REPO in policies else (default_policy[0] if default_policy else None))
+    budgets = {"S10": signal_s10(budget_pol, records, since, until, actions),
+               "S11": signal_s11(budget_pol, minutes, until, actions)}
+
     # dedupe actions
     seen_keys, uniq_actions = set(), []
     for a in actions:
@@ -532,7 +618,7 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
             uniq_actions.append(a)
 
     return {"window": {"since": since.isoformat(), "until": until.isoformat(), "days": days, "quiet_week": quiet},
-            "repos": out_repos, "no_record": no_record, "runs": runs_out, "unreadable": unreadable, "actions": uniq_actions}
+            "repos": out_repos, "budgets": budgets, "no_record": no_record, "runs": runs_out, "unreadable": unreadable, "actions": uniq_actions}
 
 
 # ---------------------------------------------------------------- render
@@ -562,6 +648,8 @@ def render(res):
             L.append(f"- {i}")
         for n in e["not_counted"]:
             L.append(f"- not counted: {n['session']} {n['date']} ({', '.join(n['fields'])} null{'; ' + n['source'] if n['source'] else ''})")
+    b = res["budgets"]
+    L += ["", "### Budgets (account-wide)", f"- {b['S10']['line']}", f"- {b['S11']['line']}"]
     L += ["", "Activity with no record:"]
     if res["no_record"]:
         L += [f"- {n['text']}" for n in res["no_record"]]
@@ -585,6 +673,7 @@ def parse_args(argv):
     p.add_argument("--cards")
     p.add_argument("--activity")
     p.add_argument("--runs")
+    p.add_argument("--minutes")
     p.add_argument("--policy", action="append", default=[], metavar="REPO=PATH")
     p.add_argument("--default-policy")
     p.add_argument("--until")
@@ -614,10 +703,11 @@ def main(argv=None):
         cards = load_list(a.cards) if a.cards else []
         activity = load_list(a.activity) if a.activity else []
         runs = load_list(a.runs) if a.runs else []
+        minutes = load_minutes(a.minutes) if a.minutes else None
     except InputError as e:
         print(f"ops_read.py: {e}", file=sys.stderr)
         return 2
-    res = build(decisions, cards, activity, runs, policies, default, until, a.days)
+    res = build(decisions, cards, activity, runs, policies, default, until, a.days, minutes)
     if a.json:
         print(json.dumps(res, indent=2, ensure_ascii=False))
     else:

@@ -25,6 +25,7 @@ row's metadata is overwritten each session, so it cannot hold a series).
  "asks": 0, "refusals": 0, "refused": [], "merges": 0,
  "calls_logged": ["<rung-3 decision ids>"], "calls_shown": ["<ids of the random fifth>"],
  "cards": ["<adjudication ids filed>"], "tasks_for_baylee": ["<task ids for him>"],
+ "cache_read_m": null,
  "source": "transcript|self-reported|no-transcript"}
 ```
 
@@ -38,6 +39,7 @@ row's metadata is overwritten each session, so it cannot hold a series).
 | `merges` | PR merge calls (`gh api -X PUT …/merge`, git-ops merge) |
 | `calls_logged` | Grove decisions this session logged at rung 3 (not the record itself, not reversals) |
 | `calls_shown`, `cards`, `tasks_for_baylee` | the random fifth below; Grove ids filed this session |
+| `cache_read_m` | the session's cache-read tokens in millions by model, `{"opus": 12.3, "sonnet": 4.1}`, from the repo's usage report when it has one (MBN `report.py`); else `null`, never a guess. The weekly read's S10 line sums it per day (`ops_read.py`); a record without it is counted as "no cost", not as zero |
 | `source` | `transcript` when counted from the transcript; `self-reported` when counted by recall; `no-transcript` for an entry stub |
 
 **Counting.** In a Code session whose repo has `scripts/session-usage/report.py`

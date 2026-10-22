@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-20-02"
+  version: "2026-10-22-01"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -262,8 +262,15 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    - `runs.json`: the newest run of `sync.yml` (ops) and `rules.yml` (each repo
      that has it): `gh api "repos/fairbay/<repo>/actions/workflows/<file>/runs?per_page=1"`.
    - Each repo's `.claude/policy.json` (from a clone or `contents/.claude/policy.json`).
+   - `minutes.json`, for the budget line S11: one `{repo, date, minutes}` row per
+     Actions run this UTC month in every private repo the session can read
+     (`gh api "repos/fairbay/<repo>/actions/runs?created=>=<YYYY-MM-01>&per_page=100"`,
+     paged; `minutes` = ceil((`updated_at` − `run_started_at`) / 60 s); public repos
+     are free and skipped). The account billing endpoint is not reachable from a
+     session; name the private repos that were not read.
 2. **Run** `python3 .claude/skills/chat-archive/scripts/ops_read.py --decisions
    decisions.json --cards cards.json --activity activity.json --runs runs.json
+   --minutes minutes.json
    --policy fairbay/ops=<path> --policy fairbay/medicaid-benefits-navigator=<path>`
    (`--json` for the actions). Thresholds come from each policy; a "not judged"
    line is reported as is, never filled with a default.
@@ -275,6 +282,14 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    one adjudication card per S4/S5 breach with the script's recommendation and
    stakes; each S5 postmortem as one line in the repo's project `next_actions`.
    "Activity with no record" is reported, never read as a quiet week.
+   The two **budget lines** (S10 cache-read tokens per day from the week's session
+   records, S11 Actions minutes this month against the plan) are account-wide and
+   read ops's policy: a breach is one Grove task (list `ops`, tags
+   `decision-routing`, `ops-read-YYYY-MM-DD`; dedup key as filed). S10 has no
+   `max_per_day` until Baylee names one: the line prints the observed figures and
+   "not judged", and the first real-week figures are what he is shown when he is
+   asked once for the flag (a number offered to him gets its consequence in
+   numbers first). Record what each line said in the run's report.
 4. **Print** the script's section verbatim under the health report, including
    the interactions and the last sync.yml and rules.yml conclusions.
 
