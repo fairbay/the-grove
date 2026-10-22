@@ -63,7 +63,8 @@ Order matters: draft first, then the owner task, so the line names a real number
   Baylee about that PR (merge or close) in one tap and act only on his answer,
   even when another session opened it; or keep this one in draft. Two ready PRs
   would both rewrite HANDOFF.yaml. The standing-rules PR of step 2 is the one
-  exception: it is merged before step 3, so it never overlaps.
+  exception: it is merged before step 3, so it never overlaps. Where landing.yaml declares
+  `lanes:`, only a ready PR of this session's lane blocks (`references/lanes.md`, Exit 3).
 
 **Steps, in order. Each is safe to re-run.**
 
@@ -79,7 +80,9 @@ Order matters: draft first, then the owner task, so the line names a real number
    opened ready (no owner task, no trailer: it is not a work PR), and merged at
    Baylee's tap before step 3. Left unmerged, the gate shows it as G6b, which is
    right: a ruling that never reached `main`.
-3. **HANDOFF.yaml on the PR branch.** `meta.landing: fairbay/<repo>#<n>`. `done:`
+3. **HANDOFF.yaml on the PR branch.** With `lanes:` declared, first merge main once, then write
+   only this lane's file and `progress` line (`references/lanes.md`, Exit 1–2); the rest of this
+   step applies to that file. `meta.landing: fairbay/<repo>#<n>`. `done:`
    in pending tense ("Lands with #n: …"). `next:` pruned per
    `handoff-schema.md`: carry forward every open item a previous session left,
    even one outside this PR's work. Decisions in `decisions_made:`.
@@ -163,7 +166,8 @@ Order matters: draft first, then the owner task, so the line names a real number
    Go sentence into the Next-step line verbatim, as the policy's `harness.go`
    states it (MBN: *"Go: live-check, apply and publish mNNNN if the independent
    check passes; open the code-half PR from main and squash-merge it when its
-   checks are green; archive."*), the batch id filled in; when the next session
+   checks are green; archive."*), the batch id filled in (in a lanes repo prefixed with the
+   lane, `lane A: Go: …`, so the lane gate loads the baton); when the next session
    is not a data batch (a library session, a build), the line names that work
    and no Go. Baylee's opening message then carries his consent and the next
    session asks no blocking question at start. What the Go covers changes only by his ruling; a refusal

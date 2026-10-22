@@ -5,7 +5,7 @@ description: >
   "add claude config". Auto-fires from ship-it when .claude/ is missing.
   Not for deployment (→ ship-it) or skill editing (→ skill-creator-b).
 metadata:
-  version: "2026-10-19-02"
+  version: "2026-10-22-01"
 ---
 
 # init-repo — bootstrap .claude/ infrastructure in a repository
@@ -51,10 +51,10 @@ Do not customize per repo.
 [One-line description of what this repo is.]
 ```
 
-**`.claude/settings.json`** — Copy the two managed hook groups verbatim from
+**`.claude/settings.json`** — Copy the three managed hook groups verbatim from
 `fairbay/ops/.claude/settings.json`: the SessionStart entry marked
-`fairbay-managed:entry-gate` and the UserPromptSubmit entry marked
-`fairbay-managed:capture`. Never retype them; the sync keeps them current from
+`fairbay-managed:entry-gate` and the UserPromptSubmit entries marked
+`fairbay-managed:capture` and `fairbay-managed:lane-gate`. Never retype them; the sync keeps them current from
 then on (docs/hook-delivery/DESIGN.md §3.5).
 
 **`.claude/skills/`** — Read all files from `fairbay/ops/.claude/skills/`

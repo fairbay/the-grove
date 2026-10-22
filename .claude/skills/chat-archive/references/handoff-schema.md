@@ -28,6 +28,10 @@ should have been encoded elsewhere and cleared.**
 - **Both** — touched a product repo AND did strategic work. Generate a build
   handoff for the product repo; the strategic context is covered by Grove.
 
+**Lanes.** Where `.claude/landing.yaml` declares `lanes:`, each lane's baton is
+`handoffs/lane-<x>.yaml` in this same schema, and HANDOFF.yaml keeps only `meta` and one
+`progress` line per lane (`references/lanes.md`).
+
 ## Format: YAML
 
 Both handoff types are YAML. Handoffs are by Claude, for Claude — the next

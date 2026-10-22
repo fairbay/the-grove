@@ -2,7 +2,7 @@
 // policy-check.mjs: the loud-failure check of fairbay/ops docs/decision-routing/DESIGN.md §5.
 // Synced into every repo with the chat-archive skill. Run from the repo root:
 //
-//   node .claude/skills/chat-archive/scripts/policy-check.mjs [--root DIR] [--skip-s8]
+//   node .claude/skills/chat-archive/scripts/policy-check.mjs [--root DIR] [--skip-s8] [--base REF] [--require-base]
 //
 // Checks, one line per failure, exit 1 on any:
 //   (a) policy  .claude/policy.json parses and has the schema's required keys; every
@@ -19,7 +19,15 @@
 //               so a later edit to an exempt sentence makes it fail again, and an entry that
 //               matches no flagged sentence fails, so the list cannot go stale silently.
 //   (d) S8      session_handoff.py measure: the entry hook, given a worst-case PR table, cuts
-//               no character of the handoff.
+//               no character of the handoff (and, where lanes are declared, of any lane's baton).
+//   (e) lanes   only where .claude/landing.yaml declares `lanes:` (fairbay/ops docs/lanes/DESIGN.md §3.4):
+//               HANDOFF.yaml holds only meta and progress; progress keys are declared lanes with a blank line
+//               between keys; every handoffs/lane-*.yaml names a declared lane; and the change against --base
+//               (default origin/main; CI passes HEAD^1) touches at most one lane's baton (its file or its
+//               progress line). The cross-lane check is skipped, with a note, when the base declares no lanes
+//               (the migration), when the change edits the lane list, or when the base cannot be resolved
+//               (--require-base, as CI passes it, makes that last one a failure). Each progress line is at
+//               most 200 characters. Lane files with no lanes declared fail.
 // The rule files are signals.S7_uncited_routing_sentences.files in policy.json. .claude/global.md
 // is never linted here: it is a synced copy, linted in fairbay/ops only.
 // Dependency-free (Node's own modules), so rules.yml runs it without an install.
@@ -28,6 +36,8 @@ import { readFileSync, existsSync, readdirSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
+import { progressEntries, declaredLanes } from "./handoff-merge.mjs";
+export { declaredLanes };
 
 const STRICTER =
   "On a red S7 or S8, prose and policy both bind and the stricter reading wins (fairbay/ops docs/decision-routing/DESIGN.md §4).";
@@ -72,10 +82,12 @@ const VERB_RE =
 const POINTER_RE = /(?<![\w-])policy:\s*([a-z][a-z0-9_]*)/g;
 
 function args(argv) {
-  const out = { root: process.cwd(), s8: true };
+  const out = { root: process.cwd(), s8: true, base: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--root") out.root = argv[++i];
     else if (argv[i] === "--skip-s8") out.s8 = false;
+    else if (argv[i] === "--base") out.base = argv[++i];
+    else if (argv[i] === "--require-base") out.requireBase = true;
   }
   return out;
 }
@@ -261,13 +273,108 @@ function checkS8(root) {
   if (res.ok) return [];
   if (res.error) return [`S8: ${res.error}`];
   const what = [...res.cut.map((k) => `${k} cut`), ...res.omitted.map((k) => `${k} left out`)].join(", ");
+  if (/lane index|progress/.test(what) && !/^lane [a-z0-9]+:/.test(what))
+    return [
+      `S8: with a worst-case PR table the entry hook cuts ${res.chars_cut} characters of HANDOFF.yaml's progress lines or the lane index (${what}; payload ${res.size} of ${res.limit}). ` +
+        `Every lane's line rides every startup payload: shorten this lane's progress line, and say in the PR body which other lanes' lines are longest (each lane trims its own).`,
+    ];
   return [
-    `S8: with a worst-case PR table the entry hook cuts ${res.chars_cut} characters of HANDOFF.yaml (${what}; payload ${res.size} of ${res.limit}). ` +
+    `S8: with a worst-case PR table the entry hook cuts ${res.chars_cut} characters of ${/lane /.test(what) ? "the batons" : "HANDOFF.yaml"} (${what}; payload ${res.size} of ${res.limit}). ` +
       `Prune next: to 3-5 items and park the rest with a location (chat-archive references/handoff-schema.md).`,
   ];
 }
 
-export function run(root, { s8 = true } = {}) {
+// (e) lanes
+const LANDING = ".claude/landing.yaml";
+const LANE_FILE = /^lane-([a-z][a-z0-9]*)\.yaml$/;
+const PROGRESS_LINE_MAX = 200; // every lane's line rides every startup payload: 7 lines of 220 already fill S8 (docs/lanes/DESIGN.md §7)
+const BATON_KEYS = ["next", "done", "carried_forward", "decisions_made", "parked", "watch_outs", "blocking_on"];
+
+// Layout checks over the working tree's HANDOFF.yaml and lane file names.
+export function checkLaneLayout(handoff, laneFileNames, lanes) {
+  const fails = [];
+  if (handoff !== null) {
+    const top = [...handoff.matchAll(/^([a-z_]+):/gm)].map((m) => m[1]);
+    for (const k of new Set(top.filter((k, i) => top.indexOf(k) !== i)))
+      fails.push(`lanes: HANDOFF.yaml has two top-level \`${k}:\` keys; a YAML reader keeps only the last one`);
+    for (const k of top)
+      if (!["meta", "progress"].includes(k))
+        fails.push(`lanes: HANDOFF.yaml has a top-level \`${k}:\`; with lanes declared it holds only meta and progress` +
+          (BATON_KEYS.includes(k) ? ` (${k} belongs in handoffs/lane-<x>.yaml)` : ""));
+    const entries = progressEntries(handoff);
+    entries.forEach((e, j) => {
+      if (!lanes.includes(e.key)) fails.push(`lanes: HANDOFF.yaml progress key \`${e.key}\` is not a declared lane (${lanes.join(", ")})`);
+      if (e.line.length > PROGRESS_LINE_MAX)
+        fails.push(`lanes: HANDOFF.yaml progress line \`${e.key}\` is ${e.line.length} characters (at most ${PROGRESS_LINE_MAX}; the detail goes in handoffs/lane-${e.key}.yaml)`);
+      if (j > 0 && e.index === entries[j - 1].index + 1)
+        fails.push(`lanes: HANDOFF.yaml progress keys \`${entries[j - 1].key}\` and \`${e.key}\` are adjacent: put a blank line between them (adjacent edits from two lanes conflict)`);
+    });
+  }
+  for (const f of laneFileNames) {
+    const m = f.match(LANE_FILE);
+    if (m && !lanes.includes(m[1])) fails.push(`lanes: handoffs/${f} names lane \`${m[1]}\`, which .claude/landing.yaml does not declare`);
+  }
+  return fails;
+}
+
+// The lanes a change touches: lane files changed, and progress keys whose line differs from the base.
+export function touchedLanes(changedPaths, baseHandoff, handoff) {
+  const out = new Set();
+  for (const p of changedPaths) {
+    const m = p.match(/^handoffs\/lane-([a-z][a-z0-9]*)\.yaml$/);
+    if (m) out.add(m[1]);
+  }
+  const before = new Map(progressEntries(baseHandoff).map((e) => [e.key, e.line]));
+  const after = new Map(progressEntries(handoff).map((e) => [e.key, e.line]));
+  for (const k of new Set([...before.keys(), ...after.keys()])) if (before.get(k) !== after.get(k)) out.add(k);
+  return [...out].sort();
+}
+
+function checkLanes(root, base, requireBase = false) {
+  const fails = [];
+  const notes = [];
+  const read = (p) => (existsSync(join(root, p)) ? readFileSync(join(root, p), "utf8") : null);
+  const lanes = declaredLanes(read(LANDING));
+  const dir = join(root, "handoffs");
+  const laneFiles = existsSync(dir) ? readdirSync(dir).filter((f) => LANE_FILE.test(f)).sort() : [];
+  if (!lanes.length) {
+    if (laneFiles.length) fails.push(`lanes: handoffs/${laneFiles[0]} exists but .claude/landing.yaml declares no lanes`);
+    return { fails, notes };
+  }
+  const handoff = read("HANDOFF.yaml");
+  fails.push(...checkLaneLayout(handoff, laneFiles, lanes));
+  const g = (args) => spawnSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 });
+  const ref = base || "origin/main";
+  if (g(["rev-parse", "-q", "--verify", `${ref}^{commit}`]).status !== 0) {
+    (requireBase ? fails : notes).push(`lanes: cross-lane check ${requireBase ? "cannot run" : "skipped"}: base ${ref} not found (fetch it, or pass --base)`);
+    return { fails, notes };
+  }
+  const mb = (g(["merge-base", ref, "HEAD"]).stdout || "").trim() || ref;
+  const at = (p) => {
+    const r = g(["show", `${mb}:${p}`]);
+    return r.status === 0 ? r.stdout : null;
+  };
+  const baseLanes = declaredLanes(at(LANDING));
+  if (!baseLanes.length) {
+    notes.push(`lanes: cross-lane check skipped: the base declares no lanes (the migration)`);
+    return { fails, notes };
+  }
+  if (baseLanes.join(",") !== lanes.join(",")) {
+    notes.push(`lanes: cross-lane check skipped: this change edits the lane list (${baseLanes.join(", ")} → ${lanes.join(", ")})`);
+    return { fails, notes };
+  }
+  const changed = [
+    ...(g(["diff", "--name-only", mb]).stdout || "").split("\n"),
+    ...(g(["ls-files", "--others", "--exclude-standard", "--", "handoffs"]).stdout || "").split("\n"),
+  ].filter(Boolean);
+  const touched = touchedLanes(changed, at("HANDOFF.yaml"), handoff);
+  if (touched.length > 1)
+    fails.push(`lanes: this change edits the batons of lanes ${touched.join(", ")} (against ${ref}); a lane writes only its own ` +
+      `handoffs/lane-<x>.yaml and its own progress line. After a merge of main, resolve with handoff-merge.mjs --lane <x>.`);
+  return { fails, notes };
+}
+
+export function run(root, { s8 = true, base = null, requireBase = false } = {}) {
   const fails = [];
   const ppath = join(root, POLICY);
   if (!existsSync(ppath)) return { fails: [`${POLICY} missing: this repo has no routing policy to check against`], files: [] };
@@ -288,7 +395,9 @@ export function run(root, { s8 = true } = {}) {
     else if (!files.includes(e.file)) fails.push(`S7: not_routing entry names ${e.file}, which is not a linted rule file`);
   for (const f of files) fails.push(...lintText(f, readFileSync(join(root, f), "utf8"), classes, exempt));
   if (s8) fails.push(...checkS8(root));
-  return { fails, files };
+  const lanes = checkLanes(root, base, requireBase);
+  fails.push(...lanes.fails);
+  return { fails, files, notes: lanes.notes };
 }
 
 const isMain = (() => {
@@ -300,7 +409,8 @@ const isMain = (() => {
 })();
 if (isMain) {
   const a = args(process.argv.slice(2));
-  const { fails, files } = run(a.root, a);
+  const { fails, files, notes = [] } = run(a.root, a);
+  for (const n of notes) console.log(`note ${n}`);
   for (const f of fails) console.log(`FAIL ${f}`);
   if (fails.length) {
     console.log(`policy-check: ${fails.length} failure(s) in ${relative(process.cwd(), a.root) || "."} (${files.length} rule files). ${STRICTER}`);

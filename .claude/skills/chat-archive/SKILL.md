@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-22-01"
+  version: "2026-10-22-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -28,6 +28,7 @@ References used by this skill (one hop):
 - `references/encoding-gate.md` — memory edit principles, finding routing
 - `references/close-at-land.md` — PR hand-off: markers, owner tasks, ready, merge tap
 - `references/session-record.md` — session record, random fifth, MBN batch close, agent state
+- `references/lanes.md` — repos whose landing.yaml declares `lanes:`: one baton per lane, handoff-merge
 
 **Surface-specific steps in this skill:**
 - Step 1: skill install check + confirmation batch differ by surface
@@ -376,8 +377,8 @@ If items matched:
 Two paths depending on what this session touched:
 
 - **Build handoff** — session involved code changes in a product repo.
-  Write `HANDOFF.yaml` at the repo root. Work in a PR: the handoff rides the
-  close-at-land commit (`references/close-at-land.md`), not a later push, and is not
+  Write `HANDOFF.yaml` at the repo root (with `lanes:` declared, only this lane's baton: `references/lanes.md`).
+  Work in a PR: the handoff rides the close-at-land commit (`references/close-at-land.md`), not a later push, and is not
   pushed while `session_handoff.py measure` fails (S8). See `references/handoff-schema.md`
   for the YAML schema, CLAUDE.md maintenance, and the no-blurb convention.
 - **Session-only work** (audits, skill updates, research, architectural
@@ -387,7 +388,7 @@ Two paths depending on what this session touched:
 
 **MBN data session first:** append the batch to `scripts/batch/guard-record.json`,
 run `node scripts/batch/guard.mjs` (with `--tasks` when a Grove dump is at hand)
-and write its verdict line into HANDOFF `progress:` and the batch's Grove
+and write its verdict line into HANDOFF `progress:` (lanes: the lane file's) and the batch's Grove
 decision (`references/session-record.md`, "MBN data-batch close").
 
 #### 9a. Populate `decisions_made:` (build handoffs only)

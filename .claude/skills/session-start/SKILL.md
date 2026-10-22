@@ -5,7 +5,7 @@ description: >
   on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-20-05"
+  version: "2026-10-22-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -166,7 +166,8 @@ Resolution order — use the first that resolves:
    frontmatter), use it as the primary source. Still run Phase 3 against it —
    a pasted handoff from 5 days ago should be flagged just like a repo
    handoff would be.
-2. **Build handoff:** `HANDOFF.yaml` in the repo root via git-ops.
+2. **Build handoff:** `HANDOFF.yaml` in the repo root via git-ops. Where `.claude/landing.yaml`
+   declares `lanes:`, also the lane's `handoffs/lane-<x>.yaml` and the row's lane line (chat-archive `references/lanes.md`, Entry).
 3. **Session handoff:** list `fairbay/ops/handoffs/` via git-ops,
    filter filenames containing the project slug, read the most recent by date
    prefix.
@@ -486,8 +487,8 @@ AskUserQuestion and continue on the answer.
 - **← grove:** `grove_list_projects`, `grove_list_decisions`, `grove_events`
   are the briefing's data source — the store of record for project memory.
 - **↔ Claude Code:** On the Claude Code surface the entry gate is a SessionStart
-  hook (this skill's `scripts/session_handoff.py inject`, an entry managed by
-  fairbay/ops) that injects the same handoffs, and the decision table of
+  hook (this skill's `scripts/session_handoff.py inject`, plus its `lane` gate on prompts in a
+  lanes repo; entries managed by fairbay/ops) that injects the same handoffs, and the decision table of
   `.claude/policy.json`, as `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
 - **← pr_state.py:** Phase 0 runs this skill's `scripts/pr_state.py report` (land-and-leave

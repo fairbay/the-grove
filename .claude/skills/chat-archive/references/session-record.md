@@ -140,7 +140,8 @@ applied and published this session), before the handoff is written:
    without `--tasks` (the record's snapshot). Exit 0, 3 and 4 are verdicts
    (continue, pause-and-repair, escalate); exit 2 is an input error: fix the
    record or the tags and run again, never write a verdict from an exit 2.
-3. **Write the verdict line** verbatim into HANDOFF `progress:` and into the
+3. **Write the verdict line** verbatim into HANDOFF `progress:` (with lanes: the lane file's
+   `progress:`, `references/lanes.md`) and into the
    batch's Grove decision: in its `context` when 9b logs it now; when it was
    logged earlier (decisions are append-only), a superseding decision that
    repeats the call and adds the line.

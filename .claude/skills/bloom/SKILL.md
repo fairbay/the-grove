@@ -1,6 +1,6 @@
 ---
 metadata:
-  version: "2026-07-12-01"
+  version: "2026-10-22-01"
   description: >-
     Strategic task triage — "bloom", "what should I work on", "plan the work".
     Cross-project mission-weighted grouping into work packages. Not capture
@@ -44,7 +44,8 @@ Pull all open work items. Cast the net broadly — filtering happens in Phase 2.
    projects. These are the canonical work items.
 2. **Grove adjudications** — `grove_list_adjudications(status="open")`.
    Pending judgments are blockers, not tasks — note them but don't rank them.
-3. **HANDOFF.yaml `next:`** — from each active repo. May contain items not
+3. **HANDOFF.yaml `next:`** — from each active repo (where `.claude/landing.yaml`
+   declares `lanes:`, each `handoffs/lane-<x>.yaml` `next:` instead). May contain items not
    yet in Grove.
 4. **Grove project `next_actions`** — from each active project row. May
    diverge from handoffs if a session updated one but not the other.
