@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-20-07"
+  version: "2026-10-22-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -364,7 +364,7 @@ resolving.
 
 If no items matched, skip — don't mention the watchlist or push anything.
 If items matched:
-- **Chat:** push the updated `watchlist.md` to ops via git-ops.
+- **Chat:** land the updated `watchlist.md` on ops with git-ops `push_and_merge()` (ops lands at the push).
 - **Code:** commit the edited copy in the same commit as the handoff. In a
   non-ops repo, also add one line to the handoff `next:` list:
   "Merge `.claude/watchlist.md` observations into `fairbay/ops/watchlist.md`

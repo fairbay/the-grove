@@ -7,7 +7,11 @@ Usage (CLI):
   git_push.py <owner/repo> <branch> <commit_msg> <remote_path>:<local_path> [...]
 
 Usage (Python):
-  from git_push import push_files, read_file, list_files, delete_repo, api
+  from git_push import push_to_pr, push_files, read_file, list_files, delete_repo, api
+
+Every surface lands by pull request (Baylee's ruling 3fa9a61e, 2026-10-21):
+push_files() refuses any branch outside claude/*, so no session pushes a
+repo's main. push_to_pr() opens the branch and its draft PR in one call.
 
 Environment auto-detection:
   If the target repo is cloned locally (e.g., in a Routine), push_files()
@@ -109,8 +113,16 @@ def _push_via_cli(clone_path, branch, message, files):
     # Pull latest to avoid conflicts with concurrent vault updates
     try:
         _run(["git", "pull", "--rebase", "origin", branch])
-    except RuntimeError:
-        pass  # May fail if no upstream tracking; safe to proceed
+    except RuntimeError as e:
+        # A new branch has no remote yet: safe to proceed. A rebase that
+        # stopped on a conflict is not: undo it and refuse.
+        git_dir = os.path.join(clone_path, ".git")
+        if any(os.path.isdir(os.path.join(git_dir, d))
+               for d in ("rebase-merge", "rebase-apply")):
+            subprocess.run(["git", "rebase", "--abort"], cwd=clone_path,
+                           capture_output=True)
+            raise RuntimeError(f"pull --rebase of {branch} conflicted; "
+                               f"aborted, nothing pushed: {e}")
 
     # Copy files into the clone at their remote paths
     for remote_path, local in files:
@@ -247,17 +259,36 @@ def api(method, path, body=None, _retries=8):
 # Public interface
 # ---------------------------------------------------------------------------
 
+PR_BRANCH_PREFIX = "claude/"
+
+
+def _require_pr_branch(branch):
+    """Refuse a push to anything but a claude/* branch (ruling 3fa9a61e).
+
+    No exception exists today; one would be added here, by ruling, naming the
+    repo it applies to.
+    """
+    if not branch.startswith(PR_BRANCH_PREFIX):
+        raise RuntimeError(
+            f"refused: push to '{branch}'. Every surface lands by pull request "
+            f"(ruling 3fa9a61e): push a {PR_BRANCH_PREFIX}* branch with "
+            f"push_to_pr() and land it through close-at-land."
+        )
+
+
 def push_files(owner_repo, branch, message, files):
-    """Push files to a GitHub repo. Auto-detects environment.
+    """Push files to a claude/* branch of a GitHub repo. Auto-detects environment.
 
     files = list of (remote_path, local_content_path_or_bytes)
-    Atomic: single commit with all files, one parent.
+    Atomic: single commit with all files, one parent. The branch must already
+    exist (push_to_pr creates it); any branch outside claude/* refuses.
 
     In a Routine or cloud session where the repo is cloned, uses native
     git CLI (fast, 1 network call). Otherwise uses Git Data API (6 calls).
     On API 401 exhaustion (egress proxy auth flap), falls back to native
     git transport via shallow clone.
     """
+    _require_pr_branch(branch)
     clone_path = _find_repo_clone(owner_repo)
     if clone_path:
         return _push_via_cli(clone_path, branch, message, files)
@@ -378,17 +409,135 @@ def _push_via_api(owner_repo, branch, message, files):
     return commit["sha"], f"https://github.com/{owner_repo}/commit/{commit['sha']}"
 
 
+def _ensure_branch_cli(clone_path, branch, base):
+    """Check out branch in the clone: the local branch, else the remote one,
+    else a new branch from origin/<base> (no upstream, so a bare `git push`
+    can never reach <base>).
+
+    Uncommitted edits ride along (git switch keeps them unless they conflict,
+    in which case it refuses and nothing changes).
+    """
+    def _git(*args):
+        return subprocess.run(["git", *args], cwd=clone_path,
+                              capture_output=True, text=True, timeout=60)
+
+    if _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == branch:
+        return
+    if _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0:
+        r = _git("switch", branch)
+    elif _git("fetch", "origin", f"+refs/heads/{branch}:refs/remotes/origin/{branch}").returncode == 0:
+        r = _git("switch", "-c", branch, "--track", f"origin/{branch}")
+    else:
+        _git("fetch", "origin", base)  # best effort; origin/<base> may be current already
+        r = _git("switch", "--no-track", "-c", branch, f"origin/{base}")
+    if r.returncode != 0:
+        raise RuntimeError(f"git switch to '{branch}' failed: {r.stderr.strip()}")
+
+
+def _ensure_branch_api(owner_repo, branch, base):
+    """Create branch from base's head on GitHub if it does not exist yet."""
+    code, got = api("GET", f"/repos/{owner_repo}/git/ref/heads/{branch}")
+    if code < 300:
+        return
+    if code != 404:
+        raise RuntimeError(f"get branch ref failed: {code} {got}")
+    code, ref = api("GET", f"/repos/{owner_repo}/git/ref/heads/{base}")
+    if code >= 300:
+        raise RuntimeError(f"get base ref failed: {code} {ref}")
+    code, new_ref = api("POST", f"/repos/{owner_repo}/git/refs", {
+        "ref": f"refs/heads/{branch}", "sha": ref["object"]["sha"]})
+    if code == 422 and "already exists" in json.dumps(new_ref):
+        return  # created between the two calls
+    if code >= 300:
+        raise RuntimeError(f"create branch failed: {code} {new_ref}")
+
+
+def _branch_prs(owner_repo, branch):
+    """Every PR (open, closed, merged) whose head is branch, newest first."""
+    owner = owner_repo.split("/", 1)[0]
+    code, prs = api("GET", f"/repos/{owner_repo}/pulls?head={owner}:{branch}"
+                           f"&state=all&sort=created&direction=desc")
+    if code >= 300:
+        raise RuntimeError(f"PR lookup for {branch} failed: {code} {prs}")
+    return prs
+
+
+def push_to_pr(owner_repo, branch, message, files, title=None, body="",
+               base="main"):
+    """Push files to a claude/* branch and make sure a PR is open for it.
+
+    The default push for every surface (ruling 3fa9a61e). Creates the branch
+    if it is new (from the remote branch if one exists, else from <base>),
+    pushes one atomic commit, and opens a draft PR if the branch has no open
+    one; a later call adds a commit to the same PR. A branch whose last PR
+    merged or closed refuses: start a fresh claude/* name (push-protocol §11).
+    Re-running after a failed PR open, with nothing new to commit, just opens
+    the PR. Mark it ready only through close-at-land.
+
+    Returns (commit_sha, commit_url, pr_url).
+    """
+    _require_pr_branch(branch)
+    prs = _branch_prs(owner_repo, branch)
+    open_prs = [p for p in prs if p.get("state") == "open"]
+    if prs and not open_prs:
+        raise RuntimeError(
+            f"refused: {branch}'s PR #{prs[0]['number']} already landed or "
+            f"closed. Use a fresh {PR_BRANCH_PREFIX}* name from origin/{base}.")
+    clone_path = _find_repo_clone(owner_repo)
+    if clone_path:
+        _ensure_branch_cli(clone_path, branch, base)
+    else:
+        _ensure_branch_api(owner_repo, branch, base)
+    try:
+        sha, commit_url = push_files(owner_repo, branch, message, files)
+    except RuntimeError as e:
+        if not (clone_path and "No changes to commit" in str(e)):
+            raise
+        # A re-run after the PR step failed: the commit is already there.
+        subprocess.run(["git", "push", "origin", branch], cwd=clone_path,
+                       capture_output=True, text=True, check=True)
+        sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=clone_path,
+                             capture_output=True, text=True).stdout.strip()
+        commit_url = f"https://github.com/{owner_repo}/commit/{sha}"
+
+    if open_prs:
+        return sha, commit_url, open_prs[0]["html_url"]
+    code, pr = api("POST", f"/repos/{owner_repo}/pulls", {
+        "title": title or message.split("\n")[0][:72],
+        "body": body or message,
+        "head": branch,
+        "base": base,
+        "draft": True,
+    })
+    if code >= 300:
+        raise RuntimeError(
+            f"pushed {sha} to {branch}, but opening the PR failed: {code} {pr}. "
+            f"Re-run push_to_pr with the same arguments to open it.")
+    return sha, commit_url, pr["html_url"]
+
+
+# push_and_merge lands at the push (no draft, no tap): only repos whose
+# .claude/landing.yaml says merge_policy: self. Add a repo here only with that file.
+SELF_LANDING_REPOS = {"fairbay/ops"}
+
+
 def push_and_merge(owner_repo, message, files, base_branch="main"):
     """Push files via branch → PR → squash-merge → delete branch.
 
-    For Claude Code web sessions that are forced to push to claude/* branches.
-    Creates a temporary branch, pushes files, creates a PR, squash-merges it,
-    and deletes the branch — all in one call.
+    The one-call landing for a merge_policy: self repo (SELF_LANDING_REPOS).
+    Creates a temporary claude/auto-* branch, pushes files, creates a PR,
+    squash-merges it, and deletes the branch — all in one call. Any other
+    repo refuses: it lands through push_to_pr and close-at-land.
 
     Returns (commit_sha, diff_url) of the merge commit on the base branch.
     """
-    import time
     import hashlib
+
+    if owner_repo not in SELF_LANDING_REPOS:
+        raise RuntimeError(
+            f"refused: push_and_merge lands at the push, which only "
+            f"{sorted(SELF_LANDING_REPOS)} allow (landing.yaml merge_policy: "
+            f"self). Use push_to_pr and close-at-land.")
 
     slug = hashlib.md5(message.encode()).hexdigest()[:8]
     temp_branch = f"claude/auto-{slug}-{int(time.time()) % 10000}"
@@ -510,7 +659,21 @@ def _fetch_url(url, timeout=20):
 
 def push_and_verify(owner_repo, branch, message, files, verify_url=None,
                     expect=None, timeout=180, interval=15, initial_wait=25):
-    """Push atomically, then verify the deploy by polling the live URL.
+    """Push atomically to a claude/* branch, then verify_live() the URL.
+
+    main is refused like any push (ruling 3fa9a61e), so for a production
+    deploy, land the PR first and call verify_live() with the merge sha; this
+    wrapper fits a branch whose push deploys (a preview).
+    """
+    sha, commit_url = push_files(owner_repo, branch, message, files)
+    return verify_live(sha, commit_url, verify_url, expect=expect,
+                       timeout=timeout, interval=interval,
+                       initial_wait=initial_wait)
+
+
+def verify_live(sha, commit_url, verify_url=None, expect=None, timeout=180,
+                interval=15, initial_wait=25):
+    """Verify a deploy by polling the live URL after sha landed.
 
     The strongest unauthenticated deploy signal is the version bump that
     push conventions already require: pass expect=<new version string>
@@ -523,14 +686,13 @@ def push_and_verify(owner_repo, branch, message, files, verify_url=None,
         TIMEOUT_STALE  -- 200s seen but expect never appeared (slow build, or
                           build failed and the old deploy is still serving)
         UNREACHABLE    -- no 200 within timeout (site down / first deploy broke)
-      sha, commit_url  -- from push_files
+      sha, commit_url  -- as passed in
       evidence         -- attempts, elapsed_s, last_status, weak flag,
                           last_body_snippet on failure
 
     On TIMEOUT_STALE / UNREACHABLE, escalate to the Vercel MCP diagnosis
     chain (references/vercel-mcp.md). The happy path needs no MCP calls.
     """
-    sha, commit_url = push_files(owner_repo, branch, message, files)
     verdict = {"sha": sha, "commit_url": commit_url,
                "state": "PUSHED", "evidence": {}}
     if not verify_url:

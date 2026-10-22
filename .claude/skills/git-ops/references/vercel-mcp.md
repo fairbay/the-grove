@@ -1,8 +1,8 @@
 # Vercel MCP — post-push deploy verification
 
-After a push to a Vercel-connected repo, the deploy kicks off automatically.
+After a PR merges into a Vercel-connected repo's `main`, the deploy kicks off automatically.
 
-**This is the failure-path reference.** The happy path is `push_and_verify()` in `scripts/git_push.py`, which verifies via live-URL polling with no MCP calls. Come here when it returns `TIMEOUT_STALE` / `UNREACHABLE`, when you need build or runtime logs, or for deploy states mid-investigation.
+**This is the failure-path reference.** The happy path is `verify_live()` in `scripts/git_push.py`, which verifies via live-URL polling with no MCP calls. Come here when it returns `TIMEOUT_STALE` / `UNREACHABLE`, when you need build or runtime logs, or for deploy states mid-investigation.
 
 ## Tool discovery
 
@@ -28,9 +28,9 @@ If `.vercel/project.json` exists in the repo, it has both `orgId` and `projectId
 
 ## Standard verify flow
 
-After `push_files()` returns a commit sha:
+After the PR merges (the merge commit's sha):
 
-1. `Vercel:list_deployments(teamId=..., projectId=...)` — find the deployment with `meta.githubCommitSha` matching your push.
+1. `Vercel:list_deployments(teamId=..., projectId=...)` — find the deployment with `meta.githubCommitSha` matching the merge commit.
 2. If `state` is `BUILDING` or `QUEUED`, wait and poll.
 3. If `state` is `ERROR`, fetch `Vercel:get_deployment_build_logs(deploymentId=...)` to diagnose.
 4. If `state` is `READY`, report the `url` to Baylee.

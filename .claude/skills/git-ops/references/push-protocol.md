@@ -22,7 +22,7 @@ The actual push mechanism is `scripts/git_push.py` (in git-ops). Don't re-implem
 
 ## 1. Behavioral interrupt
 
-**If you are about to call `push_files()` from inside another skill's workflow without `present_files` first, stop.** Tool budget pressure, long sessions, and "obvious" diffs are not exceptions. Baylee reviews via commit diff URL after the fact — `present_files` is the in-flight check that keeps presents-before-pushes intact.
+**If you are about to call `push_to_pr()` from inside another skill's workflow without `present_files` first, stop.** Tool budget pressure, long sessions, and "obvious" diffs are not exceptions. Baylee reviews via commit diff URL after the fact — `present_files` is the in-flight check that keeps presents-before-pushes intact.
 
 ## 2. Inventory the commit
 
@@ -55,23 +55,22 @@ If the file list is long (5+), present the most important and note which others 
 Delegate to git-ops:
 
 ```python
-from git_push import push_files
-sha, url = push_files("fairbay/<repo>", "main", "<message>", files)
+from git_push import push_to_pr
+sha, url, pr = push_to_pr("fairbay/<repo>", "claude/<topic>", "<message>", files,
+                          body="<what and why>")
 ```
 
-One commit, all files. Deletions go in via `{ path, delete: true }`-style tree entries (see `scripts/git_push.py`).
+One commit, all files, on a `claude/*` branch with a draft PR (opened if the branch has none). `push_files()` refuses any branch outside `claude/*`, `main` included: every surface lands by pull request (Baylee's ruling 3fa9a61e, 2026-10-21). Deletions go in via `{ path, delete: true }`-style tree entries (see `scripts/git_push.py`).
 
 CLAUDE.md push conventions — apply on every push from any skill:
 
-- **Push to `main`** from chat sessions. Code web sessions push `claude/*` branches (below).
+- **Land by PR from every surface**: chat, Code and routines push `claude/*` branches and land through the PR (below). A handoff-only archive is a PR too.
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit. Without this, "is my new code live?" is guesswork.
 - **Regenerate `package-lock.json`** (`npm install`) if dependency sections changed, before committing — Vercel installs from the lockfile.
 
-### Claude Code web sessions (claude/* branch restriction)
+### Landing the PR
 
-Claude Code web sessions are forced to push to `claude/*` branches — direct
-push to `main` is blocked. Use `push_and_merge()` as the default push path
-for these sessions:
+`push_and_merge()` is the one-call landing for a `self`-policy repo (ops; it refuses any other):
 
 ```python
 from git_push import push_and_merge
@@ -79,17 +78,11 @@ from git_push import push_and_merge
 sha, url = push_and_merge("fairbay/<repo>", "<message>", files)
 ```
 
-This creates a temp branch, pushes, creates a PR, squash-merges, and deletes
-the branch — all in one call. The returned SHA and URL point to the merge
-commit on `main`. Vercel auto-deploys from the merge.
-
-**When to use:** Any push from a Claude Code web session to a repo where
-you want changes on `main`. The function auto-detects the need — if you're
-already on a `claude/*` branch, this is the right path.
-
-**Fallback:** If the merge fails (merge conflict, branch protection), the
-error message includes the PR URL. Report it to Baylee — the PR is open
-and can be manually merged.
+This creates a temp `claude/auto-*` branch, pushes, creates a PR, squash-merges,
+and deletes the branch — all in one call. The returned SHA and URL point to the
+merge commit on `main`. If the merge fails (merge conflict, a refusal), the
+error message includes the PR URL: hand it off with close-at-land, or ask the
+merge tap at once.
 
 **Which path, by repo policy** (`.claude/landing.yaml`, `merge_policy`):
 - `self` (ops): `push_and_merge()` for small infrastructure changes, as above.
@@ -129,12 +122,12 @@ Include the Vercel project URL too if the repo is connected and the change is us
 
 ## 7. Verify deploy (when applicable)
 
-If the repo is Vercel-deployed and the change is user-facing, collapse steps 5+7: call `push_and_verify()` instead of `push_files()` in step 5, passing the live URL and the version string this commit bumps:
+If the repo is Vercel-deployed and the change is user-facing, verify once the PR has merged: call `verify_live()` with the merge sha, the live URL and the version string the PR bumped:
 
 ```python
-from git_push import push_and_verify
-verdict = push_and_verify("fairbay/<repo>", "main", "<message>", files,
-                          verify_url="https://<app>.vercel.app", expect="v<bumped>")
+from git_push import verify_live
+verdict = verify_live(merge_sha, merge_url,
+                      verify_url="https://<app>.vercel.app", expect="v<bumped>")
 ```
 
 - `VERIFIED_LIVE` → report verdict + diff URL in one line. Done — zero Vercel MCP calls.
@@ -154,7 +147,8 @@ Two attempts max. After the second failure, surface to Baylee.
 
 | Symptom | Cause | Action |
 |---|---|---|
-| 422 on push | Branch mismatch (`main` vs `master`) or path issue | Check `default_branch`; fix and retry once |
+| `refused: push to 'main'` | A push aimed outside `claude/*` (ruling 3fa9a61e) | Push the branch with `push_to_pr()`; never retry under another path |
+| 422 on push | Base mismatch (`main` vs `master`) or path issue | Check `default_branch`; pass `base=`; retry once |
 | 404 on push | Repo missing or PAT/proxy lost access | Stop; report to Baylee |
 | 5xx on push | Transient GitHub | Retry once with backoff |
 | Build ERROR on Vercel | Code issue | Fetch logs, surface to Baylee — don't loop |
@@ -165,7 +159,7 @@ The previous `pushcraft.vercel.app/api/auto-push` endpoint, `SECRET.txt` token f
 
 ## 11. Branch hygiene after squash-merge
 
-This applies to cloud Claude Code / web sessions, where work lands via a branch + PR squash-merged to `main` (not the direct-to-`main` push of chat sessions).
+This applies to every session: work lands via a branch + PR squash-merged to `main`.
 
 A squash-merge puts a single **new** commit on `main` — it does not fast-forward your branch. Your branch still holds the original pre-squash commits, so it is now diverged from `main`. Reusing it for the next PR makes git treat your already-merged changes as new, and any file the next PR re-touches conflicts against `main`'s squashed copy.
 

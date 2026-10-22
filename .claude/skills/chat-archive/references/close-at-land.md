@@ -18,7 +18,7 @@ makes a PR ready.
 - Close-at-land steps 1–8 (T3)
 - Merge request (§7.2)
 - Promotion after a merge
-- Direct-to-main sessions (§7.7)
+- Land-at-push: push_and_merge (§7.7)
 - Re-run safety
 
 ## Marker grammar
@@ -40,10 +40,11 @@ searches (`limit=100`) until a page comes back short.
 
 ## Opening a draft (owner task, T1)
 
-Code web sessions push `claude/*` branches. When work that changes a repo starts:
+Every surface pushes `claude/*` branches (Baylee's ruling 3fa9a61e). When work that changes a repo starts:
 
 1. Run the gate first (session-start Phase 0). New work starts from a clean state.
-2. Commit, push, open the PR **as a draft** (repo CLAUDE.md has the call; MBN:
+2. Commit, push, open the PR **as a draft** (git-ops `push_to_pr()` does both;
+   repo CLAUDE.md may name another call; MBN:
    `gh api repos/fairbay/<repo>/pulls -f title=… -f head=<branch> -f base=main -f body=… -F draft=true`).
 3. **Owner task, same turn.** Add the line `owns: fairbay/<repo>#<n>` to the Grove
    task this work belongs to (`grove_update_task`, notes), or create one
@@ -71,10 +72,10 @@ Order matters: draft first, then the owner task, so the line names a real number
    Every item created here carries `from: fairbay/<repo>#<n>`. Before creating,
    search for an item with that line and the same title; update it instead.
 2. **Standing rules land now, separately.** A ruling Baylee made or changed this
-   session goes to `main` by its own docs-only push (CLAUDE.md "Baylee's standing
+   session goes to `main` by its own docs-only PR (CLAUDE.md "Baylee's standing
    rules" plus the superseding Grove decision), not in this PR. Rulings belong to
-   the session and stand even if the PR never merges. In a Code session that
-   push is its own small PR from its own branch: body starts `Standing rules:`,
+   the session and stand even if the PR never merges. That PR comes from its own
+   branch on every surface: body starts `Standing rules:`,
    opened ready (no owner task, no trailer: it is not a work PR), and merged at
    Baylee's tap before step 3. Left unmerged, the gate shows it as G6b, which is
    right: a ruling that never reached `main`.
@@ -258,10 +259,15 @@ Once rewritten, the markers no longer match, so a second run does nothing.
 Closed-unmerged rollback (`NOT LANDED #n`) arrives with rollout step 4; until
 then leave a closed PR's markers alone and name them in the report.
 
-## Direct-to-main sessions (§7.7)
+## Land-at-push: push_and_merge (§7.7)
 
-Chat pushes through git-ops, ops changes through `push_and_merge`,
-content-batch archives: landing happens at the push. Run steps 1–3, and step 4's
+No session pushes to `main` (Baylee's ruling 3fa9a61e, 2026-10-21): chat
+sessions and content-batch archives open a PR like any other, and a
+handoff-only archive is a draft PR carrying the close-at-land trailer, owned
+(`owns:`) by the Grove task the session worked on, or by a new task naming the
+archive when there was none. The one
+land-at-push path left is an ops change through `push_and_merge`, which
+merges its own PR in the same call. For it, run steps 1–3, and step 4's
 decision logging, with no markers and no trailer. If `push_and_merge` cannot
 merge, the PR it leaves is ready without a trailer (G6b): convert it to draft
 (`ccr/convert_to_draft`) and hand it off with close-at-land, or ask the merge

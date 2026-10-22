@@ -47,7 +47,7 @@ meta:
   type: build  # "build" or "session"
   session_chat_id: null  # include if available
   session: "<session id or URL>"  # the same value as this session's session-record `session` (references/session-record.md)
-  landing: "fairbay/<repo>#<n>"  # only when the handoff rides a PR (close-at-land); omit for direct-to-main
+  landing: "fairbay/<repo>#<n>"  # the PR the handoff rides (close-at-land); omit only for push_and_merge
 
 done:
   - "Rewrote api/analyze.js for two-stage pipeline"
