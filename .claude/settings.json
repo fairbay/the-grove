@@ -39,6 +39,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c ': fairbay-managed:lane-gate; R=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; S=\"$R/.claude/skills/session-start/scripts/session_handoff.py\"; grep -q \"^lanes:\" \"$R/.claude/landing.yaml\" 2>/dev/null && [ -f \"$S\" ] && command -v python3 >/dev/null 2>&1 && python3 \"$S\" lane; exit 0'",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
