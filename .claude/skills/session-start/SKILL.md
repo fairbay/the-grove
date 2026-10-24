@@ -1,11 +1,11 @@
 ---
 name: session-start
 description: >
-  Session onboarding — "work on [project]", "continue [project]", "keep working
-  on X", or pasting a handoff. Loads handoff + PLAN. Not for mid-session
+  Session onboarding — "work on [project]", "continue X", a pasted handoff;
+  "dispatch [project]", "check the lanes" for per-lane prompts. Not mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-22-01"
+  version: "2026-10-24-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -40,9 +40,13 @@ Fires for:
 - Any first message with continuation intent about prior work — named project,
   Grove idea, research topic, or any work that had a previous session. Does not
   need to be an established project with a repo.
+- **Dispatch** (lanes repos): "dispatch MBN", "check the lanes", "what's next on
+  MBN" as a first message → `references/dispatch.md` instead of Phases 0–5: one
+  turn that reads the row, batons, PRs and records, does upkeep cleanup, prints
+  Baylee's taps and one prompt per lane, logs its record, and stops.
 
 Does NOT fire for:
-- Mid-session topic shifts → chat-status
+- Mid-session topic shifts, a mid-session "what's next" → chat-status
 - "archive this", session-end signals → chat-archive
 - A fresh idea with no prior work → idea-scout
 - Generic greetings without a project reference → respond normally
@@ -116,11 +120,9 @@ Grove's `project` table is the universal project index — code and non-code
 projects alike. Resolve against it first; a repo is a code-specific detail
 the project row carries, not the identity.
 
-**Loading Grove tools (chat):** the tool_search registry matches fuzzily on
-Grove tool names — descriptive queries take 2-3 attempts. Load first-try with
-the exact-name query: `grove_list_projects grove_create_task grove_update_task
-grove_update_project grove_log_decision`. Then load `grove_list_decisions grove_get grove_list_tasks`
-in one follow-up call. Two calls total — do not search piecemeal.
+**Loading Grove tools (chat):** tool_search matches Grove names fuzzily; load by exact
+names, two calls: `grove_list_projects grove_create_task grove_update_task grove_update_project
+grove_log_decision`, then `grove_list_decisions grove_get grove_list_tasks`.
 
 Resolution order:
 
@@ -258,13 +260,10 @@ the session's first push. Elsewhere, file a one-line skill-worker work order
 
 ## Phase 4b — Maturity checkpoint
 
-Flag, in one briefing line, a repo with no root `SPEC.md`, 20 or more commits
-(page 1 of `/repos/{r}/commits` returns 20) and a database schema, a `docs/`
-directory or 5+ source files: "⚠️ [N commits] and no SPEC.md — consider a
-retroactive spec pass (architect interview mode) before public launch."
-Informational, not blocking: Baylee decides whether and when to run the spec
-pass. Express-mode plans are ephemeral by design, and a project past prototype
-scope needs interview mode's quality contract.
+Flag, in one briefing line, a repo with no root `SPEC.md`, 20+ commits (page 1 of
+`/repos/{r}/commits` returns 20) and a schema, a `docs/` directory or 5+ source files:
+"⚠️ [N commits] and no SPEC.md — consider a retroactive spec pass (architect interview
+mode) before public launch." Informational: Baylee decides whether and when.
 
 ## Phase 4c — Synthesize work queue
 
@@ -495,5 +494,6 @@ AskUserQuestion and continue on the answer.
   entry gate, `ops/docs/land-and-leave-SPEC.md` §7.5, §10).
 - **→ build / systematic-test / systematic-debug:** Hands off the loaded PLAN.md
   context so they don't refetch.
-- **→ chat-status:** Mid-session checkpoints once work begins.
+- **→ chat-status:** Mid-session checkpoints once work begins. Dispatch hands off
+  nothing: its prompts start each lane's own session.
 - **→ chat-archive:** Closing this session's work at the end.

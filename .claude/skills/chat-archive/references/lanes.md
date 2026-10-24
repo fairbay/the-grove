@@ -25,6 +25,8 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
   When it and the lane file disagree, the newer one wins (session-start Phase 3's timestamp rule).
 - Lanes run one session at a time. Work found for another lane is a Grove task tagged `lane-<x>`,
   never a line in that lane's file.
+- **Dispatch** ("dispatch MBN" as a first message, session-start `references/dispatch.md`) reads
+  these files, the row and the PRs in one turn and prints each lane's next prompt; it writes no baton.
 
 ## Entry (session-start)
 

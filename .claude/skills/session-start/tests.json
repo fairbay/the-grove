@@ -1,7 +1,7 @@
 {
   "target_skill": {
     "name": "session-start",
-    "description": "Session onboarding on first message — \"work on [project]\", \"continue [project]\". Loads handoff + PLAN. Not \"where are we\" (→ chat-status) or archiving (→ chat-archive)."
+    "description": "Session onboarding — \"work on [project]\", \"continue X\", a pasted handoff; \"dispatch [project]\", \"check the lanes\" for per-lane prompts. Not mid-session (→ chat-status) or archive (→ chat-archive)."
   },
   "competing_skills": [
     {
@@ -25,13 +25,17 @@
     "Let's work on Listing Lens v7 today",
     "Continue the grove-mobile project from yesterday",
     "Pick up where we left off on ops",
-    "Work on the auth rewrite — pull the handoff"
+    "Work on the auth rewrite — pull the handoff",
+    "dispatch MBN",
+    "Check the lanes on the navigator and give me the prompt for each one so I can kick off the sessions"
   ],
   "negative_cases": [
     "Where are we on the rebuild right now? (expect chat-status)",
     "Wrap this chat up, we're done for the day (expect chat-archive)",
     "Build me a tip-splitting React artifact with touch buttons (expect build)",
     "Scout this idea: a Slack bot that summarizes new Grove tasks (expect idea-scout)",
-    "Quick status update on the Build Pipeline family (expect chat-status)"
+    "Quick status update on the Build Pipeline family (expect chat-status)",
+    "ok that PR is merged. what's next in this session? (expect chat-status)",
+    "Give me a status update on where lane C's design turns stand before we keep going (expect chat-status)"
   ]
 }
