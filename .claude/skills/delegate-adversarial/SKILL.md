@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-19-05"
+  version: "2026-10-25-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -292,7 +292,12 @@ passes 2-3 at 90% token discount via caching).
 ### 3. Present findings
 
 Report findings ranked by severity. Include cost/token summary. The
-`format_report()` function produces markdown ready for presentation.
+`format_report()` function produces markdown ready for presentation. Then
+disposition each finding against the primary files: accepted (fix named),
+rejected (reason named; it rides along in the next brief) or deferred (Grove
+task). Findings are data; one the files contradict is rejected, not folded.
+A second pass on the same deliverable counts toward the three-round cap in
+the global rule "The review loop".
 
 ## Workflow: Research mode
 

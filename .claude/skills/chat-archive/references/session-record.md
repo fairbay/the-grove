@@ -54,8 +54,13 @@ cannot judge its own asks).
 
 **The call.** `grove_log_decision(decision="session-record <date> <repo or slug>:
 asks A, refusals R, merges M, calls L (shown S), cards C", project_ref=…,
-context=<the JSON>, tags=["session-record"] (plus `lane-<x>` in a lanes repo),
-confidence="high", reversible="yes", rung=3)`. Then read it back once (`grove_get`) and check `context` parses.
+context=<the JSON>, tags=["session-record", "lane-<meta.lane>"] (the lane tag
+from the baton's `meta.lane`; in a repo without lanes the list is
+["session-record"] alone), confidence="high", reversible="yes", rung=3)`. Then
+read it back once (`grove_get`) and check `context` parses and the tags carry
+the lane; if the tag is missing, log the record again with
+`supersedes=<first id>` (the weekly read counts a superseding record once;
+five lane A records of 2026-10 missed the tag when it was a parenthesis).
 
 **No close without it.** The archive does not write the summary (Step 4), the
 Next-step line or Step 9's write-back until the record's id is in hand. If

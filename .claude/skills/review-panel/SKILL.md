@@ -5,7 +5,7 @@ description: >
   "calibrate scores", "audit my vault". Auto-runs build Phase 7.
   Not for isolated checks (→ delegate-analytical/adversarial).
 metadata:
-  version: "2026-10-19-01"
+  version: "2026-10-25-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -49,6 +49,17 @@ including the items the change did not touch. A reviewer's validator proposal
 becomes a validator rule in the script that gates the work, not prose. A
 reviewer sent to the web carries the global rule's search-first paragraph
 verbatim. Every brief after the first round carries the findings already considered and rejected, each with its reason; the reviewer contests one only with a valid counterpoint the reason does not already answer, and otherwise does not raise it again (Baylee, 2026-10-19).
+
+**Exit criteria before round 1, disposition after every round** (Baylee,
+2026-10-25; global rule "The review loop"). State what pass means before the
+first brief goes out: no blocking finding, and every high dispositioned by the
+author as accepted (fix named), rejected (reason named, carried into the next
+brief) or deferred (Grove task). Findings are data: check each against the
+primary files before acting on it, and never fold one those files contradict.
+A finding that reverses an earlier fold is an oscillation signal: stop the
+loop. Cap three rounds, then decide with the open list shown or bring Baylee
+the ledger. When the thing under review becomes buildable in one session,
+build it and test it on real state instead of running another round.
 
 ## Quality tiers (reference)
 

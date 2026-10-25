@@ -123,10 +123,12 @@ May not:
   a tap in Step 3;
 - re-word, fill in or compose a Go: a prompt carries the Go sentence verbatim
   from the row's lane line or the lane's baton, or carries none;
-- send a second data session while one is live: a lane whose next item applies
-  data (its Go sentence says "apply") is exclusive with every other such lane
-  (MBN: A and F share the live data set). At most one data prompt per dispatch,
-  and none while a data lane is running;
+- send a second data session while one is live: a data lane (MBN: lane A or
+  lane F, or any lane whose row line carries a Go sentence; they share the live
+  data set) is exclusive with every other data lane. At most one data prompt
+  per dispatch, and none while a data lane is running. When two data lanes are
+  ready, the first is the one whose row line carries a Go; both or neither, the
+  row's order. The second gets no prompt, only the Hold line;
 - touch a running lane's PR, write any lane's baton, or rewrite the row's lane
   lines (the lane's own archive does; f2826d9d).
 
@@ -155,7 +157,14 @@ May not:
 - **Prompt:** at most four lines in one copy box, from the template
   `Work on <short name>, lane <X>: the project row's lane <X> START HERE line. <one-line constraint if any>. Archive.`
   The row stays the source, so the prompt stays short; "lane <X>" in it loads
-  the baton (the lane gate). When the line has no START HERE, or its START
+  the baton (the lane gate). A lane whose line names another repo for its work
+  (MBN's lane H: `fairbay/ops`) gets `Work on fairbay/ops for MBN lane H: MBN's
+  project row lane H START HERE line is the source. Archive into MBN: update
+  MBN's lane H row line and log the record with project_ref
+  fairbay/medicaid-benefits-navigator, tags session-record, lane-h.` (ops
+  declares no lanes, so neither the lane gate nor a baton path does this on
+  its own; ops #87 archived into ops and left MBN's line stale). When the line
+  has no START HERE, or its START
   HERE item is done (its PR merged, its task done) or left with Baylee (cards
   it produced), name the starting item instead: `… lane <X>: the project row's
   lane <X> line, starting at <id> (<why, a few words>). Archive.`
@@ -171,8 +180,10 @@ May not:
   "Continue draft #<n>." A lane that is running or waits gets no prompt.
 - **Lane line:** the state and its evidence in one line; a correction to the
   row (a stale OPEN sitting) goes there too.
-- **Hold:** the data-lane exclusion ("paste lane F's only after lane A's batch
-  has published"); "a lane session started without a PR does not show here:
+- **Hold:** the data-lane exclusion as "lane <second> after lane <first>
+  archives" (the event, never a fact that expires before it: "only after
+  m1317 has published" was stale the moment the batch landed); "a lane
+  session started without a PR does not show here:
   skip a lane you know is open"; a fresh decision newer than the row that
   names no lane (a session may be mid-work: name it); a PR left dirty on code.
 
