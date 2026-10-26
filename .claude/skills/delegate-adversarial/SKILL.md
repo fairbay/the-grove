@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-25-01"
+  version: "2026-10-25-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -90,6 +90,8 @@ gap-finding, score audit, demand validation. Distinguished from:
 - **review-panel:** multi-agent, multi-round; this skill is solo, single-pass.
 
 ## Behavioral interrupts
+
+**If you are about to review a process design — a design doc in `fairbay/ops` docs/ — before `process_gate.py check` has passed it, stop.** Run `python3 .claude/skills/chat-archive/scripts/process_gate.py check <the DESIGN.md>` first (global-CLAUDE.md "Earning a design run"; docs/process-governance/DESIGN.md). A FAIL returns the doc to its author with the misses; round 1 does not start. This is the gate's entry check — CI only backstops it at landing.
 
 **If you are about to flaw-find a spec, code, architecture, or scoring output
 inline, stop.** Delegate to Gemini. Pass the deliverable + the standards it

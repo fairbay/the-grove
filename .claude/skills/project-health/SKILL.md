@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-22-01"
+  version: "2026-10-25-01"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -292,6 +292,19 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    numbers first). Record what each line said in the run's report.
 4. **Print** the script's section verbatim under the health report, including
    the interactions and the last sync.yml and rules.yml conclusions.
+5. **Process gate read** (`fairbay/ops` docs/process-governance/DESIGN.md), every
+   weekly read, any repo: `python3 .claude/skills/chat-archive/scripts/process_gate.py read
+   --decisions decisions.json --tasks tasks.json` (`tasks.json`:
+   `grove_list_tasks(tag="ledger", status="open", limit=100)`) prints touches per week
+   (asks, refusals, cards), the share of records that are process work, the rules file's
+   bytes and lines (S12, report-only until Baylee names a max: the line is what he is
+   shown, once, when asked for it), the ledger by seen-N, and whether this month's
+   consolidation is logged. When it says "not logged", run `consolidate` instead (the
+   calendar month to date, likely duplicate entries, the month's rule-file commits where
+   the clone has history), then `grove_log_decision(project_ref="fairbay/ops",
+   tags=["process-consolidate"])` with what it found: the ops session encodes or drops
+   every ledger item at seen-2, merges duplicates, and merges or removes rules by PR
+   under the review loop. Print its section with the rest.
 
 ## Integration
 

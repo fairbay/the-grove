@@ -7,6 +7,8 @@ Narrating a finding is NOT encoding it — every finding needs a tool call.
 
 | Finding type | Destination |
 |---|---|
+| Process friction seen once, not fixed this session (a step, rule, skill or tap that cost more than it should) | Ledger: Grove task tagged `ledger`, `seen-1` (see below) |
+| Process friction already in the ledger | Bump to `seen-2`; encode now by the rows below |
 | Procedure or workflow with steps/conditions | Skill update (never memory edit) |
 | Platform fact or API quirk | Skill reference file, or project CLAUDE.md |
 | Behavioral principle (catches a recurring failure mode) | Memory edit (only if not covered by an existing edit/skill) |
@@ -17,6 +19,40 @@ Memory edits are reserved for behavioral overrides and essential reference data
 that prevents real errors across all sessions. Anything that's a procedure goes
 to a skill — skills trigger at the right moment; memory edits don't trigger,
 they're always-on context that may not be consulted.
+
+## The ledger and the rule of recurrence
+
+A process friction becomes a rule, a skill edit, a lint or a design run on its
+**second** occurrence, not its first (`fairbay/ops` docs/process-governance/DESIGN.md;
+global-CLAUDE.md "Earning a design run"; Baylee's 2026-10-22 correction: review the
+existing rules before proposing new ones). The first occurrence is a ledger note.
+
+**In scope:** a friction in the toolkit that this session did not fix — a step that cost
+a tap, a round or minutes; a rule two files state differently; a skill step that did not
+fit the case. **Out of scope, keep their existing routes:** an issue fixed in-session
+(global rule 5: the class probe runs now); a reviewer's validator proposal (Task Closure
+Gate: a validator rule now, not prose); a data-batch follow-up (`from-mNNNN` with exactly
+one class tag, below — the loop guard counts it); a work item agreed in-session (capture
+at crystallization); Baylee's rulings and corrections (encoding one is upkeep, filed at once).
+
+1. Search: `grove_list_tasks(tag="ledger", status="open", limit=100)` (page until short)
+   and read the titles for the same friction (the `q` match is fuzzy; a different wording
+   of one friction is a match). Two lanes archiving the same day can both miss and both
+   file: the monthly consolidate names likely duplicates to merge (keep the higher seen-N).
+2. No match → `grove_create_task(list="ops", tags=["ledger", "seen-1"], priority=0,
+   project_ref=<repo if one>)`. The notes say where it was seen (session, record or PR),
+   what it cost (a tap, a round, minutes), and nothing about a fix. A seen-1 entry
+   untouched for 90 days is dropped by grove-prune (p0, no `deferred` tag): that decay is
+   the point — a friction nobody met again was not a rule.
+3. A match → `grove_update_task` with the full tag list read back from the task, `seen-N`
+   replaced by `seen-N+1` (`tags` replaces all: a list without `ledger` deletes the entry),
+   the new sighting appended to the notes; then route the finding through the tree above
+   now. A design run still needs the gate's count ("Earning a design run"); a skill edit or
+   a lint needs only the recurrence.
+
+The weekly ops read (project-health step 5) prints the ledger by seen-N and, once a
+month, runs `process_gate.py consolidate` (this skill's scripts; logged as a Grove
+decision tagged `process-consolidate`).
 
 ## Batch follow-ups: exactly one class tag (refusal)
 

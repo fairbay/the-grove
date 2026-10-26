@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-25-01"
+  version: "2026-10-25-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -169,6 +169,16 @@ routing decision. See `references/encoding-gate.md` for the routing tree.
 - **Class probe** → for every issue fixed this session, name the mechanical
   probe run over the whole set (its count), or the reason none applies, before
   the finding gets a routing decision (global rule 5).
+- **Ledger (process frictions)** → a process friction not fixed in this session
+  (a step, a rule, a skill, a tap that cost more than it should) seen for the
+  first time is a Grove task tagged `ledger`, `seen-1`, priority 0 — not a rule,
+  a skill edit or a run. Search the ledger first
+  (`grove_list_tasks(tag="ledger", status="open", limit=100)`): a match is bumped
+  to `seen-2` (rewrite the full tag list read back from the task) and earns
+  encoding now, by the rows below. Not for: an issue fixed this session (rule 5's
+  class probe), a reviewer's validator proposal (a validator rule now), a batch
+  follow-up (`from-mNNNN`, one class tag), or a work item agreed in-session
+  (filed at crystallization). `references/encoding-gate.md`, "The ledger".
 - **Memory edit** → apply now (chat: `memory_user_edits`; Code: add to
   CLAUDE.md or create a Grove task for the next chat session to apply)
 - **Skill update** → push now, or create a Grove task tagged

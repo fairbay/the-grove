@@ -5,7 +5,7 @@ description: >
   "calibrate scores", "audit my vault". Auto-runs build Phase 7.
   Not for isolated checks (→ delegate-analytical/adversarial).
 metadata:
-  version: "2026-10-25-01"
+  version: "2026-10-25-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -40,6 +40,8 @@ delegate-adversarial.** A user who says "panel" wants multiple voices; a user
 who says "tear this apart" or "Gemini review" wants one decisive critic.
 
 ## Every brief, every panelist
+
+**If you are about to review a process design — a design doc in `fairbay/ops` docs/ — before `process_gate.py check` has passed it, stop.** Run `python3 .claude/skills/chat-archive/scripts/process_gate.py check <the DESIGN.md>` first (global-CLAUDE.md "Earning a design run"; docs/process-governance/DESIGN.md). A FAIL returns the doc to its author with the misses; round 1 does not start. This is the gate's entry check — CI only backstops it at landing.
 
 Reviewers get the primary material, never an intermediate summary of it, and
 the whole set under a new rule, not only the items the rule changed. Give the
