@@ -8,7 +8,7 @@ Fairbay is a solo builder brand. `fairbay` is a GitHub **User** account (not an 
 
 - **Claude Code** — filesystem, git, builds, debugging, testing, deploys. Best for repo-level work, multi-file changes, and git operations.
 - **Claude.ai Chat** — planning, architecture, idea evaluation, communication, research, artifacts, skills. Best for cross-project thinking and skill-driven workflows.
-- **Routines** — API-triggered fire-and-forget batch work (e.g., scout-r, skill-worker-r). No interactive feedback. Convention: `-r` suffix on Routine names.
+- **Routines** — API-triggered fire-and-forget batch work (e.g., skill-worker-r, grove-prune-r). No interactive feedback. Convention: `-r` suffix on Routine names.
 
 ## Mission Model
 
