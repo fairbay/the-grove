@@ -164,6 +164,21 @@ Order matters: draft first, then the owner task, so the line names a real number
 8. **Next-step line:** "#n is ready. Merge to land it: <link>." From here the chat
    can be dropped. Then go to the merge request below; the session itself goes on.
 
+   **The last line of every close-out is one of two sentences** (Baylee, 2026-10-23
+   and 2026-10-26: he should know at a glance when a thread needs nothing more from
+   him, and a failure after that point must make noise somewhere else). After the merge,
+   the promotion and the session record, end the turn with exactly one of:
+   - `Safe to leave. Yours next: <one item with its page or link, or "nothing">.` —
+     only when every check this session started has finished green, the handoff is on
+     main, the Grove markers are promoted and the record id is in hand.
+   - `Not safe to leave: <what is still running or unverified>; a failure shows up as
+     <where>.` — a check still running (sync.yml, unit.yml on main) is named with its
+     noise channel: GitHub emails the merge actor on a failed run, the next session's
+     entry gate lists main's red head (G2), and the weekly read's Runs section prints
+     the newest sync and rules conclusions. Never let a running check be the last word
+     without saying so.
+   "Nothing pending from me" and "say which when it's done" are not close-out lines.
+
    **The Go sentence rides in the Next-step line.** When the repo's
    `.claude/policy.json` carries a `harness` note (a Code data session's
    apply, publish and merge are refused by the auto-mode classifier until a
