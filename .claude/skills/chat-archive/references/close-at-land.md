@@ -150,6 +150,11 @@ Order matters: draft first, then the owner task, so the line names a real number
 7. **Mark ready, then leave the branch.** Confirm the PR's remote head carries
    the trailer (`pr_state.py report` row for #n has `"cal": true`; if not, push
    first). Then `gh api -X POST repos/fairbay/<repo>/pulls/<n>/ccr/ready_for_review`.
+   **In a chat session with a repo attached, skip that call**: the auto-mode
+   classifier refused it on every try (#91, #92, #93; ledger 62ab0083, encoded
+   2026-10-26). Go straight to the merge request below; on Baylee's yes the
+   ready call and the merge both run under his answer. A Code session still
+   makes the call, and a refusal there is counted (S2) and never re-worded.
    **In the same turn, before the tap or any further edit,** move off the PR
    branch: `git fetch origin main && git checkout -b <new branch> origin/main`.
    A session bound to one branch name instead waits for the merge (or the
