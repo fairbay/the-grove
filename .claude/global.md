@@ -331,7 +331,7 @@ plan websites.)
 
 ## MCP Configuration
 
-MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add`). Permissions use the `permissions.allow` schema (not the legacy `allowedTools` format). Master copies of both `.mcp.json` and permissions configs live in `fairbay/ops`.
+MCP servers are configured via `.mcp.json` at the repo root (not `claude mcp add`). Permissions use the `permissions.allow` schema (not the legacy `allowedTools` format). Master copies of both `.mcp.json` and permissions configs live in `fairbay/ops`. No outside model is wired in as an MCP server: those calls go through the doorway ("Outside-Model Calls"); ops removed its gemini and openai servers on 2026-10-26.
 
 ## Remote Control / Scheduling Tools
 
