@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-25-02"
+  version: "2026-10-26-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -71,13 +71,23 @@ starting.
   `multi_pass_review` take `rejected=[(finding, reason), …]`.
 
 **From chat** (no token): two connector calls per model call, single statements.
-`select llm.call('google', '<model>', convert_from(decode('<base64 body>', 'base64'), 'utf8')::jsonb, '<purpose>', 'chat', '<session url>') as r`
-then `select llm.result('<call_id>'::uuid, 25) as r` (a third time if still
-`queued`). Pass `timeout_ms` 600000 as the last `llm.call` argument for a review. Read
+`select llm.call('google', '<model>', convert_from(decode('<base64 body>', 'base64'), 'utf8')::jsonb, '<purpose>', 'chat', '<session url>', null, null, 600000) as r`
+(the nine arguments in that order: provider, model, body, purpose, surface, session, `run_id`,
+`run_budget_usd`, `timeout_ms`; a seventh positional 600000 lands in `run_id` and fails the
+signature) then `select llm.result('<call_id>'::uuid, 25) as r` (a third time if still
+`queued`). **The body is built by hand in chat, so it carries what `gemini.py` adds for you:**
+`generationConfig.maxOutputTokens` and `generationConfig.thinkingConfig` (`{"thinkingLevel":
+"low"}` on a `gemini-3*` model, `{"thinkingBudget": 1024}` otherwise), or the doorway refuses
+it ("no explicit thinking setting"; call 31a3f167, 2026-10-25). Research from chat is the same
+body plus `"tools": [{"google_search": {}}]`. Read
 `response->'candidates'->0->>'finishReason'` from a `text_only := false` result: anything but `STOP`
 means the answer is incomplete. Base64 keeps a semicolon or `$$` in a bundle from cancelling the
 connector call. Nothing over 20 KB goes from chat: a Code session or the manual
 channel. Never retry a `refused` or `error` result; report it.
+**Size the deliverable before a chat design run:** one that will pass about 14 KB raw (20 KB once base64-wrapped, the connector's cap) plans its
+adversarial review as the next Code session's first step (the task filed with the brief and
+the bundle on the PR, before the cards) or as Baylee's manual channel; discovering this at the
+end wastes the run's review slot (MBN #400, 2026-10-21).
 
 ## What "adversarial" means
 
@@ -224,6 +234,20 @@ output, usage = call_with_urls(
 URL Context: Gemini fetches up to 20 public URLs (34MB each) and uses
 them as context. Reference URLs in both the `urls` param AND the prompt.
 Public URLs only — no auth, no localhost.
+
+**Inline first, URL context only for sources already public** (Google's "File
+input methods" guide: inline for files under 100 MB / 50 MB PDF, the Files API
+for larger or reused files, URLs for data already hosted online; 4ab959be). Our
+own documents go inline: up to about 14 KB of text from any surface, larger
+from a Code session or routine (chat's connector caps a statement near 20 KB).
+URL context is for pages that are public anyway, never a way to ship our docs:
+the doorway prices and audits only the body it sees, so a URL body has a blind
+estimate and no record of what was reviewed. Pass `content_sha256={url: sha}`
+so the hash of what you fetched at each URL rides in the prompt and the audit
+row (a label of what the author expected; nothing compares it to Gemini's
+fetch); `call_with_urls` reads `urlContextMetadata` back and fails loudly on
+any status but `URL_RETRIEVAL_STATUS_SUCCESS` (an incomplete fetch is not a
+review). The Files API stays unrouted until bundles are reused across passes.
 
 ### 3. Parse and return
 

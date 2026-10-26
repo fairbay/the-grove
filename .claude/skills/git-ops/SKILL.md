@@ -5,7 +5,7 @@ description: >
   "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
   Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-22-01"
+  version: "2026-10-26-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -185,12 +185,12 @@ Placed near the operations above, summarized here:
 - **NEVER use raw `git commit` / `git push` in chat sessions.** Always use `push_to_pr()`. The helper hardcodes the commit author identity to match the Vercel Hobby team owner. Raw git commands use whatever identity is in the container's git config (usually wrong), causing Vercel to BLOCK production deploys on private repos. This applies even when you've already cloned the repo — the clone is for reading, `push_to_pr()` is for writing.
 - Files already inside the clone may be passed by path as `(remote_path, local_path)`: `_push_via_cli` skips the copy when both are the same file. `push_to_pr` moves the clone's checkout to the target branch (uncommitted edits ride along; a file committed only on the old branch is gone after the switch, so pass it as bytes). `push_files` instead refuses when the clone is on a different branch.
 - A repo's default branch may be `master`, not `main`. If `push_to_pr` fails on the base ref, check `api("GET", f"/repos/{r}")["default_branch"]` and pass `base="master"`.
-- Remote paths use forward slashes only. No leading `/`.
+- Remote paths are relative, normalized, forward slashes only: `check_remote_path` refuses an absolute path, a backslash, `:`, a leading `-`, a glob character, a `.`, `..` or `.git` segment, `./x`, `a//b`, a trailing slash, or a path through a symlink in the clone, and `git add` runs with `--literal-pathspecs --` (ba29ce5b). `read_file()` with no branch reads the clone's working tree; `read_file(branch=)` reads that branch even when the clone sits on another (`origin/<branch>` after a depth-1 fetch, then the API).
 - Don't rewrite the push sequence from scratch — the bundled script handles blob/tree/commit/ref correctly.
 - For binary or > 1MB reads, the contents endpoint returns base64 — `read_file` only handles UTF-8 text.
 - **Egress proxy auth flap (claude.ai containers).** Symptom: valid PAT + bursty 401 "Requires authentication" + GitHub request-ids present in response. Cause: transparent egress proxy intermittently drops the Authorization header. This is NOT a PAT expiry — don't tell Baylee to regenerate a healthy token. `api()` retries 8 times with backoff; `push_files()` falls back to native git transport (shallow clone with `x-access-token:PAT@github.com`) on 401 exhaustion. If the flap persists across sessions, Baylee may want to report to Anthropic.
 - **Cloud session limits: `gh api --paginate` fails through the session proxy.** The second page is requested by numeric repository id and the proxy answers 403 "Numeric-ID repository paths (repositories/{id}/...) are not supported through this proxy." The first page returns, so counts silently cover only the newest 100 rows. Page by hand instead: add `per_page=100&page=N` to the path and loop until a page comes back empty (or its last row is older than the window you need).
-
+- **A shallow single-branch clone (`git clone --depth 1`) tracks only `main`:** after the first `git push -u origin <branch>`, the stop hook reports "N unpushed commits and no remote branch" on every turn though the push succeeded, because the clone has no fetch refspec for the branch. Run `git config --add remote.origin.fetch '+refs/heads/<branch>:refs/remotes/origin/<branch>' && git fetch origin <branch>` once, or clone with `--no-single-branch` (observed 2026-10-21 twice, 2026-10-26).
 - **Cloud Code sessions refuse force-pushes**, `--force-with-lease` included, even to the session's own branch after its PR squash-merged. Without rewriting history: restart the branch from `origin/main`, then `git merge -s ours --no-edit origin/<branch>`, so the push is a fast-forward.
 - **Mass removals need Baylee's explicit yes first** (the classifier refused a 246-file deletion until he approved in chat). Before pushing one, build from a `git archive HEAD` copy: files left on disk hide a missing input.
 

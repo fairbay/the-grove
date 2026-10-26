@@ -247,6 +247,47 @@ def research(
 # URL CONTEXT — let Gemini fetch and analyze URLs (repos, docs, etc.)
 # =========================================================================
 
+URL_SUCCESS = 'URL_RETRIEVAL_STATUS_SUCCESS'
+
+
+def _norm_url(u: str) -> str:
+    """One spelling for a URL Gemini may echo differently: lowercase scheme and host,
+    no fragment, no trailing slash."""
+    from urllib.parse import urlsplit, urlunsplit
+    p = urlsplit(u.strip())
+    return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path.rstrip('/'), p.query, '')).rstrip('/')
+
+
+def check_url_context(usage: dict, urls: list[str]) -> None:
+    """Fail loudly unless every requested URL was fetched, and nothing else failed (4ab959be).
+
+    Every urlContextMetadata entry for a requested URL must be
+    URL_RETRIEVAL_STATUS_SUCCESS (a repeated URL with one ERROR fails); a requested URL
+    absent from the metadata is "not retrieved"; any other entry that is not SUCCESS
+    fails too. URLs are compared after normalization (scheme and host case, fragment,
+    trailing slash).
+    """
+    statuses: dict[str, set] = {}
+    for m in usage.get('url_context', []):
+        statuses.setdefault(_norm_url(m['url']), set()).add(m['status'])
+    bad = []
+    for u in urls:
+        got = statuses.get(_norm_url(u))
+        if not got:
+            bad.append(f"{u}: not retrieved")
+        elif got != {URL_SUCCESS}:
+            bad.append(f"{u}: {', '.join(sorted(st for st in got if st != URL_SUCCESS))}")
+    wanted = {_norm_url(u) for u in urls}
+    for u, got in statuses.items():
+        if u not in wanted and got != {URL_SUCCESS}:
+            bad.append(f"{u} (not requested): {', '.join(sorted(got - {URL_SUCCESS}))}")
+    if bad:
+        raise GeminiError(
+            "URL context incomplete, the output is not a review: " + "; ".join(bad)
+            + ". Send the content inline, or fix the URL, and make one new call."
+        )
+
+
 def call_with_urls(
     system: str,
     user: str,
@@ -254,17 +295,23 @@ def call_with_urls(
     model: str = MODEL_PRO,
     max_tokens: int = 16384,
     temperature: float = 0,
+    content_sha256: dict | None = None,
 ) -> tuple[str, dict]:
     """
-    Review call with URL Context tool enabled.
+    Review call with URL Context tool enabled, for sources that are public anyway.
 
     Gemini fetches the content at the provided URLs and uses it as context
     for the review. URLs must be publicly accessible. Max 20 URLs per
-    request, 34MB per URL.
+    request, 34MB per URL. Our own documents go inline instead (the doorway
+    prices and audits only the body it sees; Google's file-input guide:
+    inline for our files, URLs for data already hosted online).
 
-    Best for: GitHub repo review, documentation analysis, comparing
-    multiple public sources. Include URLs both in the `urls` parameter
-    AND reference them in the `user` prompt for best results.
+    `content_sha256` maps a URL (one of `urls`) to the sha256 of the content
+    the author fetched there; each hash is written into the prompt so the
+    audit row (llm.calls.request) records what the author expected Gemini to
+    read. Nothing compares it to what Gemini fetched. The response's
+    urlContextMetadata is checked (check_url_context): any requested URL not
+    retrieved with URL_RETRIEVAL_STATUS_SUCCESS raises GeminiError.
 
     Example:
         output, usage = call_with_urls(
@@ -273,11 +320,18 @@ def call_with_urls(
             urls=['https://github.com/org/repo'],
         )
     """
-    if urls and len(urls) > 20:
+    urls = list(urls or [])
+    if len(urls) > 20:
         raise GeminiError(
             f"URL Context supports max 20 URLs per request, got {len(urls)}. "
             "Split into multiple calls."
         )
+    if content_sha256:
+        extra = [u for u in content_sha256 if _norm_url(u) not in {_norm_url(x) for x in urls}]
+        if extra:
+            raise GeminiError(f"content_sha256 names URLs not in urls: {extra}")
+        user = user + "\n\nExpected content (sha256 of each URL's content as fetched by the author):\n" + "\n".join(
+            f"- {u}: {h}" for u, h in content_sha256.items())
 
     payload = {
         "systemInstruction": {"parts": [{"text": system}]},
@@ -289,7 +343,9 @@ def call_with_urls(
         },
     }
     result = _post(model, payload)
-    return _extract(result)
+    text, usage = _extract(result)
+    check_url_context(usage, urls)
+    return text, usage
 
 
 # =========================================================================

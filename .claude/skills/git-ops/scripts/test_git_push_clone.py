@@ -176,5 +176,129 @@ class TokenTests(unittest.TestCase):
             self._token(GITHUB_PAT_PATH="/nonexistent")
 
 
+class RemotePathTests(unittest.TestCase):
+    """ba29ce5b: a remote_path never writes outside the clone's tree."""
+
+    REFUSED = ["../x", "/etc/x", ".git/hooks/h", ".git", "a/.GIT/config", "a/.git./x", "a/../b", "a/./b", ".",
+               "./a.txt", "a//b", "a/", "a\\b", "", "-A", "--all", ":(top)x", "*", "a?.txt", "a[1].txt", "a\0b"]
+
+    def test_bad_paths_refused_by_push_files(self):
+        for bad in self.REFUSED:
+            with self.subTest(path=bad):
+                with self.assertRaises(RuntimeError) as cm:
+                    git_push.push_files("fairbay/x", "claude/t", "m", [(bad, b"x")])
+                self.assertIn("refused", str(cm.exception))
+
+    def test_bytes_path_refused_with_its_own_message(self):
+        with self.assertRaises(RuntimeError) as cm:
+            git_push.check_remote_path(b"a.txt")
+        self.assertIn("must be a str", str(cm.exception))
+
+    def test_generator_files_are_not_consumed_by_the_check(self):
+        t = CloneTests(); t.setUp()
+        try:
+            git(t.clone, "checkout", "-b", "claude/t")
+            saved = git_push._find_repo_clone
+            git_push._find_repo_clone = lambda _r: t.clone
+            try:
+                sha, _ = git_push.push_files("fairbay/x", "claude/t", "m", ((p, b"g") for p in ["g.txt"]))
+            finally:
+                git_push._find_repo_clone = saved
+            self.assertEqual(git(t.remote, "show", "claude/t:g.txt"), "g")
+        finally:
+            t.tearDown()
+
+    def test_good_paths_pass(self):
+        for good in ["a.txt", "docs/a.md", ".claude/skills/x/SKILL.md", ".github/workflows/ci.yml"]:
+            self.assertEqual(git_push.check_remote_path(good), good)
+
+    def test_symlinked_parent_refused_in_clone(self):
+        t = CloneTests(); t.setUp()
+        try:
+            outside = os.path.join(t.tmp.name, "outside-target")
+            os.makedirs(outside)
+            os.symlink(outside, os.path.join(t.clone, "link"))
+            with self.assertRaises(RuntimeError) as cm:
+                git_push._push_via_cli(t.clone, "main", "m", [("link/evil.txt", b"x")])
+            self.assertIn("symlink", str(cm.exception))
+            self.assertFalse(os.path.exists(os.path.join(outside, "evil.txt")))
+            # a symlink as the final component, through the writer every route shares
+            os.symlink(os.path.join(outside, "target.txt"), os.path.join(t.clone, "leaf"))
+            with self.assertRaises(RuntimeError):
+                git_push._write_files(t.clone, [("leaf", b"x")])
+            self.assertFalse(os.path.exists(os.path.join(outside, "target.txt")))
+        finally:
+            t.tearDown()
+
+
+class ReadFileBranchTests(unittest.TestCase):
+    """ba29ce5b: read_file(branch=) names the branch read, whatever the clone has checked out."""
+
+    def setUp(self):
+        CloneTests.setUp(self)
+        self._saved = git_push._find_repo_clone
+        git_push._find_repo_clone = lambda _r: self.clone
+
+    def tearDown(self):
+        git_push._find_repo_clone = self._saved
+        CloneTests.tearDown(self)
+
+    def test_main_read_while_clone_sits_on_a_pr_branch(self):
+        git(self.clone, "checkout", "-b", "claude/t")
+        with open(os.path.join(self.clone, "a.txt"), "w") as f:
+            f.write("two\n")
+        git(self.clone, "commit", "-am", "edit")
+        git(self.clone, "push", "-u", "origin", "claude/t")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt", branch="main"), "one\n")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt", branch="claude/t"), "two\n")
+
+    def test_checked_out_branch_sees_uncommitted_edit(self):
+        with open(os.path.join(self.clone, "a.txt"), "w") as f:
+            f.write("dirty\n")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt", branch="main"), "dirty\n")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt"), "dirty\n")  # default: the working tree
+
+    def test_default_reads_working_tree_whatever_the_branch_name(self):  # review of #91, finding 3
+        git(self.clone, "checkout", "-b", "master")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt"), "one\n")
+
+    def test_stale_origin_ref_is_refreshed(self):  # finding 5
+        git(self.clone, "checkout", "-b", "claude/t")
+        other = os.path.join(self.tmp.name, "other")
+        git(self.tmp.name, "clone", "-q", self.remote, other)
+        git(other, "config", "user.name", "t"); git(other, "config", "user.email", "t@example.com")
+        with open(os.path.join(other, "a.txt"), "w") as f:
+            f.write("newer\n")
+        git(other, "commit", "-am", "newer"); git(other, "push", "origin", "main")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt", branch="main"), "newer\n")
+
+    def test_directory_and_symlink_raise(self):  # finding 4 and 8
+        os.makedirs(os.path.join(self.clone, "d")); open(os.path.join(self.clone, "d/f"), "w").close()
+        os.symlink("/etc/hostname", os.path.join(self.clone, "lnk"))
+        git(self.clone, "add", "-A"); git(self.clone, "commit", "-m", "d"); git(self.clone, "push", "origin", "main")
+        git(self.clone, "checkout", "-b", "claude/t")
+        saved = git_push.api
+        git_push.api = lambda *a, **k: (404, {})
+        try:
+            for p in ("d", "lnk"):
+                with self.assertRaises(RuntimeError):
+                    git_push.read_file("fairbay/x", p, branch="main")
+            with self.assertRaises(RuntimeError):
+                git_push.read_file("fairbay/x", "lnk")
+        finally:
+            git_push.api = saved
+
+    def test_branch_the_clone_lacks_is_fetched(self):
+        # a second clone pushes a branch this clone has never seen
+        other = os.path.join(self.tmp.name, "other")
+        git(self.tmp.name, "clone", "-q", self.remote, other)
+        git(other, "config", "user.name", "t"); git(other, "config", "user.email", "t@example.com")
+        git(other, "checkout", "-b", "claude/far")
+        with open(os.path.join(other, "a.txt"), "w") as f:
+            f.write("far\n")
+        git(other, "commit", "-am", "far"); git(other, "push", "-u", "origin", "claude/far")
+        self.assertEqual(git_push.read_file("fairbay/x", "a.txt", branch="claude/far"), "far\n")
+
+
 if __name__ == "__main__":
     unittest.main()

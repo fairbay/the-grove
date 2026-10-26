@@ -29,6 +29,7 @@ Auth resolution (API path only):
   and read from disk — no token needed.
 """
 import os
+import posixpath
 import sys
 import json
 import base64
@@ -82,6 +83,56 @@ def _find_repo_clone(owner_repo):
 # Git CLI push (Routine / cloud session path)
 # ---------------------------------------------------------------------------
 
+def check_remote_path(remote_path, clone_path=None):
+    """Refuse a remote_path that would write outside the intended tree, or that
+    `git add` would read as a flag or pathspec magic (ba29ce5b).
+
+    Rejected: empty or not a str, absolute, a backslash, `:` or NUL, a leading
+    `-`, a glob character (`*?[`), a `.`, `..` or `.git` segment (any case,
+    trailing dots or spaces ignored), or a path that is not already normalized
+    (`./x`, `a//b`, a trailing slash). With clone_path, a path component that
+    is a symlink is refused too, so a copy can't follow it out of the clone.
+    Returns the path.
+    """
+    if not isinstance(remote_path, str):
+        raise RuntimeError(f"refused: remote_path must be a str, got {type(remote_path).__name__}")
+    if not remote_path:
+        raise RuntimeError("refused: empty remote_path")
+    if remote_path.startswith("/") or "\\" in remote_path:
+        raise RuntimeError(f"refused: remote_path {remote_path!r} must be relative, forward slashes only")
+    if remote_path[0] in "-:" or any(c in remote_path for c in "*?[:\0"):
+        raise RuntimeError(f"refused: remote_path {remote_path!r} would read as a git option or pathspec magic")
+    if posixpath.normpath(remote_path) != remote_path or remote_path.startswith("./"):
+        raise RuntimeError(f"refused: remote_path {remote_path!r} is not normalized")
+    for seg in remote_path.split("/"):
+        if seg in (".", "..") or seg.lower().rstrip(". ") == ".git":
+            raise RuntimeError(f"refused: remote_path {remote_path!r} has a {seg!r} segment")
+    if clone_path:
+        cur = clone_path
+        for seg in remote_path.split("/"):
+            cur = os.path.join(cur, seg)
+            if os.path.islink(cur):
+                raise RuntimeError(f"refused: remote_path {remote_path!r} passes through symlink {seg!r}")
+    return remote_path
+
+
+def _write_files(clone_path, files):
+    """Check every remote_path against the clone, then write each file there.
+    Shared by the clone and native-fallback routes."""
+    for remote_path, _ in files:
+        check_remote_path(remote_path, clone_path)
+    for remote_path, local in files:
+        dest = os.path.join(clone_path, remote_path)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        if isinstance(local, bytes):
+            with open(dest, "wb") as f:
+                f.write(local)
+        elif os.path.exists(dest) and os.path.samefile(local, dest):
+            pass  # already in place in the clone (copy2 would raise SameFileError)
+        else:
+            shutil.copy2(local, dest)
+
+
 def _push_via_cli(clone_path, branch, message, files):
     """Push files using native git add/commit/push in a local clone.
 
@@ -125,20 +176,12 @@ def _push_via_cli(clone_path, branch, message, files):
                                f"aborted, nothing pushed: {e}")
 
     # Copy files into the clone at their remote paths
-    for remote_path, local in files:
-        dest = os.path.join(clone_path, remote_path)
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        if isinstance(local, bytes):
-            with open(dest, "wb") as f:
-                f.write(local)
-        elif os.path.exists(dest) and os.path.samefile(local, dest):
-            pass  # already in place in the clone (copy2 would raise SameFileError)
-        else:
-            shutil.copy2(local, dest)
+    files = list(files)
+    _write_files(clone_path, files)
 
     # Stage, commit, push
     remote_paths = [rp for rp, _ in files]
-    _run(["git", "add"] + remote_paths)
+    _run(["git", "--literal-pathspecs", "add", "--"] + remote_paths)
 
     # Check if there are changes to commit
     status = subprocess.run(
@@ -289,6 +332,9 @@ def push_files(owner_repo, branch, message, files):
     git transport via shallow clone.
     """
     _require_pr_branch(branch)
+    files = list(files)
+    for remote_path, _ in files:
+        check_remote_path(remote_path)
     clone_path = _find_repo_clone(owner_repo)
     if clone_path:
         return _push_via_cli(clone_path, branch, message, files)
@@ -325,16 +371,10 @@ def _push_via_native_fallback(owner_repo, branch, message, files):
             ["git", "config", "user.email", GIT_AUTHOR_EMAIL],
             cwd=tmpdir, capture_output=True,
         )
-        for remote_path, local in files:
-            dest = os.path.join(tmpdir, remote_path)
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            if isinstance(local, bytes):
-                with open(dest, "wb") as f:
-                    f.write(local)
-            else:
-                shutil.copy2(local, dest)
-            subprocess.run(["git", "add", remote_path], cwd=tmpdir,
-                           check=True, capture_output=True)
+        files = list(files)
+        _write_files(tmpdir, files)
+        subprocess.run(["git", "--literal-pathspecs", "add", "--"] + [rp for rp, _ in files],
+                       cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", message],
             cwd=tmpdir, check=True, capture_output=True, text=True,
@@ -472,7 +512,9 @@ def push_to_pr(owner_repo, branch, message, files, title=None, body="",
     one; a later call adds a commit to the same PR. A branch whose last PR
     merged or closed refuses: start a fresh claude/* name (push-protocol §11).
     Re-running after a failed PR open, with nothing new to commit, just opens
-    the PR. Mark it ready only through close-at-land.
+    the PR. Mark it ready only through close-at-land. With a local clone, the
+    clone is left checked out on <branch> afterwards (read_file(branch=...)
+    still reads the branch you name).
 
     Returns (commit_sha, commit_url, pr_url).
     """
@@ -592,17 +634,42 @@ def push_and_merge(owner_repo, message, files, base_branch="main"):
     return merge_sha, f"https://github.com/{owner_repo}/commit/{merge_sha}"
 
 
-def read_file(owner_repo, remote_path, branch="main"):
-    """Read a file from a GitHub repo. Uses local clone if available."""
+def read_file(owner_repo, remote_path, branch=None):
+    """Read a file from a GitHub repo.
+
+    branch=None (the default) reads the clone's working tree on whatever branch
+    is checked out (an uncommitted edit is seen), or `main` through the API
+    when there is no clone. A named branch is honored exactly: the working
+    tree when it is checked out, else `origin/<branch>` after a quiet
+    depth-1 fetch (content as of that fetch; a fetch that fails offline leaves
+    the last fetched copy), else the contents API. A directory, a symlink or
+    a missing path raises.
+    """
+    check_remote_path(remote_path)
     clone_path = _find_repo_clone(owner_repo)
     if clone_path:
-        local_file = os.path.join(clone_path, remote_path)
-        if os.path.isfile(local_file):
-            with open(local_file, "r", errors="replace") as f:
-                return f.read()
-        raise RuntimeError(f"File not found in clone: {remote_path}")
+        check_remote_path(remote_path, clone_path)
+        current = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=clone_path,
+                                 capture_output=True, text=True).stdout.strip()
+        if branch is None or current == branch:
+            local_file = os.path.join(clone_path, remote_path)
+            if os.path.isfile(local_file):
+                with open(local_file, "r", errors="replace") as f:
+                    return f.read()
+            raise RuntimeError(f"File not found in clone: {remote_path}")
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+        try:
+            subprocess.run(["git", "fetch", "--quiet", "--depth=1", "origin",
+                            f"+refs/heads/{branch}:refs/remotes/origin/{branch}"],
+                           cwd=clone_path, capture_output=True, text=True, timeout=60, env=env)
+            r = subprocess.run(["git", "cat-file", "blob", f"origin/{branch}:{remote_path}"],
+                               cwd=clone_path, capture_output=True, timeout=60)
+            if r.returncode == 0:
+                return r.stdout.decode("utf-8", errors="replace")
+        except subprocess.TimeoutExpired:
+            pass
     # API fallback
-    code, resp = api("GET", f"/repos/{owner_repo}/contents/{remote_path}?ref={branch}")
+    code, resp = api("GET", f"/repos/{owner_repo}/contents/{remote_path}?ref={branch or 'main'}")
     if code >= 300:
         raise RuntimeError(f"read file failed: {code} {resp}")
     if resp.get("encoding") == "base64":
