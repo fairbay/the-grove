@@ -3,8 +3,8 @@ grove.py — Claude-side client for grove-api v1 (Step 4).
 
 Seven operations exposed:
     grove.create(entity_type, title, ...)        → POST   /api/{tasks,ideas}
-    grove.list_items(entity_type, q=None, ...)   → GET    /api/{tasks,ideas}
-    grove.get(entity_type, id)                   → GET    /api/{tasks,ideas}/:id
+    grove.list_items(entity_type, q=None, ...)   → GET    /api/{tasks,ideas,decisions,projects}
+    grove.get(entity_type, id)                   → GET    /api/{tasks,ideas,decisions,projects}/:id
     grove.update(entity_type, id, **patch)       → PATCH  /api/{tasks,ideas}/:id
     grove.complete(id, source=...)               → POST   /api/tasks/:id/complete
     grove.drop(id, source=...)                   → POST   /api/tasks/:id/drop
@@ -54,7 +54,9 @@ VALID_IDEA_VERDICTS = {
     "greenlight", "overreach", "public_good", "mirage",
     "workhorse", "fools_gold", "lark", "pass",
 }
-VALID_ENTITIES = {"task", "idea"}
+VALID_ENTITIES = {"task", "idea"}            # create / update / complete / drop
+READ_ENTITIES = {"task", "idea", "decision", "project"}  # list / get / events (decisions are append-only; projects: MCP writes)
+DECISION_LIMIT = 500                           # /api/decisions accepts up to 500 rows per call
 
 # Default source tag for calls made from Claude.ai web chat. Override per-call.
 DEFAULT_SOURCE = "claude-web"
@@ -199,10 +201,11 @@ def _request(
 # Validation helpers
 # ----------------------------------------------------------------------------
 
-def _check_entity(entity_type: str) -> None:
-    if entity_type not in VALID_ENTITIES:
+def _check_entity(entity_type: str, *, read: bool = False) -> None:
+    allowed = READ_ENTITIES if read else VALID_ENTITIES
+    if entity_type not in allowed:
         raise ValueError(
-            f"Unknown entity_type {entity_type!r}. Expected 'task' or 'idea'."
+            f"Unknown entity_type {entity_type!r}. Expected one of {sorted(allowed)}."
         )
 
 
@@ -301,19 +304,26 @@ def list_items(
     list: str | None = None,      # noqa: A002 — task filter
     verdict: str | None = None,   # idea filter
     tag: str | None = None,
+    project_ref: str | None = None,  # decision filter
+    current_only: bool = True,       # decision filter: exclude superseded
+    slug: str | None = None,         # project filter
     limit: int = 50,
 ) -> list[dict]:
     """
-    List this owner's tasks or ideas, newest first. All filters optional.
+    List this owner's tasks, ideas, decisions or projects, newest first. All filters optional.
 
-    Task filters:   q, status, list, tag, limit
-    Idea filters:   q, status, verdict, tag, limit
+    Task filters:     q, status, list, tag, limit
+    Idea filters:     q, status, verdict, tag, limit
+    Decision filters: project_ref, current_only, limit (up to DECISION_LIMIT; the weekly
+                      ops read dumps a repo's records with current_only=False, limit=500)
+    Project filters:  q, slug, limit
 
     `q` runs full-text search over title + notes (Postgres FTS, English).
     """
-    _check_entity(entity_type)
-    if not (1 <= limit <= 200):
-        raise ValueError("limit must be 1–200")
+    _check_entity(entity_type, read=True)
+    max_limit = DECISION_LIMIT if entity_type == "decision" else 200
+    if not (1 <= limit <= max_limit):
+        raise ValueError(f"limit must be 1–{max_limit}")
 
     query: dict[str, Any] = {"limit": limit}
     if q is not None:
@@ -321,7 +331,21 @@ def list_items(
     if tag is not None:
         query["tag"] = tag
 
-    if entity_type == "task":
+    if entity_type == "decision":
+        if q is not None or tag is not None or status is not None or list is not None or verdict is not None:
+            raise ValueError("decision filters are project_ref, current_only and limit only")
+        if project_ref is not None:
+            query["project_ref"] = project_ref
+        if not current_only:
+            query["current_only"] = "false"
+        envelope_key = "decisions"
+    elif entity_type == "project":
+        if tag is not None or status is not None or list is not None or verdict is not None:
+            raise ValueError("project filters are q, slug and limit only")
+        if slug is not None:
+            query["slug"] = slug
+        envelope_key = "projects"
+    elif entity_type == "task":
         if status is not None and status not in VALID_TASK_STATUSES:
             raise ValueError(f"task status must be one of {sorted(VALID_TASK_STATUSES)}")
         if verdict is not None:
@@ -353,8 +377,8 @@ def list_items(
 # ----------------------------------------------------------------------------
 
 def get(entity_type: str, id: str) -> dict:
-    """Fetch one task or idea by UUID. Raises GroveError(404) if not found."""
-    _check_entity(entity_type)
+    """Fetch one task, idea, decision or project by UUID. Raises GroveError(404) if not found."""
+    _check_entity(entity_type, read=True)
     if not id:
         raise ValueError("id is required")
     result = _request("GET", f"{_route(entity_type)}/{id}")
@@ -457,8 +481,8 @@ def events(
     (pass entity_type='idea', entity_id=...) or to show recent activity
     across the vault.
     """
-    if entity_type is not None and entity_type not in VALID_ENTITIES:
-        raise ValueError(f"entity_type must be one of {sorted(VALID_ENTITIES)}")
+    if entity_type is not None and entity_type not in READ_ENTITIES:
+        raise ValueError(f"entity_type must be one of {sorted(READ_ENTITIES)}")
     if not (1 <= limit <= 200):
         raise ValueError("limit must be 1–200")
 
@@ -495,17 +519,21 @@ def _cli() -> int:
     p_create.add_argument("--status")
     p_create.add_argument("--verdict")
 
-    p_list = sub.add_parser("list", help="List tasks or ideas")
-    p_list.add_argument("entity_type", choices=["task", "idea"])
+    p_list = sub.add_parser("list", help="List tasks, ideas, decisions or projects")
+    p_list.add_argument("entity_type", choices=sorted(READ_ENTITIES))
     p_list.add_argument("--q")
     p_list.add_argument("--status")
     p_list.add_argument("--list", dest="list_name")
     p_list.add_argument("--verdict")
     p_list.add_argument("--tag")
+    p_list.add_argument("--project-ref", help="decision filter")
+    p_list.add_argument("--all", action="store_true", help="decisions: include superseded (current_only=false)")
+    p_list.add_argument("--slug", help="project filter")
     p_list.add_argument("--limit", type=int, default=50)
+    p_list.add_argument("--json", action="store_true", help="print the rows as a JSON array (a dump for scripts)")
 
     p_get = sub.add_parser("get", help="Get one entity by id")
-    p_get.add_argument("entity_type", choices=["task", "idea"])
+    p_get.add_argument("entity_type", choices=sorted(READ_ENTITIES))
     p_get.add_argument("id")
 
     p_complete = sub.add_parser("complete", help="Mark a task done")
@@ -517,7 +545,7 @@ def _cli() -> int:
     p_drop.add_argument("--source", default=DEFAULT_SOURCE)
 
     p_events = sub.add_parser("events", help="Read audit log")
-    p_events.add_argument("--entity-type", choices=["task", "idea"])
+    p_events.add_argument("--entity-type", choices=sorted(READ_ENTITIES))
     p_events.add_argument("--entity-id")
     p_events.add_argument("--kind")
     p_events.add_argument("--limit", type=int, default=50)
@@ -537,11 +565,19 @@ def _cli() -> int:
             args.entity_type,
             q=args.q, status=args.status,
             list=args.list_name, verdict=args.verdict,
-            tag=args.tag, limit=args.limit,
+            tag=args.tag, project_ref=args.project_ref,
+            current_only=not args.all, slug=args.slug, limit=args.limit,
         )
+        if args.json:
+            print(json.dumps(rows))
+            return 0
         print(f"{len(rows)} {args.entity_type}(s)")
         for r in rows:
-            if args.entity_type == "task":
+            if args.entity_type == "decision":
+                print(f"  {r['created_at'][:10]} {(r.get('project_ref') or '-'):40s} {r['decision'][:70]}  ({r['id'][:8]})")
+            elif args.entity_type == "project":
+                print(f"  [{r.get('phase') or '-':11s}] {r['slug']:32s} {r['name']}  ({r['id'][:8]})")
+            elif args.entity_type == "task":
                 flag = "✓" if r["status"] == "done" else ("…" if r["status"] == "dropped" else " ")
                 print(f"  [{flag}] {r['list']:12s} {r['title']}  ({r['id'][:8]})")
             else:

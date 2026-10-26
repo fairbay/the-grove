@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-10-20-02"
+  version: "2026-10-26-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -68,7 +68,10 @@ When active, 17 tools are available natively — no code execution needed.
 **ID lookups: `grove_get` requires the full UUID.** IDs are commonly quoted as 8-char prefixes (e.g. `6bac6029`) — never pad a prefix into a fake UUID. Resolve the full ID first via `grove_list_decisions` / `grove_list_tasks` / `grove_list_projects` (`current_only=false` for decisions), then call `grove_get`.
 
 MCP is the only interface. The Python script (`scripts/grove.py`) is the fallback
-for Routines that lack MCP access — same operations, same auth flow.
+for Routines that lack MCP access — same operations, same auth flow — and the dump
+route for scripts: `grove.py list decision --project-ref <ref> --all --limit 500 --json`
+(also `list project`, `get decision|project`, `events --entity-type decision`) writes
+rows a file can hold, so a weekly read never pastes MCP output by hand (ledger 70c3aeb8).
 
 ## Idea capture
 

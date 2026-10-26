@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-25-01"
+  version: "2026-10-26-01"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -244,8 +244,14 @@ already schedules; no new timer) and whenever he asks for "the ops read". It
 is not a member-facing metric: its filings sit outside the five-task cap and
 the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4–§5.
 
-1. **Gather** (window: the 7 days ending today, UTC), saving each as JSON in the
-   working directory:
+1. **Gather** (window: the 7 days ending today, UTC). One command writes every
+   file below into a directory and prints the counts plus each cap or read failure
+   it met (a repo it could not read is named, never skipped): from the ops clone,
+   `GROVE_TOKEN` in the environment, `python3 .claude/skills/chat-archive/scripts/ops_gather.py
+   <dir> [--repo fairbay/<r> ...]` (default repos: ops and MBN; each needs
+   `add_repo` read access; `gh` is the session's). Then fetch any non-clone policy
+   with `gh api repos/fairbay/<repo>/contents/.claude/policy.json -H "Accept:
+   application/vnd.github.raw"`. What it gathers, for a hand run when it cannot:
    - `decisions.json`: `grove_list_decisions(project_ref=…, current_only=false,
      compact=false, limit=100)` for `fairbay/ops`, `ops`,
      `fairbay/medicaid-benefits-navigator` and any repo with a
