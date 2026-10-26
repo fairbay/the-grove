@@ -17,15 +17,14 @@ Command line (bulk text goes in files, never in tool arguments):
       --model claude-sonnet-5-5 --system-file sys.txt --user-file task.txt [--max-tokens 4096]
   The reply goes to stdout; token usage goes to stderr.
 
-The key is ANTHROPIC_API_KEY in fairbay/ops secrets/delegate.env, found in this order:
-a local ops clone (this repo, or /home/user/ops), `gh api` on fairbay/ops (a Code session
-with ops attached; in a product-repo session attach it first: add_repo fairbay/ops, read),
-then git-ops read_file (chat). A missing key is surfaced, never retried or worked around.
+The key is $ANTHROPIC_API_KEY from the session's environment; no key file is read
+(faca1b33). Where it is not set, a Code session uses an Agent sub-agent with an explicit
+model and chat applies the lens inline. A missing key is surfaced, never retried or
+worked around.
 """
 import argparse
 import json
 import os
-import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -35,46 +34,13 @@ class DelegateError(RuntimeError):
     """Surfaced verbatim — message tells Baylee what to do."""
 
 
-def _read_env_text() -> str:
-    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
-    for root in (top, "/home/user/ops"):
-        path = os.path.join(root, "secrets", "delegate.env") if root else ""
-        if path and os.path.isfile(path):
-            return open(path).read()
-    try:
-        out = subprocess.run(["gh", "api", "repos/fairbay/ops/contents/secrets/delegate.env",
-                              "-H", "Accept: application/vnd.github.raw"],
-                             capture_output=True, text=True, timeout=30)
-        if out.returncode == 0 and "ANTHROPIC_API_KEY" in out.stdout:
-            return out.stdout
-    except Exception:
-        pass
-    for p in (".claude/skills/git-ops/scripts", "/mnt/skills/user/git-ops/scripts"):
-        if os.path.isdir(p) and p not in sys.path:
-            sys.path.insert(0, p)
-    try:
-        from git_push import read_file  # chat path (PAT)
-        return read_file('fairbay/ops', 'secrets/delegate.env')
-    except Exception as e:
-        raise DelegateError(
-            "secrets/delegate.env not reachable. In a Code session on another repo, attach "
-            "fairbay/ops (add_repo, read) and retry. First-time setup: create the file with "
-            "ANTHROPIC_API_KEY=sk-ant-... from console.anthropic.com."
-        ) from e
-
-
 def _load_api_key() -> str:
-    env = _read_env_text()
-    pairs = dict(
-        line.split('=', 1)
-        for line in env.strip().split('\n')
-        if '=' in line and not line.startswith('#')
-    )
-    key = pairs.get('ANTHROPIC_API_KEY', '').strip()
+    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not key:
         raise DelegateError(
-            "ANTHROPIC_API_KEY missing from secrets/delegate.env. "
-            "Rotate at console.anthropic.com and update the file."
+            "ANTHROPIC_API_KEY is not set in this session's environment (no key file is "
+            "read). In a Code session, use an Agent sub-agent with model set instead; "
+            "to use this helper, Baylee adds the key to the cloud environment."
         )
     return key
 

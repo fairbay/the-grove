@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-10-26-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.

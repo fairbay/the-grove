@@ -46,8 +46,9 @@ Body: { "base64": "<...>", "format": "webp", "name": "slug",
 
 ## Key handling
 
-`IMAGE_STORE_KEY` lives in `fairbay/ops/secrets/image-store.env` (tier-2
-committed secret — read it via the GitHub API the same way `grove.py` reads `grove.env`).
+`IMAGE_STORE_KEY` is an environment variable of the "GitHub" cloud environment, so the
+store call runs from a Code session (`$IMAGE_STORE_KEY`); no key file is read or committed
+(faca1b33). Chat has no copy of the key.
 **Never hardcode the literal key value in a skill file, page, or commit.**
 
 ## Provenance

@@ -5,7 +5,7 @@ description: >
   filter by tag/keyword, scan. Use proactively. Not for judgment
   (→ delegate-analytical) or async (→ fire-routine).
 metadata:
-  version: "2026-10-18-01"
+  version: "2026-10-26-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -85,6 +85,11 @@ only the extracted result needs surfacing.
 
 ### 2. Call API
 
+**Key check first.** The helper reads `$ANTHROPIC_API_KEY` only (no key file). Run
+`python3 -c "import os; print(bool(os.environ.get('ANTHROPIC_API_KEY')))"`; if it prints
+`False`, skip the helper: in a Code session run the same prompt as an Agent sub-agent with
+`model:` set; in chat apply the lens inline.
+
 ```python
 import sys
 sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')  # chat: '/mnt/skills/user/delegate-mechanical/scripts'
@@ -100,12 +105,12 @@ output, usage = call(
 Or from Bash, with the prompts in files (Code sessions; bulk text never rides in
 tool arguments): `python3 .claude/skills/delegate-mechanical/scripts/delegate.py
 --model claude-haiku-5-5 --system-file sys.txt --user-file task.txt`. The reply is on stdout,
-token usage on stderr. In a product-repo Code session, attach fairbay/ops (read)
-first so the helper can read the key.
+token usage on stderr. The key comes from `$ANTHROPIC_API_KEY` only.
 
 If the helper raises `DelegateError`, surface its message verbatim — it tells
-Baylee whether to set up `secrets/delegate.env` or rotate the token. Do not
-retry or fall back silently.
+Baylee that `ANTHROPIC_API_KEY` is not in this session's environment (no key
+file is read). In a Code session, run the same prompt as an Agent sub-agent with
+`model:` set instead. Do not retry or fall back silently.
 
 ### 3. Verify and return
 

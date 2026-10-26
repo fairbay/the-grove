@@ -15,11 +15,9 @@ underlying write path (RPC wraps mutation + event insert atomically, FR-005
 strict). Event kind is `task.completed` / `task.dropped` so the audit log
 carries the semantic intent rather than a generic `task.updated`.
 
-Auth: opaque Bearer token seeded into public.token. Token resolution:
-1. $GROVE_TOKEN env var (set from Claude memory edit in chat)
-2. ops/secrets/grove.env (for Routines / Claude Code)
-3. SECRET.txt next to this script (legacy fallback)
-The API hashes the value and looks it up;
+Auth: opaque Bearer token seeded into public.token, read from $GROVE_TOKEN
+only (the cloud environment sets it for Routines and Code sessions; no key
+file is read, faca1b33). The API hashes the value and looks it up;
 owner_id is resolved server-side.
 
 Transient edge 503s ("DNS cache overflow" body) are retried with exponential
@@ -33,7 +31,6 @@ import os
 import time
 import urllib.request
 import urllib.error
-from pathlib import Path
 from typing import Any, Iterable
 
 # ----------------------------------------------------------------------------
@@ -66,69 +63,17 @@ DEFAULT_BASE_URL = "https://grove-woad-phi.vercel.app"
 
 
 # ----------------------------------------------------------------------------
-# Config resolution (token + base URL) — unchanged from v0
+# Config resolution (token + base URL): environment only
 # ----------------------------------------------------------------------------
 
 def _load_config() -> tuple[str, str]:
-    env_token = os.environ.get("GROVE_TOKEN")
-    env_base = os.environ.get("GROVE_BASE_URL")
-    if env_token:
-        return env_token.strip(), (env_base or DEFAULT_BASE_URL).strip()
-
-    # Routine/Claude Code fallback: check cloned ops repo
-    for candidate in [
-        Path.home() / "ops" / "secrets" / "grove.env",
-        Path("/home/user/ops/secrets/grove.env"),
-    ]:
-        if candidate.is_file():
-            token, base_url = _parse_env_file(candidate)
-            if token:
-                return token, base_url or DEFAULT_BASE_URL
-
-    # Legacy fallback: SECRET.txt next to this script
-    secret_path = os.environ.get("GROVE_SECRET_PATH")
-    if not secret_path:
-        here = Path(__file__).resolve().parent
-        secret_path = str(here.parent / "SECRET.txt")
-
-    if os.path.exists(secret_path):
-        token, base_url = _parse_env_file(Path(secret_path))
-        if token:
-            return token, base_url or DEFAULT_BASE_URL
-
-    raise RuntimeError(
-        "Grove token not found. In chat: set GROVE_TOKEN env var from memory. "
-        "In Routines: ensure secrets/grove.env exists in ops repo."
-    )
-
-
-def _parse_env_file(path: Path) -> tuple[str | None, str | None]:
-    """Parse a key=value env file, returning (token, base_url)."""
-    token = None
-    base_url = None
-    try:
-        with open(path, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "=" in line:
-                    k, v = line.split("=", 1)
-                    k, v = k.strip(), v.strip()
-                    kl = k.lower()
-                    if kl in ("token", "grove_token"):
-                        token = v
-                    elif kl in ("base_url", "base", "url", "grove_base_url"):
-                        base_url = v
-                else:
-                    token = line
-    except FileNotFoundError:
-        pass
-    return token, base_url
-
-    if not token:
-        raise RuntimeError(f"Grove token not found in {secret_path}")
-    return token, base_url
+    env_token = os.environ.get("GROVE_TOKEN", "").strip()
+    if not env_token:
+        raise RuntimeError(
+            "GROVE_TOKEN is not set. It comes from the cloud environment (Routines, "
+            "Code sessions); no key file is read. In chat, use the Grove MCP tools."
+        )
+    return env_token, (os.environ.get("GROVE_BASE_URL") or DEFAULT_BASE_URL).strip()
 
 
 # ----------------------------------------------------------------------------

@@ -19,10 +19,8 @@ Environment auto-detection:
   Otherwise, it falls back to the Git Data API — 6 network calls.
 
 Auth resolution (API path only):
-  1. $GITHUB_PAT env var (Routines that set one)
-  2. $GITHUB_PAT_PATH env var (path to file holding token)
-  3. /home/claude/github-pat.txt (dev fallback)
-  4. The session's agent proxy ($HTTPS_PROXY set): a placeholder token; the
+  1. $GITHUB_PAT env var (Routines and Code sessions whose environment sets one)
+  2. The session's agent proxy ($HTTPS_PROXY set): a placeholder token; the
      proxy injects real credentials for repos attached with add_repo. This is
      the chat path — no session reads the Vault PAT.
   In Routines, read_file/list_files/push_files auto-detect the local clone
@@ -250,12 +248,6 @@ def _token():
     """Resolve GitHub auth: an explicit PAT if one is set, else the session proxy."""
     if os.environ.get("GITHUB_PAT"):
         return os.environ["GITHUB_PAT"].strip()
-    path = os.environ.get("GITHUB_PAT_PATH")
-    if not path:
-        path = "/home/claude/github-pat.txt"
-    if os.path.exists(path):
-        with open(path) as f:
-            return f.read().strip()
     if os.environ.get("HTTPS_PROXY"):
         return PROXY_TOKEN
     raise RuntimeError(

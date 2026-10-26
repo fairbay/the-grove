@@ -5,7 +5,7 @@ description: >
   proactively. Not for flaw-finding (→ delegate-adversarial), rote
   (→ delegate-mechanical), panel reviews (→ review-panel).
 metadata:
-  version: "2026-10-18-01"
+  version: "2026-10-26-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -88,6 +88,11 @@ plan to echo the system prompt, raw input, or reasoning back into the main chat.
 
 ### 2. Call API
 
+**Key check first.** The helper reads `$ANTHROPIC_API_KEY` only (no key file). Run
+`python3 -c "import os; print(bool(os.environ.get('ANTHROPIC_API_KEY')))"`; if it prints
+`False`, skip the helper: in a Code session run the same prompt as an Agent sub-agent with
+`model:` set; in chat apply the lens inline.
+
 ```python
 import sys
 sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')  # chat: '/mnt/skills/user/delegate-mechanical/scripts'
@@ -101,8 +106,9 @@ output, usage = call(
 ```
 
 If the helper raises `DelegateError`, surface its message verbatim — it tells
-Baylee whether to set up `secrets/delegate.env` or rotate the token. Do not
-retry or fall back silently.
+Baylee that `ANTHROPIC_API_KEY` is not in this session's environment (no key
+file is read). In a Code session, run the same prompt as an Agent sub-agent with
+`model:` set instead. Do not retry or fall back silently.
 
 ### 3. Verify and return
 

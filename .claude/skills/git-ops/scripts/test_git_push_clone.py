@@ -152,7 +152,7 @@ class PushToPrTests(unittest.TestCase):
 
 class TokenTests(unittest.TestCase):
     """2026-10-19: chat sessions read a write-scoped PAT from Vault; the proxy makes that unnecessary."""
-    KEYS = ("GITHUB_PAT", "GITHUB_PAT_PATH", "HTTPS_PROXY")
+    KEYS = ("GITHUB_PAT", "GITHUB_PAT_PATH", "HTTPS_PROXY")  # GITHUB_PAT_PATH: proves it is ignored
 
     def _token(self, **env):
         saved = {k: os.environ.pop(k, None) for k in self.KEYS}
@@ -174,6 +174,16 @@ class TokenTests(unittest.TestCase):
     def test_no_auth_raises(self):
         with self.assertRaises(RuntimeError):
             self._token(GITHUB_PAT_PATH="/nonexistent")
+
+    def test_no_key_file_is_read(self):
+        """faca1b33: a token file never counts as auth, even when it exists."""
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".txt") as f:
+            f.write("ghp_from_file\n")
+            f.flush()
+            self.assertEqual(self._token(GITHUB_PAT_PATH=f.name, HTTPS_PROXY="http://p"), git_push.PROXY_TOKEN)
+            with self.assertRaises(RuntimeError):
+                self._token(GITHUB_PAT_PATH=f.name)
 
 
 class RemotePathTests(unittest.TestCase):

@@ -47,7 +47,7 @@ In those cases just report the commit URL and stop.
 
 ### Deploy gap
 
-The Vercel MCP `deploy_to_vercel` tool only returns CLI instructions — it cannot deploy. The Vercel CLI requires a token not stored in `ops/secrets/`. New repos require a one-time dashboard import at vercel.com/new; only already-imported projects auto-deploy on push.
+The Vercel MCP `deploy_to_vercel` tool only returns CLI instructions — it cannot deploy. The Vercel CLI requires a token that no session holds. New repos require a one-time dashboard import at vercel.com/new; only already-imported projects auto-deploy on push.
 
 **Pipeline for a brand-new repo:**
 1. Push the repo to GitHub (git-ops handles this).

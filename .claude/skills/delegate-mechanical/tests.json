@@ -14,7 +14,7 @@
     },
     {
       "name": "fire-routine",
-      "description": "Fire async Claude Code Routines — \"fire scout-r\", \"fire skill-worker-r\", \"drain the queue\", \"routine-fire X\". Not for inline scoring/scouting (→ idea-scout) or sync delegation (→ delegate-*)."
+      "description": "Fire async Claude Code Routines — \"fire skill-worker-r\", \"drain the queue\", \"routine-fire X\". Not for inline scoring/scouting (→ idea-scout) or sync delegation (→ delegate-*)."
     },
     {
       "name": "build",
@@ -30,7 +30,7 @@
   "negative_cases": [
     "Compare these three architecture options and rank them (expect delegate-analytical)",
     "Tear this skill design apart — every flaw, every failure mode (expect delegate-adversarial)",
-    "Fire scout-r on the new idea queue overnight (expect fire-routine)",
+    "Fire skill-worker-r to drain the queue overnight (expect fire-routine)",
     "Build me a React component to render this list (expect build)",
     "Evaluate which of these three naming options reads best (expect delegate-analytical)"
   ]

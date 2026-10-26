@@ -5,7 +5,7 @@ description: >
   "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
   Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-10-26-02"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -80,7 +80,7 @@ fall back to a stored token.
 
 The repo is cloned and the git proxy handles auth. `push_to_pr`, `push_files`, `read_file`, and `list_files` auto-detect the local clone and use the native git CLI — no PAT setup needed. The interface is identical to the chat path. Where the GitHub connector is loaded, a Code session may open the draft PR with it instead of `push_to_pr`'s API call.
 
-API-path auth order: `$GITHUB_PAT` env var → `$GITHUB_PAT_PATH` → `/home/claude/github-pat.txt` → the session proxy (placeholder token; the proxy injects credentials for attached repos).
+API-path auth order: `$GITHUB_PAT` env var → the session proxy (placeholder token; the proxy injects credentials for attached repos). No token file is read.
 
 ## The five operations
 

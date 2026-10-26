@@ -1,7 +1,7 @@
 {
   "target_skill": {
     "name": "fire-routine",
-    "description": "Fire async Claude Code Routines — \"fire scout-r\", \"fire skill-worker-r\", \"drain the queue\", \"routine-fire X\". Not for inline scoring/scouting (→ idea-scout) or sync delegation (→ delegate-*)."
+    "description": "Fire async Claude Code Routines — \"fire skill-worker-r\", \"drain the queue\", \"routine-fire X\". Not for inline scoring/scouting (→ idea-scout) or sync delegation (→ delegate-*)."
   },
   "competing_skills": [
     {
@@ -22,7 +22,7 @@
     }
   ],
   "positive_cases": [
-    "Fire scout-r on the new idea queue overnight",
+    "Kick off the worker routine tonight so the queued skill fixes land",
     "Drain the routine queue before I head out",
     "Routine-fire ll-data-r for the FEMA integration",
     "Fire skill-worker-r on the delegation family rebuild"
