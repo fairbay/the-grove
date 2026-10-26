@@ -39,18 +39,20 @@ row's metadata is overwritten each session, so it cannot hold a series).
 | `merges` | PR merge calls (`gh api -X PUT …/merge`, git-ops merge) |
 | `calls_logged` | Grove decisions this session logged at rung 3 (not the record itself, not reversals) |
 | `calls_shown`, `cards`, `tasks_for_baylee` | the random fifth below; Grove ids filed this session |
-| `cache_read_m` | the session's cache-read tokens in millions by model, `{"opus": 12.3, "sonnet": 4.1}`, from the repo's usage report when it has one (MBN `report.py`); else `null`, never a guess. The weekly read's S10 line sums it per day (`ops_read.py`); a record without it is counted as "no cost", not as zero |
+| `cache_read_m` | the session's cache-read tokens in millions by model family, `{"opus": 12.3, "sonnet": 4.1}`, as `session_report.py` prints it (below); else `null`, never a guess. The weekly read's S10 line sums it per day (`ops_read.py`); a record without it is counted as "no cost", not as zero |
 | `source` | `transcript` when counted from the transcript; `self-reported` when counted by recall; `no-transcript` for an entry stub |
 | `lane` | in a lanes repo, the lane the session worked (`"a"`); the record also takes the tag `lane-<x>`, which is how dispatch finds each lane's last session (session-start `references/dispatch.md`). Omitted outside lanes and for a dispatch record (tag `dispatch` instead) |
 
-**Counting.** In a Code session whose repo has `scripts/session-usage/report.py`
-(MBN), run `python3 scripts/session-usage/report.py <session-dir-prefix>
-<out.json> <out.md> --routing`: stdout prints `{"asks","refusals","merges",
-"source":"transcript"}`, and the refused commands for `refused` are in the
-out.json's `routing` section. Anywhere else (chat, ops,
-a repo without the script) count the three from the conversation and set
-`source: self-reported`. Never grade the asks (no "needed" field: a session
-cannot judge its own asks).
+**Counting.** In a Code session, run `python3 .claude/skills/chat-archive/scripts/session_report.py
+<session-dir-prefix> <out.json> <out.md> --routing` (the prefix is
+`~/.claude/projects/<project>/<session-id>`, no extension; MBN's
+`scripts/session-usage/report.py` wraps it and takes `--work-from` too): stdout
+ends with `{"asks","refusals","merges","source":"transcript","cache_read_m":{…}}`,
+the record's four counts and its cost in one line, and the refused commands for
+`refused` are in the out.json's `routing` section. Anywhere else (chat, a repo
+without the synced skill) count the three from the conversation, set
+`source: self-reported` and `cache_read_m: null`. Never grade the asks (no
+"needed" field: a session cannot judge its own asks).
 
 **The call.** `grove_log_decision(decision="session-record <date> <repo or slug>:
 asks A, refusals R, merges M, calls L (shown S), cards C", project_ref=…,

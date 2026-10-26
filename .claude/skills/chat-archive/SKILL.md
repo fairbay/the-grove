@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-25-02"
+  version: "2026-10-26-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -247,11 +247,11 @@ One-time grants don't need encoding — the summary is sufficient.
 #### 3e. Session record (refusal: no close without it)
 
 Before the summary, log the session-record decision (`references/session-record.md`,
-"The record"): asks, refusals, merges (Code with `report.py --routing`, else
-self-reported), the rung-3 call ids, the random fifth picked from them (printed
-in Step 4 and 9b), cards and tasks for Baylee. **No summary or Next-step line
-until its id is in hand.** If Grove refuses twice, the record JSON goes into
-the handoff's `pending_record:` (Phase 0 logs it) and the archive says so.
+"The record"): asks, refusals, merges, cache_read_m (Code: `session_report.py
+--routing`; else self-reported), the rung-3 call ids, the random fifth picked
+from them (printed in Step 4 and 9b), cards and tasks for Baylee. **No summary
+or Next-step line until its id is in hand.** If Grove refuses twice, the record
+JSON goes into the handoff's `pending_record:` (Phase 0 logs it) and the archive says so.
 
 ### 4. Session summary
 
