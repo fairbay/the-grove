@@ -280,10 +280,12 @@ Select Gemini 3 Pro. Gemini generates React/Tailwind components. Copy output
 back to Claude for integration. Best for: initial component design, visual
 iteration, when you want to see and adjust the visual output directly.
 
-**Gemini MCP Server** (automated, Claude Code):
-MCP server at glama.ai/mcp/servers/bobvasic/gemini-mcp-server lets Claude
-Code call Gemini for UI design work. Claude orchestrates, Gemini designs.
-Best for: integrated workflow where you don't want to context-switch.
+**The doorway** (automated, Claude Code):
+Claude calls Gemini through the `llm` doorway (delegate-adversarial,
+`scripts/llm_doorway.py`) for UI design work. Claude orchestrates, Gemini designs.
+Best for: integrated workflow where you don't want to context-switch. No Gemini
+MCP server: it would call Google with its own key, outside the doorway's limits
+and log (global rules, "Outside-Model Calls").
 
 **Google Stitch** (wireframe → polished UI):
 Free tool. Upload screenshots, wireframes, or sketches → get polished UI
