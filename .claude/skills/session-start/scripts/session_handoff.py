@@ -179,8 +179,7 @@ def _decision_table(root: Path):
     try:
         pol = json.loads(path.read_text(encoding="utf-8"))
         rows = pol["decision_table"]
-        lines = [f"Decision table ({POLICY} v{pol.get('version', '?')}; first yes routes the change; "
-                 f"classes and routes in the file):"]
+        lines = [f"Decision table ({POLICY} v{pol.get('version', '?')}; first yes routes the change):"]
         n = 0
         for r in rows:
             if "else" in r:

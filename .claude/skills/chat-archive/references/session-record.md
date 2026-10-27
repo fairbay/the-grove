@@ -8,7 +8,7 @@ that consumes the records is `scripts/ops_read.py` (project-health, "Ops read").
 ## Contents
 - The record (Step 3e) — fields, sources, the decision call, no close without it
 - The random fifth — which calls Baylee sees, and how he reverses one
-- Reversals and wrong questions — the two tags
+- Reversals and wrong questions — the tags, with needless asks
 - At entry (session-start Phase 0) — a missing record for the previous session
 - MBN data-batch close — guard-record.json, guard.mjs, the verdict line, the Go
 - Agent state — the output-file check before any report about an agent
@@ -104,6 +104,18 @@ Their ids go in the record's `calls_shown`. No rung-3 calls → the line reads
   that sent the item to him, 1-based; `table-row-unknown` when none did) with
   `grove_update_task`, keeping the card's existing tags. The next session's
   plan carries one postmortem line naming that row.
+- **Needless ask.** When Baylee answers an ask, a task or a parked item routed
+  to him with "no need to ask" in any words ("why not just do it", "you could
+  have done that"), the session that receives it, or the archive counting asks
+  at Step 3e, logs one decision tagged `needless_ask` and `table-row-<n>` (the
+  row that sent it to him; `table-row-unknown` when none did), `project_ref`
+  `fairbay/<repo>`, the item and his words in `context`, then does the work.
+  A card he resolves by note is a wrong question above, never also a needless
+  ask (one incident, one count). The weekly read counts needless asks with the
+  wrong-question cards (S5): a postmortem line each, and a card when two land
+  on one row where the repo's policy sets `same_row_card` (ops does; MBN does
+  not). Decision-table tidy, fairbay/ops
+  docs/decision-routing/table-tidy/DESIGN.md (Grove d0f4f58d).
 
 ## At entry (session-start Phase 0)
 

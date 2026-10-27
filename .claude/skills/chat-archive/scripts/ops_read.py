@@ -366,7 +366,7 @@ def card_row(card):
 
 
 def signal_s5(repo, pol, cards, since, until, days, actions):
-    """cards: this repo's wrong_question cards (any date)."""
+    """cards: this repo's wrong_question cards and needless_ask decisions (any date)."""
     vals, bad = thresholds(pol, repo, K_S5, [("any", "any")])
     if bad:
         return not_judged(bad)
@@ -375,24 +375,26 @@ def signal_s5(repo, pol, cards, since, until, days, actions):
     res = {"status": "ok", "postmortems": [], "row_counts": {}, "same_row_card": sig.get("same_row_card"), "window_days": sig.get("window_days")}
     lines = []
     for c in sorted(in_week, key=lambda c: (c["day"], str(c["id"]))):
-        text = f"postmortem: card {short(c['id'])} {c['title']} resolved by note with no option; decision-table row {c['row']}"
+        what = "ask" if c.get("kind") == "ask" else "card"
+        how = "answered: no need to ask" if what == "ask" else "resolved by note with no option"
+        text = f"postmortem: {what} {short(c['id'])} {c['title']} {how}; decision-table row {c['row']}"
         res["postmortems"].append(text)
         lines.append(text)
         actions.append({"type": "postmortem", "signal": "S5", "repo": repo,
                         "dedup_key": f"routing-postmortem {c['id']}",
-                        "title": f"Postmortem: wrong-question card {short(c['id'])} {c['title']} (row {c['row']})",
-                        "body": text + "\nName the decision-table row that produced the wrong question in the next session's plan."})
+                        "title": f"Postmortem: {'needless ask' if what == 'ask' else 'wrong-question card'} {short(c['id'])} {c['title']} (row {c['row']})",
+                        "body": text + "\nName the decision-table row that produced it in the next session's plan."})
     if in_week:
         res["status"] = "postmortem"
     wd = sig.get("window_days")
     if sig.get("same_row_card") is None:
         lines.append("same-row card not judged: policy has no S5 same_row_card")
-        head = f"S5 wrong-question cards this week (any): {len(in_week)} -> {res['status']}"
+        head = f"S5 wrong-question cards and needless asks this week (any): {len(in_week)} -> {res['status']}"
         res["line"], res["detail"] = head, lines
         return res
     if not (isinstance(wd, int) and not isinstance(wd, bool) and wd >= 1):
         lines.append(f"same-row card not judged: {repo} policy lacks signals.{K_S5}.window_days")
-        head = f"S5 wrong-question cards this week (any): {len(in_week)} -> {res['status']}"
+        head = f"S5 wrong-question cards and needless asks this week (any): {len(in_week)} -> {res['status']}"
         res["line"], res["detail"] = head, lines
         return res
     counts = {}
@@ -402,7 +404,7 @@ def signal_s5(repo, pol, cards, since, until, days, actions):
     res["row_counts"] = {str(k): len(v) for k, v in counts.items()}
     per_row = ", ".join(f"row {k}: {len(v)}" for k, v in sorted(counts.items(), key=lambda kv: (kv[0] == "unknown", kv[0] if kv[0] != "unknown" else 0))) or "none"
     scope = f"{wd} days"
-    lines.append(f"wrong-question cards per decision-table row over {scope}: {per_row}")
+    lines.append(f"wrong-question cards and needless asks per decision-table row over {scope}: {per_row}")
     srow = sig.get("same_row_card")
     if srow is None:
         lines.append("same-row card not judged: policy has no S5 same_row_card")
@@ -412,14 +414,14 @@ def signal_s5(repo, pol, cards, since, until, days, actions):
         for row, cs in sorted(((k, v) for k, v in counts.items() if k != "unknown"), key=lambda kv: kv[0]):
             if len(cs) >= srow:
                 res["status"] = "breach"
-                lines.append(f"row {row}: {len(cs)} wrong-question cards (card at {fmt_num(srow)}) -> breach")
+                lines.append(f"row {row}: {len(cs)} wrong-question cards and needless asks (card at {fmt_num(srow)}) -> breach")
                 actions.append({"type": "card", "signal": "S5", "repo": repo,
                                 "dedup_key": f"routing-card S5 {repo} row-{row} {short(max(cs, key=lambda c: (c['day'], str(c['id'])))['id'])}",
-                                "title": f"S5 {repo}: {len(cs)} wrong-question cards on decision-table row {row} in {scope}",
-                                "body": f"Cards resolved by note with no option, all from decision-table row {row}:\n"
+                                "title": f"S5 {repo}: {len(cs)} wrong-question cards and needless asks on decision-table row {row} in {scope}",
+                                "body": f"Wrong-question cards and needless asks, all from decision-table row {row}:\n"
                                         + "\n".join(f"- {short(c['id'])} {c['title']} ({c['day'].isoformat()})" for c in sorted(cs, key=lambda c: c["day"])),
                                 "recommendation": f"rewrite decision-table row {row}"})
-    head = f"S5 wrong-question cards this week (any): {len(in_week)} -> {res['status']}"
+    head = f"S5 wrong-question cards and needless asks this week (any): {len(in_week)} -> {res['status']}"
     res["line"] = head
     res["detail"] = lines
     return res
@@ -516,6 +518,17 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
         when = res.get("resolved_at") if isinstance(res, dict) else None
         wq.append({"id": c.get("id"), "title": c.get("title") or c.get("question") or "", "repo": repo,
                    "row": card_row(c), "day": day_of(c.get("updated_at") or when)})
+    # An ask Baylee answered "no need to ask" is logged as a decision tagged needless_ask and
+    # table-row-<n> (session-record.md); it counts with the wrong-question cards on its row.
+    for d in decisions:
+        if "needless_ask" not in tags_of(d):
+            continue
+        repo = norm_repo(d.get("project_ref"))
+        if repo is None:
+            unreadable.append({"kind": "needless_ask", "id": d.get("id"), "title": (d.get("decision") or "")[:80], "reason": "no project_ref"})
+            continue
+        wq.append({"id": d.get("id"), "title": (d.get("decision") or "")[:80].strip(), "repo": repo, "kind": "ask",
+                   "row": card_row(d), "day": day_of(d.get("created_at"))})
 
     act = []
     for a in activity:
