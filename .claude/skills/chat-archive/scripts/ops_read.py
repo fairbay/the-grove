@@ -16,6 +16,8 @@ Usage:
 --minutes FILE: JSON array of {repo, date, minutes}, one row per Actions run in the billing month
 (minutes = the run's duration rounded up to whole minutes). It feeds S11, the account-wide Actions
 minutes line; S10 (cache-read tokens per day) reads the optional `cache_read_m` of the records.
+The Budgets section also prints a report-only "Counter" line from record-2 fields (session_report.py
+--record): whole records, interrupts, starts, PR taps and the process share of cache-read.
 
 Exit 0 normally; 2 on an input error (unreadable file, bad JSON, --policy without '=').
 Python 3.11, stdlib only.
@@ -200,6 +202,10 @@ def parse_records(decisions):
         if not isinstance(refused, list):
             bad("refused is not a list")
             continue
+        prs = ctx.get("prs") or []
+        if not isinstance(prs, list):
+            bad("prs is not a list")
+            continue
         records.append({
             "id": did, "session": str(ctx.get("session") or did or "?"), "date": rdate,
             "created": created or datetime.min.replace(tzinfo=timezone.utc),
@@ -207,6 +213,13 @@ def parse_records(decisions):
             "asks": counts["asks"], "refusals": counts["refusals"],
             "refused": [str(x) for x in refused], "calls_shown": [str(x) for x in shown],
             "cache_read_m": cache,
+            # record 2 (session_report.py --record, 75cbc21d): the whole counter; absent on older records
+            "version": ctx.get("record") if isinstance(ctx.get("record"), int) and not isinstance(ctx.get("record"), bool) else 1,
+            "lane": str(ctx["lane"]).lower() if ctx.get("lane") else None,
+            "start": ctx.get("start") if ctx.get("start") in ("pasted", "typed", "none") else None,
+            "prs": [x for x in prs if isinstance(x, dict)],
+            "cards": len(ctx.get("cards") or []) if isinstance(ctx.get("cards"), list) else 0,
+            "interrupts": ctx.get("interrupts") if isinstance(ctx.get("interrupts"), int) and not isinstance(ctx.get("interrupts"), bool) else None,
         })
     return records, unreadable
 
@@ -461,6 +474,33 @@ def signal_s10(pol, records, since, until, actions):
     return res
 
 
+def is_process(r):
+    """Process work: an ops session, or lane H (global ops and the tech stack) in a lanes repo."""
+    return r["repo"] == BUDGET_REPO or r["lane"] == "h"
+
+
+def counter_line(records, since, until):
+    """The whole counter (75cbc21d build item 1). Report-only: no threshold, no action. Two record sets, each named in the line:
+    whole records (record 2, built from the transcript by session_report.py --record) give interrupts, starts and PR taps;
+    every record with a cost (record 1 included) gives the process share of cache-read (ops sessions and lane H)."""
+    week = [r for r in records if since < r["date"] <= until]
+    whole = [r for r in week if r["version"] >= 2 and r["source"] == "transcript" and r["interrupts"] is not None]
+    res = {"records": len(week), "whole": len(whole)}
+    starts = {k: sum(1 for r in whole if r["start"] == k) for k in ("pasted", "typed", "none")}
+    prs = [x for r in whole for x in r["prs"]]
+    taps = sum(1 for x in prs if x.get("tapped"))
+    res.update(interrupts=sum(r["interrupts"] for r in whole), starts=starts, prs=len(prs), tapped=taps)
+    costed = [r for r in week if r["cache_read_m"] is not None]
+    total = sum(sum(r["cache_read_m"].values()) for r in costed)
+    proc = sum(sum(r["cache_read_m"].values()) for r in costed if is_process(r))
+    res["process_share"] = round(proc / total, 3) if total else None
+    share = f"{round(100 * proc / total)}% of {fmt_num(round(total, 1))}M over the {len(costed)} records with a cost" if total else "no record carries a cost"
+    res["line"] = (f"Counter: {len(whole)} of {len(week)} records whole (built by --record); from those: interrupts {res['interrupts']}, "
+                   f"starts pasted {starts['pasted']} / typed {starts['typed']} / none {starts['none']}, "
+                   f"PRs {len(prs)} ({taps} tapped by him). Process share of cache-read (ops sessions and lane H): {share}")
+    return res
+
+
 def signal_s11(pol, minutes, until, actions):
     """GitHub Actions minutes used this billing month (UTC calendar month) against the plan's limit."""
     vals, bad = thresholds(pol, BUDGET_REPO, K_S11, [("limit_per_month", "num"), ("flag_at_fraction", "num")]) if pol else ({}, [f"not judged: no {BUDGET_REPO} policy"])
@@ -619,7 +659,8 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
 
     budget_pol = (policies[BUDGET_REPO][0] if BUDGET_REPO in policies else (default_policy[0] if default_policy else None))
     budgets = {"S10": signal_s10(budget_pol, records, since, until, actions),
-               "S11": signal_s11(budget_pol, minutes, until, actions)}
+               "S11": signal_s11(budget_pol, minutes, until, actions),
+               "counter": counter_line(records, since, until)}
 
     # dedupe actions
     seen_keys, uniq_actions = set(), []
@@ -662,7 +703,7 @@ def render(res):
         for n in e["not_counted"]:
             L.append(f"- not counted: {n['session']} {n['date']} ({', '.join(n['fields'])} null{'; ' + n['source'] if n['source'] else ''})")
     b = res["budgets"]
-    L += ["", "### Budgets (account-wide)", f"- {b['S10']['line']}", f"- {b['S11']['line']}"]
+    L += ["", "### Budgets (account-wide)", f"- {b['S10']['line']}", f"- {b['S11']['line']}", f"- {b['counter']['line']}"]
     L += ["", "Activity with no record:"]
     if res["no_record"]:
         L += [f"- {n['text']}" for n in res["no_record"]]

@@ -20,38 +20,66 @@ numbers as JSON in its `context` field (decisions have no metadata; the project
 row's metadata is overwritten each session, so it cannot hold a series).
 
 ```json
-{"record": 1, "session": "<session URL or id>", "surface": "chat|code|routine",
+{"record": 2, "session": "<session URL>", "surface": "chat|code|routine",
  "date": "YYYY-MM-DD", "repo": "fairbay/<repo> or null", "kind": "upkeep|direction|<change_batches.kind>",
  "asks": 0, "refusals": 0, "refused": [], "merges": 0,
+ "prs": [{"pr": "fairbay/<repo>#<n>", "via": "self|ask|github|pending|open", "tapped": false}],
+ "start": "pasted|typed|none", "opening_chars": 0, "interrupts": 0,
  "calls_logged": ["<rung-3 decision ids>"], "calls_shown": ["<ids of the random fifth>"],
  "cards": ["<adjudication ids filed>"], "tasks_for_baylee": ["<task ids for him>"],
- "cache_read_m": null,
- "source": "transcript|self-reported|no-transcript", "lane": "<x>, lanes repos only"}
+ "cache_read_m": {"opus": 12.3}, "source": "transcript", "lane": "<x>"}
 ```
+
+**Build it with one call, on every surface** (architecture run 75cbc21d, build item 1:
+the counter whole; `docs/architecture-run/04-PROPOSAL.md` §8). A chat and a Code
+session both keep their transcript on disk (`~/.claude/projects/<dir>/<id>.jsonl`;
+seen 2026-10-28 in chat), so nothing is counted by recall:
+
+```bash
+python3 .claude/skills/chat-archive/scripts/session_report.py --record \
+  --session <session URL> --surface chat|code|routine --repo fairbay/<repo>|null \
+  --kind upkeep|direction|<kind> [--lane <x>] \
+  --prs "<n>:<via>,fairbay/<other>#<n>:<via>" [--not-merged <n>] [--asks-prose N] \
+  --calls <ids> --shown <ids> --cards <ids> --tasks <ids>
+```
+
+It reads the newest transcript (`--prefix` to name one), prints the record as one
+JSON line, and that line is the decision's `context`, unedited. **Exit 2 means no
+record yet:** it prints why (a PR this session opened or merged that `--prs` does
+not name, a `self` or `ask` PR with no merge call here, an `ask` with no ask counted)
+and nothing on stdout; fix the inputs, never the JSON by hand. The transcript
+checks what it can see: every PR this session opened (`gh pr create`, `gh api` POST
+`…/pulls`) or merged must be in `--prs`, keyed by repo and number; a merge call whose
+result shows no merge is named in `--prs` (it did merge) or `--not-merged`; and
+`--cards` names at least as many cards as the session filed. A merge call with no PR
+number is counted in `unchecked_merges`.
 
 | Field | Source |
 |---|---|
-| `session` | this session's id or URL; the archive also writes it as the handoff's `meta.session`, which is how the next entry finds this record |
+| `session` | `--session`: this session's URL; the archive also writes it as the handoff's `meta.session`, which is how the next entry finds this record |
 | `date` | UTC date of the archive |
-| `kind` | a data batch: its `ops.change_batches.kind`; else the goal line: a ledger item is `upkeep` unless the goal marked it `direction` |
-| `asks` | questions put to Baylee after his opening message (AskUserQuestion, `ask_user_input_v0`, a question in prose) |
-| `refusals`, `refused` | tool results carrying a permission or classifier refusal, each refused command in `refused` |
-| `merges` | PR merge calls (`gh api -X PUT …/merge`, git-ops merge) |
-| `calls_logged` | Grove decisions this session logged at rung 3 (not the record itself, not reversals) |
-| `calls_shown`, `cards`, `tasks_for_baylee` | the random fifth below; Grove ids filed this session |
-| `cache_read_m` | the session's cache-read tokens in millions by model family, `{"opus": 12.3, "sonnet": 4.1}`, as `session_report.py` prints it (below); else `null`, never a guess. The weekly read's S10 line sums it per day (`ops_read.py`); a record without it is counted as "no cost", not as zero |
-| `source` | `transcript` when counted from the transcript; `self-reported` when counted by recall; `no-transcript` for an entry stub |
-| `lane` | in a lanes repo, the lane the session worked (`"a"`); the record also takes the tag `lane-<x>`, which is how dispatch finds each lane's last session (session-start `references/dispatch.md`). Omitted outside lanes and for a dispatch record (tag `dispatch` instead) |
+| `kind` | `--kind`: a data batch: its `ops.change_batches.kind`; else the goal line: a ledger item is `upkeep` unless the goal marked it `direction` |
+| `asks` | AskUserQuestion and `ask_user_input_v0` calls in the transcript, plus `--asks-prose` for questions put to Baylee in prose (the transcript cannot tell a prose question from prose) |
+| `refusals`, `refused` | tool results carrying a permission or classifier refusal, or his rejection of a tool call, each refused command in `refused` |
+| `merges` | PR merge calls (`gh api -X PUT …/merge`, `gh pr merge`, git-ops merge), whatever their outcome |
+| `prs` | `--prs`: **every PR this session opened, merged or left for his tap**, with how it stands. `self`: the session merged ruled upkeep, no tap. `ask`: the session merged under his answer (close-at-land's merge request). `github`: he merged it himself. `pending`: ready and waiting for his tap at archive. `open`: a draft the work continues on. `tapped` is `ask`, `github` or `pending` |
+| `start`, `opening_chars` | from the transcript's first human message (meta records, compaction summaries and "being continued" openers skipped): `pasted` only on positive evidence of a printed prompt (a `Go:` sentence at a line start or after `lane X:`, a dispatch prompt), else `typed`; `none` when there is none, and always for a routine (its prompt is not his). The length rides beside it |
+| `interrupts` | `asks + refusals − merge-call refusals + github/pending PRs + cards + 1 for a pasted start`: a refused merge costs him its tap, counted once on its PR (an ask, or `github`/`pending`); a merge under his answer is inside the ask; ruled upkeep costs nothing |
+| `calls_logged` | `--calls`: Grove decisions this session logged at rung 3 (not the record itself, not reversals) |
+| `calls_shown`, `cards`, `tasks_for_baylee` | `--shown`, `--cards`, `--tasks`: the random fifth below; Grove ids filed this session |
+| `cache_read_m` | the session's cache-read tokens in millions by model family. The weekly read's S10 line sums it per day (`ops_read.py`) |
+| `source` | `transcript`; an entry stub is `no-transcript` (At entry, below) |
+| `lane` | `--lane`: in a lanes repo, the lane the session worked (`"a"`); the record also takes the tag `lane-<x>`, which is how dispatch finds each lane's last session (session-start `references/dispatch.md`). Omitted outside lanes and for a dispatch record (tag `dispatch` instead) |
 
-**Counting.** In a Code session, run `python3 .claude/skills/chat-archive/scripts/session_report.py
-<session-dir-prefix> <out.json> <out.md> --routing` (the prefix is
-`~/.claude/projects/<project>/<session-id>`, no extension; MBN's
-`scripts/session-usage/report.py` wraps it and takes `--work-from` too): stdout
-ends with `{"asks","refusals","merges","source":"transcript","cache_read_m":{…}}`,
-the record's four counts and its cost in one line, and the refused commands for
-`refused` are in the out.json's `routing` section. Anywhere else (chat, a repo
-without the synced skill) count the three from the conversation, set
-`source: self-reported` and `cache_read_m: null`. Never grade the asks (no
+**What reads it.** The weekly read's "Counter" line (`ops_read.py`, Budgets) counts
+the week's whole records (record 2, built by `--record`), sums their interrupts,
+starts and PR taps, and, over every record with a cost (record 1 included), prints
+the process share: cache-read of ops sessions and lane H. Record 1 (written by hand
+before 2026-10-28) still counts for S1, S2, S4 and S10.
+
+**No transcript at all** (a surface without the harness): count asks, refusals and
+merges from the conversation, `source: self-reported`, `cache_read_m: null`,
+`record: 1`. The weekly read shows it as not whole. Never grade the asks (no
 "needed" field: a session cannot judge its own asks).
 
 **The call.** `grove_log_decision(decision="session-record <date> <repo or slug>:
@@ -88,8 +116,16 @@ Print the picked calls in the Step 4 summary and in the Grove session line
 - 5f2c1a90 — <the decision's first 90 characters> — reply "reverse 5f2c1a90" to undo
 ```
 
-Their ids go in the record's `calls_shown`. No rung-3 calls → the line reads
-"Calls to check: none this session" and `calls_shown` is empty.
+Their ids go in the record's `calls_shown` (ids only, never prose: the sitting looks
+them up). No rung-3 calls → the line reads "Calls to check: none this session" and
+`calls_shown` is empty.
+
+**Contested calls go to the sitting.** A rung-3 call made against a reviewer's
+blocking or high finding, against what a card for it would have recommended, or on a
+reading of one of his rulings that its words do not plainly settle (when he is not in
+the session to ask) gets the tag `contested` when it is logged. The weekly sitting
+shows every contested call, and every call the archives showed, once more, for keep or
+reverse (session-start `references/sitting.md`).
 
 ## Reversals and wrong questions
 

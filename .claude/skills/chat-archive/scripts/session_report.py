@@ -22,6 +22,11 @@ when the next tool call came, number of questions and their header labels), the 
 refused, failed). It copies no question text and no answer; the only free text kept is the first 200 characters of a classifier's reason,
 redacted like every other label. Without it the output is as before.
 
+--record (its own options; see record_main) prints the whole session record as one JSON line, ready for the Grove session-record
+decision's context: the routing counts, cache_read_m, the start (pasted, typed or none), and every PR opened or landed with how it merged
+(self, ask, github, pending, open) and whether that cost Baylee a tap. It exits 2, printing nothing on stdout, when the record would
+be partial or inconsistent (a PR this session opened or merged that --prs does not name, say). chat-archive references/session-record.md.
+
 A repo wraps this script for its own extras (MBN scripts/session-usage/report.py; it puts the synced
 .claude/skills/chat-archive/scripts on sys.path and imports the module): `session_report.PATH_PATTERNS.insert(0, …)` adds the repo's
 path generalizations, `session_report.COPY_WATCH = "…"` (assigned on the module, not an imported name) names a path substring whose
@@ -274,11 +279,37 @@ def cache_read_millions(cache_by_family, cost_state):
         out.update(cache_by_family)
     return {k: round(v / 1e6, 1) for k, v in sorted(out.items(), key=lambda kv: -kv[1])}
 
+ASK_TOOLS = ("AskUserQuestion", "ask_user_input_v0")  # Code's and chat's tap question
+
+def repo_of(name, inp):
+    """owner/repo a PR call names (repos/<o>/<r>/pulls, a pull URL, -R/--repo, a tool's owner and repo arguments), else None."""
+    inp = inp if isinstance(inp, dict) else {}
+    if inp.get("owner") and inp.get("repo"): return f"{inp['owner']}/{inp['repo']}"
+    cmd = str(inp.get("command", ""))
+    m = re.search(r"repos/([\w.-]+/[\w.-]+)/pulls\b", cmd) or re.search(r"github\.com/([\w.-]+/[\w.-]+)/pull/\d+", cmd) \
+        or re.search(r"(?:-R|--repo)[\s=]+([\w.-]+/[\w.-]+)", cmd)
+    return m.group(1) if m else None
+
+def creates_pr(name, inp):
+    """True for a tool call that opens a pull request: gh pr create, gh api POST repos/<o>/<r>/pulls, a create_pull_request tool."""
+    if name.endswith("create_pull_request"): return True
+    if name != "Bash": return False
+    for seg in shell_segments(strip_heredocs(str((inp or {}).get("command", "")))):
+        seg = seg[ENV_PREFIX.match(seg).end():]
+        if re.match(r"gh\s+pr\s+create\b", seg): return True
+        if re.match(r"gh\s+api\b", seg) and re.search(r"repos/[\w.-]+/[\w.-]+/pulls(?=[\s'\"?]|$)", seg) \
+           and not re.search(r"(?:-X\s*|--method[\s=]+)(GET|PATCH|PUT|DELETE)\b", seg) and re.search(r"(?:^|\s)(?:-[fF]|--field|--raw-field|--input|-X\s*POST|--method[\s=]+POST)\b", seg):
+            return True
+    return False
+
+PR_URL = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)")
+
 def scan_routing(path, agent):
     """One transcript's asks (main thread only), refusals and merge calls."""
     global CWD_PREFIX
     pending, ask_by_id, merge_by_id = {}, {}, {}
     asks, refusals, merges, tool_uses = [], [], [], []  # tool_uses: (record number, timestamp)
+    create_by_id, created, cards = set(), [], []  # PRs this thread opened ("owner/repo#n"); adjudications filed
     with open(path) as fh: lines = fh.readlines()
     for n, line in enumerate(lines):
         line = line.strip()
@@ -294,20 +325,24 @@ def scan_routing(path, agent):
             if t == "assistant" and b.get("type") == "tool_use":
                 name, inp = b.get("name", "?"), b.get("input") or {}
                 pending[b.get("id")] = (name, target_of(name, inp))
+                if creates_pr(name, inp): create_by_id.add(b.get("id"))
                 tool_uses.append((n, ts))
-                if name == "AskUserQuestion" and agent == "main":
+                if name.split("__")[-1] in ASK_TOOLS and agent == "main":
                     qs = [q for q in (inp.get("questions") if isinstance(inp, dict) else None) or [] if isinstance(q, dict)]
                     asks.append({"asked_at": ts, "answered_at": None, "next_tool_at": None, "wait_min": None, "gap_min": None, "questions": len(qs),
                                  "headers": [redact(str(q.get("header", "")))[:12] for q in qs], "_answered_n": None})
                     ask_by_id[b.get("id")] = asks[-1]
                 is_merge, pr = merge_of(name, inp)
                 if is_merge:
-                    merges.append({"at": ts, "agent": agent, "tool": name, "pr": pr, "outcome": "failed", "result_at": None})
+                    merges.append({"at": ts, "agent": agent, "tool": name, "pr": pr, "repo": repo_of(name, inp), "outcome": "failed", "result_at": None})
                     merge_by_id[b.get("id")] = merges[-1]
             elif t == "user" and b.get("type") == "tool_result":
                 tid = b.get("tool_use_id"); name, target = pending.get(tid, ("?", ""))
                 text = result_text(b.get("content")); ref = refusal_of(text, bool(b.get("is_error")))
                 if ref: refusals.append({"at": ts, "agent": agent, "tool": name, "target": target, "kind": ref[0], "reason": ref[1]})
+                if tid in create_by_id and not ref and not b.get("is_error"):
+                    created += [f"{o}#{n}" for o, n in PR_URL.findall(text)[:1]]
+                if name.endswith("grove_create_adjudication") and not ref and not b.get("is_error"): cards.append(tid)
                 a = ask_by_id.get(tid)
                 if a and a["answered_at"] is None: a["answered_at"], a["_answered_n"] = ts, n
                 mg = merge_by_id.get(tid)
@@ -321,16 +356,16 @@ def scan_routing(path, agent):
             a["next_tool_at"] = next((ts for n, ts in tool_uses if n > a["_answered_n"]), None)
         a["wait_min"], a["gap_min"] = minutes(a["asked_at"], a["answered_at"]), minutes(a["asked_at"], a["next_tool_at"])
         del a["_answered_n"]
-    return asks, refusals, merges
+    return asks, refusals, merges, created, cards
 
 def routing_section(paths):
     """The routing section from transcript files: paths = [(agent id, path)], the main thread ("main") first."""
-    asks, refusals, merges = [], [], []
+    asks, refusals, merges, created, cards = [], [], [], [], []
     for agent, path in paths:
-        a, r, m = scan_routing(path, agent)
-        asks += a; refusals += r; merges += m
+        a, r, m, c, k = scan_routing(path, agent)
+        asks += a; refusals += r; merges += m; created += c; cards += k
     return {"source": "transcript", "asks": len(asks), "refusals": len(refusals), "merges": len(merges),
-            "ask_list": asks, "refusal_list": refusals, "merge_list": merges}
+            "ask_list": asks, "refusal_list": refusals, "merge_list": merges, "prs_opened": sorted(set(created)), "cards_filed": len(cards)}
 
 def routing_md_line(r):
     plural = lambda n, w: f"{n} {w}" if n == 1 else f"{n} {w}s"
@@ -491,6 +526,174 @@ def main(prefix, out_json, out_md, routing=False, sections=()):
         print(json.dumps({"asks": r["asks"], "refusals": r["refusals"], "merges": r["merges"], "source": r["source"], "cache_read_m": report["cache_read_m"]}))
     return report
 
+# ---------------------------------------------------------------- the whole session record (--record)
+# Architecture run 75cbc21d, build item 1 (docs/architecture-run/04-PROPOSAL.md §8): every session record
+# carries the transcript's counts, cache_read_m, the start, and how each landed PR merged; the record is
+# built here in one call and exits 2 rather than print a partial or inconsistent record.
+
+RECORD_VERSION = 2
+VIAS = ("self", "ask", "github", "pending", "open")
+# self: the session merged ruled upkeep, no tap; ask: the session merged under his answer; github: he merged it himself;
+# pending: ready, waiting for his tap; open: a draft the work continues on (no tap yet)
+TAPPED = ("ask", "github", "pending")
+SYSTEM_REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+GO_SENTENCE = re.compile(r"(?:^|\blane [a-z]:\s*)Go:", re.I | re.M)  # close-at-land's Next-step Go, alone on a line or after "lane X:"
+DISPATCH_PROMPT = re.compile(r"^\s*work on [^\n,]+, lane [a-z]\b", re.I)  # session-start references/dispatch.md Step 3
+CONTINUED = re.compile(r"^This session is being continued from a previous conversation")
+
+class RecordError(Exception):
+    pass
+
+def opening_text(path):
+    """The first message a human wrote in the main thread (system-reminder blocks removed), or None when there is none.
+    Meta records, sidechains, tool results and compaction summaries are not his."""
+    with open(path) as fh:
+        for line in fh:
+            try: o = json.loads(line)
+            except Exception: continue
+            if o.get("type") != "user" or o.get("isMeta") or o.get("isSidechain") or o.get("isCompactSummary"): continue
+            c = (o.get("message") or {}).get("content")
+            if isinstance(c, str): parts = [c]
+            elif isinstance(c, list):
+                if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c): continue
+                parts = [b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text"]
+            else: continue
+            text = SYSTEM_REMINDER.sub("", "\n".join(parts)).strip()
+            if text and not CONTINUED.match(text): return text
+    return None
+
+def start_of(text):
+    """How the session started: "pasted" (a printed prompt: a Go sentence or a dispatch prompt), "typed" (anything else he wrote),
+    "none" (no human opening message). Only positive evidence makes "pasted"; the length rides beside it as opening_chars."""
+    if not text: return "none"
+    return "pasted" if GO_SENTENCE.search(text) or DISPATCH_PROMPT.match(text) else "typed"
+
+def ids(spec):
+    return [s.strip() for s in (spec or "").split(",") if s.strip()]
+
+def parse_prs(spec, repo):
+    """'105:self,fairbay/medicaid-benefits-navigator#431:ask' -> [{"pr": "fairbay/ops#105", "repo": …, "n": 105, "via": "self"}, …]."""
+    out = []
+    for item in ids(spec):
+        m = re.fullmatch(r"(?:([\w.-]+/[\w.-]+)#)?(\d+):(\w+)", item)
+        if not m or m.group(3) not in VIAS:
+            raise RecordError(f"--prs item {item!r}: want [owner/repo#]<n>:<{'|'.join(VIAS)}>")
+        r = m.group(1) or repo
+        if not r: raise RecordError(f"--prs item {item!r} names no repo and --repo is null")
+        out.append({"pr": f"{r}#{m.group(2)}", "repo": r, "n": int(m.group(2)), "via": m.group(3)})
+    seen = [x["pr"] for x in out]
+    dup = sorted({p for p in seen if seen.count(p) > 1})
+    if dup: raise RecordError(f"--prs lists {', '.join(dup)} twice")
+    return out
+
+def merge_key(m, repo):
+    """owner/repo#n of a merge call; the repo read from the call, else --repo; None when the call names no number."""
+    if m["pr"] is None: return None
+    r = m.get("repo") or repo
+    return f"{r}#{m['pr']}" if r else f"?#{m['pr']}"
+
+def check_prs(prs, routing, repo, not_merged):
+    """The transcript decides what it can: every merge call that did not merge is explained, every PR merged here is named
+    self or ask, every PR opened here is named, and no PR named self or ask lacks a merge here."""
+    named = {x["pr"]: x for x in prs}
+    errs, merged, unchecked = [], set(), 0
+    for m in routing["merge_list"]:
+        k = merge_key(m, repo)
+        if m["outcome"] == "refused": continue
+        if k is None:
+            unchecked += 1; continue
+        if m["outcome"] == "merged": merged.add(k)
+        elif k not in not_merged and not (k in named and named[k]["via"] in ("self", "ask")):
+            errs.append(f"merge call on {k} shows no merge in its result: name it in --prs (self or ask) if it merged, else --not-merged {k}")
+    for k in sorted(merged - set(named)): errs.append(f"{k} was merged by this session but is not in --prs (as self or ask)")
+    for k in routing.get("prs_opened", []):
+        if k not in named: errs.append(f"{k} was opened by this session but is not in --prs (open, pending, github, self or ask)")
+    for x in prs:
+        if x["via"] in ("self", "ask") and x["pr"] not in merged and not any(merge_key(m, repo) == x["pr"] for m in routing["merge_list"] if m["outcome"] == "failed"):
+            errs.append(f"{x['pr']}:{x['via']} has no merge call in this session (he merged it: github; waiting: pending; a draft: open)")
+        if x["via"] in ("github", "pending", "open") and x["pr"] in merged:
+            errs.append(f"{x['pr']}:{x['via']} was merged by this session: self or ask")
+    if errs: raise RecordError("; ".join(errs))
+    return unchecked
+
+def interrupts_of(rec, routing):
+    """Baylee's interrupts: asks + refusals that were not of a merge call (a refused merge's cost is his tap, counted on its PR) +
+    PRs he merged or has yet to merge + cards + a pasted start. A merge under his answer is inside the ask; ruled upkeep costs nothing."""
+    merge_refusals = sum(1 for m in routing["merge_list"] if m["outcome"] == "refused")
+    taps = sum(1 for x in rec["prs"] if x["via"] in ("github", "pending"))
+    return rec["asks"] + rec["refusals"] - merge_refusals + taps + len(rec["cards"]) + (1 if rec["start"] == "pasted" else 0)
+
+def newest_prefix(root=None):
+    """The newest main-thread transcript under ~/.claude/projects (this session's own in a cloud container), without .jsonl."""
+    root = root or os.path.expanduser("~/.claude/projects")
+    files = [os.path.join(d, f) for d in (os.path.join(root, x) for x in (os.listdir(root) if os.path.isdir(root) else []))
+             if os.path.isdir(d) for f in os.listdir(d) if f.endswith(".jsonl")]
+    if not files: raise RecordError(f"no transcript under {root}: count by hand (record 1, source self-reported)")
+    return max(files, key=os.path.getmtime)[:-len(".jsonl")]
+
+def build_record(a, prefix, scratch):
+    """The whole record from the transcript at prefix and the session's own fields (argparse namespace a)."""
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = main(prefix, os.path.join(scratch, "report.json"), os.path.join(scratch, "report.md"), routing=True)
+    r = report["routing"]
+    repo = None if a.repo in (None, "", "null") else a.repo
+    prs = parse_prs(a.prs, repo)
+    unchecked = check_prs(prs, r, repo, set(parse_not_merged(a.not_merged, repo)))
+    asks = r["asks"] + a.asks_prose
+    if any(x["via"] == "ask" for x in prs) and asks == 0:
+        raise RecordError("a PR merged under his answer (ask) but the session counts no ask: add --asks-prose for a question put in prose")
+    cards = ids(a.cards)
+    if len(cards) < r["cards_filed"]:
+        raise RecordError(f"the transcript shows {r['cards_filed']} adjudication cards filed; --cards names {len(cards)}")
+    opening = opening_text(prefix + ".jsonl")
+    rec = {"record": RECORD_VERSION, "session": a.session, "surface": a.surface,
+           "date": datetime.datetime.now(datetime.timezone.utc).date().isoformat(), "repo": repo, "kind": a.kind,
+           "asks": asks, "refusals": r["refusals"], "refused": [x["target"] for x in r["refusal_list"]], "merges": r["merges"],
+           "prs": [{"pr": x["pr"], "via": x["via"], "tapped": x["via"] in TAPPED} for x in prs],
+           "start": "none" if a.surface == "routine" else start_of(opening), "opening_chars": len(opening or ""),  # a routine's prompt is not his
+           "calls_logged": ids(a.calls), "calls_shown": ids(a.shown), "cards": cards, "tasks_for_baylee": ids(a.tasks),
+           "cache_read_m": report["cache_read_m"] or None, "source": "transcript"}
+    if unchecked: rec["unchecked_merges"] = unchecked
+    if a.lane: rec["lane"] = a.lane.lower()
+    rec["interrupts"] = interrupts_of(rec, r)
+    return rec
+
+def parse_not_merged(spec, repo):
+    out = []
+    for item in ids(spec):
+        m = re.fullmatch(r"(?:([\w.-]+/[\w.-]+)#)?(\d+)", item)
+        if not m or not (m.group(1) or repo): raise RecordError(f"--not-merged item {item!r}: want [owner/repo#]<n>")
+        out.append(f"{m.group(1) or repo}#{m.group(2)}")
+    return out
+
+def record_main(argv):
+    import argparse, tempfile
+    p = argparse.ArgumentParser(prog="session_report.py --record", description="Print the whole session record (one JSON line) for the Grove session-record decision.")
+    p.add_argument("--record", action="store_true", required=True)
+    p.add_argument("--prefix", default="auto", help="transcript prefix without .jsonl; auto = the newest under ~/.claude/projects")
+    p.add_argument("--session", required=True, help="the session URL, as the handoff's meta.session")
+    p.add_argument("--surface", required=True, choices=("chat", "code", "routine"))
+    p.add_argument("--repo", required=True, help="fairbay/<repo>, or null")
+    p.add_argument("--kind", required=True, help="upkeep, direction, or a change_batches kind")
+    p.add_argument("--lane", help="the lane worked (lanes repos)")
+    p.add_argument("--prs", default="", help="every PR this session opened, merged or left for his tap: [owner/repo#]<n>:<" + "|".join(VIAS) + ">, comma-separated")
+    p.add_argument("--not-merged", default="", help="PRs whose merge call shows no merge and did not merge")
+    p.add_argument("--asks-prose", type=int, default=0, help="questions put to Baylee in prose (the transcript counts the ask tools only)")
+    for f in ("calls", "shown", "cards", "tasks"): p.add_argument("--" + f, default="")
+    a = p.parse_args(argv)
+    try:
+        prefix = newest_prefix() if a.prefix == "auto" else a.prefix
+        if not os.path.isfile(prefix + ".jsonl"): raise RecordError(f"no transcript at {prefix}.jsonl")
+        print(f"transcript: {prefix}.jsonl", file=sys.stderr)
+        with tempfile.TemporaryDirectory() as scratch:
+            rec = build_record(a, prefix, scratch)
+    except RecordError as e:
+        print(f"session_report.py --record: {e}", file=sys.stderr)
+        return 2
+    print(json.dumps(rec, separators=(",", ":")))
+    return 0
+
 USAGE = __doc__.split("\n")[2]
 
 def parse_args(argv, opts=None, usage=USAGE):
@@ -508,5 +711,6 @@ def parse_args(argv, opts=None, usage=USAGE):
     return tuple(args), routing, opts
 
 if __name__ == "__main__":
+    if "--record" in sys.argv[1:]: sys.exit(record_main(sys.argv[1:]))
     (prefix, out_json, out_md), routing, _ = parse_args(sys.argv[1:])
     main(prefix, out_json, out_md, routing)

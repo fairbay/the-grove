@@ -82,6 +82,7 @@ so in the lane's line.
 | A ready PR of the lane | **waits on** its merge (a tap, or cleanup below) |
 | An open card gates it (step 5) and the line names no next item the card does not gate, or its START HERE waits on a sitting with an open card ("once the cards are answered") | **waits on** those cards (ids) |
 | Its START HERE waits on another lane's item ("wait for lane D's e70fc434") that is still open, with no alternative given | **waits on** that item |
+| Its START HERE item has a `SITTING fairbay/<repo>@<branch>` row line or an open `sitting-queue` task naming it (built, waiting for the weekly sitting) | **waits on** the sitting (name the branch); its next item, if the line has one the queued work does not gate, is ready |
 | Otherwise | **ready**: give a prompt |
 
 A stale decision (6 hours or older) with no record after it means a session
@@ -192,10 +193,9 @@ No briefing, no decisions list, no narration of the reads.
 ## Step 4 — Record and stop
 
 In the same turn, after the output: the session record (chat-archive
-`references/session-record.md`, Step 3e) with `kind: upkeep`, `repo` the
-dispatched repo, tags `session-record` and `dispatch`, `merges` counting
-Step 2's merges, `asks: 0`, `source: self-reported` (a dispatch is counted by
-recall; no usage report). Read it back once and end the output with
+`references/session-record.md`, Step 3e), built by `session_report.py --record`
+with `--kind upkeep`, `--repo` the dispatched repo, Step 2's merges in
+`--prs` (each `self`, or `ask` under his answer), no `--lane`; tags `session-record` and `dispatch`. Read it back once and end the output with
 "Session record: <id 8>". Dispatch writes no handoff file and no row line
 except Phase 0's promotions. The chat is done after one or two turns: a
 second "dispatch" in the same chat re-reads everything (Step 1), never

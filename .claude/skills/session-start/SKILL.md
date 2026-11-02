@@ -2,10 +2,10 @@
 name: session-start
 description: >
   Session onboarding — "work on [project]", "continue X", a pasted handoff;
-  "dispatch [project]", "check the lanes" for per-lane prompts. Not mid-session
+  "dispatch [project]", "check the lanes"; "run the sitting". Not mid-session
   (→ chat-status) or archive (→ chat-archive).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-10-28-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -41,9 +41,9 @@ Fires for:
   Grove idea, research topic, or any work that had a previous session. Does not
   need to be an established project with a repo.
 - **Dispatch** (lanes repos): "dispatch MBN", "check the lanes", "what's next on
-  MBN" as a first message → `references/dispatch.md` instead of Phases 0–5: one
-  turn that reads the row, batons, PRs and records, does upkeep cleanup, prints
-  Baylee's taps and one prompt per lane, logs its record, and stops.
+  MBN" as a first message → `references/dispatch.md` instead of Phases 0–5 (one turn).
+- **The sitting** (weekly): "run the sitting" as a first message →
+  `references/sitting.md` instead of Phases 0–5: one page, his one answer, merges.
 
 Does NOT fire for:
 - Mid-session topic shifts, a mid-session "what's next" → chat-status
@@ -268,7 +268,7 @@ mode) before public launch." Informational: Baylee decides whether and when.
 ## Phase 4c — Synthesize work queue
 
 Merge work items from all sources into one deduplicated, dependency-ordered
-list. Sources: handoff `next:`, Grove project `next_actions`, open Grove tasks
+list. Sources: handoff `next:`, Grove project `next_actions` (a `SITTING …` line is built work waiting for the weekly sitting: list it as such, never redo it), open Grove tasks
 (`grove_list_tasks(project_ref=..., status="open", limit=10)`), open
 adjudications (`grove_list_adjudications(list=<project slug>, status="open")`),
 and PLAN.md's active phase remaining steps. Cross-cutting items (skill updates,

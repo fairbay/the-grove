@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Gather the weekly ops read's inputs (project-health SKILL.md "Ops read", step 1) into one directory.
 
-Writes decisions.json, cards.json, tasks.json, activity.json, runs.json and minutes.json, then prints
+Writes decisions.json, cards.json, tasks.json, activity.json, runs.json and minutes.json (plus
+minutes-cache.json, the per-run minutes already read: keep the directory between weeks and only new
+runs are fetched), then prints
 a JSON summary with the counts, the window and every truncation or read failure it met. The read
 itself stays offline (ops_read.py, process_gate.py); this script is the only part that talks to
 Grove (grove.py, GROVE_TOKEN from the environment) and GitHub (the gh CLI the session already has).
@@ -67,13 +69,73 @@ def parse_iso(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def run_minutes(run):
-    """Whole minutes of one Actions run, rounded up (the plan bills per run, rounded up)."""
-    s, u = run.get("run_started_at"), run.get("updated_at")
-    if not s or not u:
-        return None
-    secs = (parse_iso(u) - parse_iso(s)).total_seconds()
-    return max(1, math.ceil(secs / 60))
+def job_minutes(job):
+    """Whole minutes GitHub bills for one job: rounded up per job; a skipped or unstarted job is 0."""
+    if job.get("conclusion") in (None, "skipped") or not job.get("started_at") or not job.get("completed_at"):
+        return 0
+    secs = (parse_iso(job["completed_at"]) - parse_iso(job["started_at"])).total_seconds()
+    return max(1, math.ceil(secs / 60)) if secs > 0 else 0
+
+
+def run_minutes(jobs):
+    """Billable minutes of one run: the sum over every job of every attempt (`jobs?filter=all`).
+    The per-run duration rounded up once, which this counted before 2026-10-27, undercounts
+    two-job workflows and overcounts queue time and skipped runs (docs/ci-efficiency/DESIGN.md §1)."""
+    return sum(job_minutes(j) for j in jobs or [])
+
+
+def week_windows(start, end):
+    """[(a, b), ...] week-sized inclusive date ranges covering start..end: the runs listing stops
+    at 1,000 results, and a month of MBN runs passed that in October 2026."""
+    out, a = [], start
+    while a <= end:
+        b = min(a + timedelta(days=6), end)
+        out.append((a, b))
+        a = b + timedelta(days=1)
+    return out
+
+
+def minutes_rows(repos, month_start, until, notes, gh=None, cache=None, workers=8):
+    """One {repo, date, minutes, workflow, run_id} row per completed run since month_start, minutes
+    read per job from the jobs endpoint (every attempt). `cache` maps "repo/run_id" to a row from an
+    earlier gather, so a weekly read fetches jobs only for runs it has not seen; only completed runs
+    are cached."""
+    from concurrent.futures import ThreadPoolExecutor
+    cache = cache if cache is not None else {}
+    listed = []
+    for repo in repos:
+        for a, b in week_windows(month_start, until):
+            page = 1
+            while True:
+                d = gh_json(f"repos/{repo}/actions/runs?created={a.isoformat()}..{b.isoformat()}&per_page=100&page={page}", notes, gh)
+                if not d:
+                    break
+                rows = d.get("workflow_runs", [])
+                listed += [(repo, r) for r in rows if r.get("run_started_at")]
+                if len(rows) < 100:
+                    break
+                page += 1
+                if page > 10:
+                    notes.append(f"minutes {repo} {a}..{b}: more than 1,000 runs in one week; the rest unread")
+                    break
+
+    def fetch(item):
+        repo, r = item
+        key = f"{repo}/{r['id']}"
+        if key in cache:
+            return cache[key]
+        jobs = gh_json(f"repos/{repo}/actions/runs/{r['id']}/jobs?filter=all&per_page=100", notes, gh)
+        if jobs is None:
+            return None
+        row = {"repo": repo, "date": r["run_started_at"][:10], "minutes": run_minutes(jobs.get("jobs")),
+               "workflow": r.get("name"), "run_id": r["id"]}
+        if r.get("status") == "completed":
+            cache[key] = row
+        return row
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        rows = [row for row in ex.map(fetch, listed) if row is not None]
+    return rows
 
 
 def event_row(e):
@@ -125,22 +187,14 @@ def gather(out, repos, decision_refs, days, until, grove, gh=None):
                              "created_at": r.get("created_at"), "html_url": r.get("html_url"), "head_sha": r.get("head_sha")})
     (out / "runs.json").write_text(json.dumps(runs))
 
-    minutes = []
-    for repo in repos:
-        page = 1
-        while True:
-            d = gh_json(f"repos/{repo}/actions/runs?created=>={month_start.isoformat()}&per_page=100&page={page}", notes, gh)
-            if not d:
-                break
-            rows = d.get("workflow_runs", [])
-            for r in rows:
-                m = run_minutes(r)
-                if m is not None:
-                    minutes.append({"repo": repo, "date": r["run_started_at"][:10], "minutes": m, "workflow": r.get("name")})
-            if len(rows) < 100:
-                break
-            page += 1
+    cache_path = out / "minutes-cache.json"
+    try:
+        cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    except ValueError:
+        cache = {}
+    minutes = minutes_rows(repos, month_start, until, notes, gh, cache)
     (out / "minutes.json").write_text(json.dumps(minutes))
+    cache_path.write_text(json.dumps(cache))
 
     return {"window": f"{since.date().isoformat()} to {until.isoformat()}", "decisions": len(decisions),
             "activity": len(activity), "runs": len(runs), "minutes_rows": len(minutes),

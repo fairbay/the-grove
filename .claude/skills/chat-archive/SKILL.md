@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-26-05"
+  version: "2026-10-28-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -42,7 +42,7 @@ References used by this skill (one hop):
 **If you are about to mark a PR ready, stop.** Run
 `references/close-at-land.md` instead: handoff and Grove markers written for the
 post-merge state, `pre_ready` checks, the `Close-at-land:` commit, ready, then
-one merge tap (none for ruled upkeep, which the session merges itself). It is the PR-scoped mini archive: the session goes on afterwards,
+one merge tap (none for ruled upkeep, which merges itself; direction that is not a fork queues for the weekly sitting instead: close-at-land "Queue for the sitting"). It is the PR-scoped mini archive: the session goes on afterwards,
 and this full archive still runs at session end (its Step 9 handoff is then the
 one already in the close-at-land commit). When no other work is ongoing or
 planned, the merge tap offers "Merge and archive", so one answer lands the PR
@@ -247,9 +247,9 @@ One-time grants don't need encoding — the summary is sufficient.
 #### 3e. Session record (refusal: no close without it)
 
 Before the summary, log the session-record decision (`references/session-record.md`,
-"The record"): asks, refusals, merges, cache_read_m (Code: `session_report.py
---routing`; else self-reported), the rung-3 call ids, the random fifth picked
-from them (printed in Step 4 and 9b), cards and tasks for Baylee. **No summary
+"The record"): one `session_report.py --record` call on every surface, with every PR
+opened, merged or left for his tap in `--prs`, the rung-3 ids, the random fifth (Step 4, 9b),
+cards and tasks; its JSON line is the `context`. Exit 2: fix the input, never the JSON. **No summary
 or Next-step line until its id is in hand.** If Grove refuses twice, the record
 JSON goes into the handoff's `pending_record:` (Phase 0 logs it) and the archive says so.
 

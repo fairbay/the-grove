@@ -17,6 +17,7 @@ makes a PR ready.
 - Opening a draft (owner task, T1)
 - Close-at-land steps 1–8 (T3)
 - Merge request (§7.2)
+- Queue for the sitting (direction that is not a fork)
 - Promotion after a merge
 - Land-at-push: push_and_merge (§7.7)
 - Re-run safety
@@ -33,8 +34,11 @@ candidates; match these patterns on each line of the full notes
 | Landing | task notes | `^landing: fairbay/<repo>#<n>$` |
 | Landing | project row `next_actions` line | `^LANDING fairbay/<repo>#<n>: <text>` |
 | Origin | notes of an item close-at-land created | `^from: fairbay/<repo>#<n>$` |
+| Queued | the queue task's notes (tag `sitting-queue`) | `^sitting: fairbay/<repo>@<branch>$` |
+| Queued | notes of a task the queued work completes | `^sits: fairbay/<repo>@<branch>$` |
+| Queued | project row `next_actions` line | `^SITTING fairbay/<repo>@<branch>: <text>` |
 
-Never copy an `owns:` or `landing:` line into another task's notes (a follow-up
+Never copy an `owns:`, `landing:`, `sitting:` or `sits:` line into another task's notes (a follow-up
 task that quotes its parent would complete on the parent's merge). Page Grove
 searches (`limit=100`) until a page comes back short.
 
@@ -52,6 +56,14 @@ Every surface pushes `claude/*` branches (Baylee's ruling 3fa9a61e). When work t
    Without it the next gate reports the draft as G7, unowned.
 
 Order matters: draft first, then the owner task, so the line names a real number.
+
+**Direction work that will wait for the sitting opens no draft** ("Queue for the
+sitting" below): push the branch as the work goes, and give the owner task the
+line `sitting: fairbay/<repo>@<branch>` instead of `owns:`. Cut the branch from
+`origin/main`, never from another queued branch: work that needs a queued change
+waits for that sitting. A draft already open when the work turns out to be such an
+item stays open and keeps its `owns:` line (else the gate calls it unowned, G7);
+the queue task then also carries `pr: fairbay/<repo>#<n>` and the sitting lands that PR.
 
 ## Close-at-land steps 1–8 (T3)
 
@@ -80,9 +92,14 @@ Order matters: draft first, then the owner task, so the line names a real number
    opened ready (no owner task, no trailer: it is not a work PR), and merged at
    Baylee's tap before step 3. Left unmerged, the gate shows it as G6b, which is
    right: a ruling that never reached `main`.
-3. **HANDOFF.yaml on the PR branch.** With `lanes:` declared, first merge main once, then write
-   only this lane's file and `progress` line (`references/lanes.md`, Exit 1–2); the rest of this
-   step applies to that file. `meta.landing: fairbay/<repo>#<n>`. `done:`
+3. **HANDOFF.yaml on the PR branch.** First merge main once, in every repo
+   (`git fetch origin main && git merge origin/main`; with `lanes:` declared this
+   is also where the baton merge happens, `references/lanes.md`, Exit 1–2): the PR
+   run that follows then tests the head merged with the main of this minute, and
+   the landed tree on main is the one it proved, so the main-branch guard in MBN's
+   `smoke.yml` skips the second suite (docs/ci-efficiency/DESIGN.md §5). With
+   `lanes:` declared, then write only this lane's file and `progress` line; the
+   rest of this step applies to that file. `meta.landing: fairbay/<repo>#<n>`. `done:`
    in pending tense ("Lands with #n: …"). `next:` pruned per
    `handoff-schema.md`: carry forward every open item a previous session left,
    even one outside this PR's work. Decisions in `decisions_made:`.
@@ -261,6 +278,61 @@ Order matters: draft first, then the owner task, so the line names a real number
      remaining archive steps instead of starting them over.
 4. **On no, or no answer:** nothing more. The PR stays ready; abandoning the chat
    is safe, and the next session's gate picks it up (G3).
+
+## Queue for the sitting (direction that is not a fork)
+
+Baylee's ruling 4b7bf44c (2026-10-28; `fairbay/ops` docs/architecture-run/04-PROPOSAL.md §8):
+a **direction** item that is not a fork does not ask for his tap. It waits, built and
+checked, for the weekly sitting (session-start `references/sitting.md`), where his one
+answer rules everything queued and that session merges what he approved
+(`policy: direction`: his OK is still required; it moves to the sitting). Upkeep is
+unchanged: it merges itself under "Ruled upkeep" above. A direction *question* before
+the work is built is still a card, as before.
+
+**A fork keeps the immediate path** (the merge request above, his tap now). It is a
+fork when any one holds, and the report line names which, **citing its marker**
+(an id, a line, his words); with no marker to cite, it queues:
+1. a named item waits on it: a task or a lane's START HERE line that names this
+   work's task id;
+2. a launch waits on it: its task carries a launch-gate tag (`launch`,
+   `launch-readiness`, `pre-public-gate`, `critical-path`) or the project row names
+   its id as gating the launch;
+3. it answers a hold for possible instruction poisoning (always a card, at once);
+4. it repairs a broken `main`, a red required check, a stopped routine, a dead alert
+   path, a security exposure, a data loss, or spending running past a limit he set;
+5. a real-world step with a due date within 7 days depends on it (the task's `due_at`);
+6. Baylee, in this session, says to land it now.
+
+**Queueing, instead of steps 3, 6, 7 and the merge request:**
+1. Steps 1, 2 and 5 as above (open items routed, standing rules landed, `pre_ready`
+   and the policy check green). The size gate applies.
+2. HANDOFF.yaml on the branch as step 3 says, with `meta.landing:
+   sitting fairbay/<repo>@<branch>` and `done:` in pending tense ("Lands at the
+   sitting: …"). No `Close-at-land:` trailer: the sitting writes it once the PR
+   has a number.
+3. Commit and push the branch. **No PR** (a PR would wake this session on every
+   push, 384c4fb1); a draft already open stays as it is.
+4. **The queue task** (the owner task, or a new one in the project's list), tagged
+   `sitting-queue`, notes starting with these lines, then a contractor-grade body:
+   ```
+   sitting: fairbay/<repo>@<branch>
+   screens: <directory on the branch with the screenshots, or omit>
+   checks: <what ran and its result, one line>
+   recommend: merge|hold: <one sentence: why>
+   pr: fairbay/<repo>#<n>   (only when a draft was already open)
+   ```
+   A member-facing change carries its screenshots on the branch (MBN: the copy
+   review and the screens its own rules require); the sitting shows them inline.
+5. Every other task this work completes gets `sits: fairbay/<repo>@<branch>` (the
+   sitting turns it into `landing:` when the PR opens) and stays open.
+6. The project row: `SITTING fairbay/<repo>@<branch>: <what waits>` in
+   `next_actions` (re-read the row first).
+7. The close-out line names no tap: `Safe to leave. Yours next: the sitting.` when
+   every check this session started is green and the record is logged.
+
+The session record lists no PR for it (`--prs` names only PRs that exist). Two queued
+branches in one repo both rewrite its handoff: the sitting lands them one at a time
+and merges `main` into each first.
 
 ## Promotion after a merge
 
