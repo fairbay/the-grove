@@ -2,10 +2,10 @@
 name: session-start
 description: >
   Session onboarding — "work on [project]", "continue X", a pasted handoff;
-  "dispatch [project]", "check the lanes"; "run the sitting". Not mid-session
-  (→ chat-status) or archive (→ chat-archive).
+  "dispatch [project]", "check the lanes". Not mid-session (→ chat-status) or
+  archive (→ chat-archive).
 metadata:
-  version: "2026-10-28-02"
+  version: "2026-11-08-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -42,8 +42,8 @@ Fires for:
   need to be an established project with a repo.
 - **Dispatch** (lanes repos): "dispatch MBN", "check the lanes", "what's next on
   MBN" as a first message → `references/dispatch.md` instead of Phases 0–5 (one turn).
-- **The sitting** (weekly): "run the sitting" as a first message →
-  `references/sitting.md` instead of Phases 0–5: one page, his one answer, merges.
+  "Run the sitting" is retired (Baylee, 2026-11-06, becb3a31): direction work is one
+  card each, answered in any chat or on /adjudicate; dispatch's "Your call" lists them.
 
 Does NOT fire for:
 - Mid-session topic shifts, a mid-session "what's next" → chat-status
@@ -83,6 +83,9 @@ by hand, never handed off; recommendation: hand off now").
 
 - **Unreachable (G1):** say "PRs unchecked: <reason>". Never report all clear
   when GitHub couldn't be read.
+- **G2 with a `hold_check`** (MBN's publish holds): the script runs it in a local
+  clone first; a held build reads "held: <batch> <state>; <remedy>", not a redeploy.
+  No clone: the row says "holds not read" and the redeploy stands.
 - **G8 drafts:** for each, `grove_list_tasks(q="owns: fairbay/<repo>#<n>",
   status="open", compact=false)` and keep only tasks with a notes line exactly
   `owns: fairbay/<repo>#<n>` (`q` is fuzzy). One found → "in progress: #n —
@@ -268,7 +271,7 @@ mode) before public launch." Informational: Baylee decides whether and when.
 ## Phase 4c — Synthesize work queue
 
 Merge work items from all sources into one deduplicated, dependency-ordered
-list. Sources: handoff `next:`, Grove project `next_actions` (a `SITTING …` line is built work waiting for the weekly sitting: list it as such, never redo it), open Grove tasks
+list. Sources: handoff `next:`, Grove project `next_actions` (a `CARD …` line is built work waiting on his card: list it as his call, never redo it), open Grove tasks
 (`grove_list_tasks(project_ref=..., status="open", limit=10)`), open
 adjudications (`grove_list_adjudications(list=<project slug>, status="open")`),
 and PLAN.md's active phase remaining steps. Cross-cutting items (skill updates,
@@ -285,49 +288,11 @@ referenced timestamp means the item is already satisfied. Drop verified items
 from the queue silently; don't present stale action items that waste Baylee's
 attention.
 
-**Ordering principle — topological batches:**
-
-Sort items into sequential batches. Items within a batch have no dependencies
-on each other and can run in parallel. Batches are sequential gates — batch N+1
-waits for batch N.
-
-Classification tiers (batch assignment):
-
-1. **Blockers & correctness** — broken tools, bugs, anything producing wrong
-   output. Gates all downstream work.
-2. **Tooling & infrastructure** — pipeline improvements, flags, automation.
-   Group related changes together. These compound: every future run benefits.
-3. **Data enrichment & cleanup** — work that uses the tooling. Do after tooling
-   is solid. Independent enrichment tasks are parallel within this batch.
-4. **External data integration** — independent enrichment from outside sources.
-   Can float earlier if truly independent.
-5. **Downstream consumers** — prototype updates, UI changes, exports. Depend on
-   data being right — do last.
-
-**Rendering format (topological batch list):**
-
-```
-Next up (critical-path-ordered):
-
-Batch 1 ‖ [cluster label]
-  ○ Item A
-  ○ Item B
-
-Batch 2 — [cluster label]
-  ○ Item C [needs A]
-
-Batch 3 ‖ [cluster label]
-  ○ Item D
-  ○ Item E
-```
-
-`‖` after batch number = items within are parallel-safe. `—` = single item or
-sequential sub-items. Status: `○` pending, `◉` active, `●` done. Batch labels
-describe the cluster purpose (e.g., "Pipeline correctness", "Data quality").
-
-Within each batch, group related items. If an item could float to an earlier
-batch (no dependencies on prior batches), move it — don't penalize independent
-work with artificial sequencing.
+**Order and render** the verified items as topological batches (items within a
+batch independent, batches sequential), assigned by five tiers: blockers and
+correctness, tooling, data, external data, downstream consumers. The tiers, the
+`Batch N ‖` / `—` list format and its status marks are in `references/work-queue.md`:
+read it before rendering the first briefing of a session.
 
 ## Phase 5 — Render the briefing (read-back gate)
 
@@ -490,6 +455,8 @@ AskUserQuestion and continue on the answer.
   lanes repo; entries managed by fairbay/ops) that injects the same handoffs, and the decision table of
   `.claude/policy.json`, as `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
+- **← issues_next.py:** dispatch (`references/dispatch.md`, read 7) runs this skill's
+  `scripts/issues_next.py` over MBN `docs/ISSUES.md` for "next from the list" per lane.
 - **← pr_state.py:** Phase 0 runs this skill's `scripts/pr_state.py report` (land-and-leave
   entry gate, `ops/docs/land-and-leave-SPEC.md` §7.5, §10).
 - **→ build / systematic-test / systematic-debug:** Hands off the loaded PLAN.md

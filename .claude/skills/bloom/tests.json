@@ -1,0 +1,39 @@
+{
+  "target_skill": {
+    "name": "bloom",
+    "description": "Strategic task triage — \"bloom\", \"what should I work on\", \"plan the work\". Cross-project mission-weighted grouping into work packages. Not capture (→ add-to-do) or onboarding (→ session-start)."
+  },
+  "competing_skills": [
+    {
+      "name": "session-start",
+      "description": "Session onboarding — \"work on [project]\", \"continue X\", a pasted handoff; \"dispatch [project]\", \"check the lanes\". Not mid-session (→ chat-status) or archive (→ chat-archive)."
+    },
+    {
+      "name": "chat-status",
+      "description": "Mid-session checkpoint — \"where are we\", \"status update\", \"what's next\", summaries, topic shifts. Use proactively. Not session start (→ session-start) or close (→ chat-archive)."
+    },
+    {
+      "name": "add-to-do",
+      "description": "Task capture and triage — \"add to do\", \"remind me to\", \"show my to-dos\", \"done with X\", \"drop X\". Also project feature ideas. Not standalone ideas (→ idea-scout) or scoring (→ idea-vault)."
+    },
+    {
+      "name": "project-health",
+      "description": "MBN health check — \"status report\", \"scorecard\", \"health check\", \"how's the navigator doing\". Audits DB + Grove + Vercel with real metrics. Not mid-session (→ chat-status) or close (→ chat-archive)."
+    }
+  ],
+  "positive_cases": [
+    "ok I have a free afternoon and something like 40 open things across MBN, earmark and ops. what should I actually work on this week? ignore the priority numbers, half of them are stale",
+    "bloom",
+    "Plan the work for the next few days across all my projects — group the open tasks into chunks I could hand to sessions, highest mission impact first",
+    "everything feels urgent and nothing is moving. can you triage the whole backlog across projects and tell me what's highest-impact right now?"
+  ],
+  "negative_cases": [
+    "work on MBN lane C, picking up from the handoff",
+    "dispatch MBN — check the lanes and give me the prompts for whatever is ready",
+    "where are we on this? quick status update before I step away",
+    "add to do: renew the car registration before the 20th",
+    "show my to-dos for the family list",
+    "how's the navigator doing? give me the scorecard with real numbers",
+    "done with the dentist appointment task, drop the duplicate one too"
+  ]
+}

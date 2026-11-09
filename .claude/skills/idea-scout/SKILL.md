@@ -5,7 +5,7 @@ description: >
   Not project features (→ add-to-do), building (→ architect), saving
   (→ idea-vault), batch (→ brainstorm-engine).
 metadata:
-  version: "2026-10-17-01"
+  version: "2026-11-04-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.

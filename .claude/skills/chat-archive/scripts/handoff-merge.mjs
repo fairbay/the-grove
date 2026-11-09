@@ -11,6 +11,11 @@
 //   HANDOFF.yaml                  main's copy, with the branch's own `progress:` line for <x> spliced back; a branch
 //                                 whose HANDOFF.yaml predates the split (a top-level `next:`) gets main's as is, and the
 //                                 session writes its baton again with `session_handoff.py write --lane <x>`
+//   package.json                  when the root package.json's top-level "version" is its only conflict (every code PR
+//                                 bumps it; MBN 0464f027): the three sides are merged again with that line held equal,
+//                                 and the result carries main's version plus one patch. Anything else in it conflicting,
+//                                 a version that is not x.y.z, a branch that bumps the minor or major past main's, or a
+//                                 result that is not JSON: left conflicted (code)
 //   anything else                 left conflicted and listed; exit 1 (code, resolved as code)
 // Refused (left conflicted, exit 1): main changed this lane's own file or progress line since the merge base. Lanes run
 // one session at a time, so that is another session's baton; taking the branch's copy would drop it silently. A re-run
@@ -19,7 +24,8 @@
 // 1 when other paths are, 2 on a usage error (no merge in progress, no --lane, a lane landing.yaml does not declare). Dependency-free (Node's own modules).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -97,9 +103,53 @@ export function spliceProgress(text, lane, line) {
   return lines.join("\n") + "\n";
 }
 
-// What to do with one conflicted path: "ours" | "theirs" | "handoff" | null (not a handoff file).
+// package.json's top-level "version" line (two-space indent, as npm writes it) and its value, or null.
+const VERSION_LINE = /^  "version": "([^"\n]*)"(,?)$/m;
+const PLACEHOLDER = "0.0.0-handoff-merge";
+
+// main's x.y.z plus one patch; null for anything else (a prerelease, a range, a missing value).
+export function bumpPatch(v) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v || "");
+  return m ? `${m[1]}.${m[2]}.${Number(m[3]) + 1}` : null;
+}
+
+// The three sides of a conflicted package.json merged with the version line held equal: the merged text with main's
+// version plus one patch, or { reason } when something else conflicts or a side is not what npm writes.
+export function mergeVersionOnly(base, ours, theirs) {
+  if (base === null || ours === null || theirs === null) return { reason: "a side added or deleted it" };
+  const sides = [base, ours, theirs];
+  const versions = [];
+  for (const t of sides) {
+    let top;
+    try { top = JSON.parse(t).version; } catch { return { reason: "a side is not JSON" }; }
+    const m = t.match(VERSION_LINE);
+    if (!m || m[1] !== top) return { reason: "no top-level \"version\" line as npm writes it" };
+    versions.push(m[1]);
+  }
+  const next = bumpPatch(versions[2]);
+  if (!next) return { reason: `main's version "${versions[2]}" is not x.y.z` };
+  const mm = (v) => (v.match(/^(\d+)\.(\d+)\./) || []).slice(1).map(Number);
+  const [bM, bm] = mm(versions[1]), [tM, tm] = mm(versions[2]);
+  if (bM > tM || (bM === tM && bm > tm)) return { reason: `the branch bumps past a patch (${versions[1]} over main's ${versions[2]})` };
+  const held = sides.map((t) => t.replace(VERSION_LINE, (_, __, comma) => `  "version": "${PLACEHOLDER}"${comma}`));
+  const d = mkdtempSync(join(tmpdir(), "handoff-merge-pkg-"));
+  try {
+    const [fb, fo, ft] = ["base", "ours", "theirs"].map((n, i) => { const f = join(d, n); writeFileSync(f, held[i]); return f; });
+    const r = (() => {
+      try { return { code: 0, out: execFileSync("git", ["merge-file", "-p", "-q", fo, fb, ft], { encoding: "utf8" }) }; }
+      catch (e) { return { code: e.status ?? 1, out: "" }; }
+    })();
+    if (r.code !== 0) return { reason: "lines other than \"version\" conflict" };
+    const text = r.out.replace(`"version": "${PLACEHOLDER}"`, `"version": "${next}"`);
+    try { JSON.parse(text); } catch { return { reason: "the merged text is not JSON" }; }
+    return { text, version: next, main: versions[2], branch: versions[1] };
+  } finally { rmSync(d, { recursive: true, force: true }); }
+}
+
+// What to do with one conflicted path: "ours" | "theirs" | "handoff" | "version" | null (resolved as code).
 export function plan(path, lane) {
   if (path === "HANDOFF.yaml") return "handoff";
+  if (path === "package.json") return "version";
   const m = path.match(LANE_FILE);
   if (!m) return null;
   return m[1] === lane ? "ours" : "theirs";
@@ -131,6 +181,17 @@ export function run({ lane, commit = true, cwd = process.cwd() }) {
     const what = plan(path, lane);
     if (!what) {
       left.push(path);
+      continue;
+    }
+    if (what === "version") {
+      const m = mergeVersionOnly(stage(1, path, cwd), stage(2, path, cwd), stage(3, path, cwd));
+      if (!m.text) {
+        left.push(`${path} (${m.reason})`);
+        continue;
+      }
+      writeFileSync(join(cwd, path), m.text);
+      g(["add", "--", path]);
+      lines.push(`resolved ${path}: version ${m.version} (main's ${m.main} plus one patch; the branch had ${m.branch})`);
       continue;
     }
     if (what === "handoff") {

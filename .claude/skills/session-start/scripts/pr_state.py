@@ -39,6 +39,7 @@ DEFAULT_POLICY = {
     "ci_checks": [],
     "checks_start_within": 20,
     "redeploy": None,
+    "hold_check": None,      # a command run in a clone of the repo that prints `holds: <batch> <state> since …` lines (MBN G5)
     "deploy_check": "none",
     "stale_draft_days": 14,
     "bot_prs": {"dependabot": "offer_merge_when_green", "block_major": True},
@@ -252,12 +253,29 @@ def _parse_ts(s: str):
 
 
 def deploy_state(c: Client, sha: str, policy: dict):
-    """success | pending | failure | error | missing for the `Vercel` status context; None when deploy_check is none."""
+    """success | pending | failure | error | missing over the Vercel status contexts; None when deploy_check is none.
+
+    A repo with one Vercel project gets the context `Vercel`; with two or more, one per project,
+    `Vercel – <project>` (MBN since the admin guide's project: every G2 read "missing" until 2026-11-04).
+    Each context's newest state counts, and the worst one is the answer."""
     if policy.get("deploy_check") != "vercel":
         return None
     st = c.get(f"/repos/{c.repo}/commits/{sha}/status")
-    states = [s.get("state") for s in st.get("statuses", []) if s.get("context") == "Vercel"]
-    return states[0] if states else "missing"  # statuses are newest first
+    newest = {}
+    for s in st.get("statuses", []):  # statuses are newest first
+        ctx = s.get("context") or ""
+        if is_vercel_context(ctx) and ctx not in newest:
+            newest[ctx] = s.get("state")
+    if not newest:
+        return "missing"
+    for state in ("error", "failure", "pending"):
+        if state in newest.values():
+            return state
+    return "success"
+
+
+def is_vercel_context(ctx: str) -> bool:
+    return ctx == "Vercel" or re.match(r"^Vercel\s+[–-]\s+\S", ctx) is not None
 
 
 def check_status(c: Client, sha: str, head_age_min: float, pr: dict, policy: dict) -> tuple[str, list]:
@@ -459,6 +477,81 @@ def classify(c: Client, n: int, policy: dict) -> dict:
     return item
 
 
+# --- publish holds (MBN trust chain G5; Grove ac561ff7) ------------------------
+
+HOLD_LINE = re.compile(r"^holds: (\S+) (\S+) since\b", re.M)
+HOLD_ORDER = ("rollback", "applying", "publishing", "checking")   # the state whose remedy comes first; unknown first of all
+HOLD_CMD = re.compile(r"node scripts/[\w./-]+\.mjs")   # the only hold_check shape run (no shell; the clone's own script)
+HOLD_REMEDY = {
+    "checking": "the batch is applied and waits for its post-apply checks: `npm run site:publish` (its gate releases it)",
+    "applying": "finish the apply (its record moves the hold to checking), or give it up with "
+                "`scripts/migrate/record-batch.mjs FILE --release`",
+    "publishing": "the publish workflow is releasing it: wait for the run; a G5 refusal in that build needs a ruling or a revert",
+    "rollback": "apply the row_history revert (db-apply `--mode revert --args <batch>`), then "
+                "`scripts/migrate/record-batch.mjs FILE --release`",
+}
+
+
+def parse_holds(text: str) -> list[dict]:
+    return [{"batch": m.group(1), "state": m.group(2)} for m in HOLD_LINE.finditer(text or "")]
+
+
+def _clone_of(repo: str) -> str | None:
+    """A local clone of `repo`: the current one, or a sibling directory named after it."""
+    if _repo_from_git() == repo:
+        try:
+            return subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True,
+                                  text=True, timeout=10).stdout.strip() or None
+        except Exception:
+            return None
+    name = repo.split("/")[-1]
+    for base in (os.getcwd(), os.path.dirname(os.getcwd())):
+        cand = os.path.join(base, name)
+        if os.path.isdir(os.path.join(cand, ".git")):
+            try:
+                url = subprocess.run(["git", "-C", cand, "config", "--get", "remote.origin.url"],
+                                     capture_output=True, text=True, timeout=10).stdout
+            except Exception:
+                continue
+            if re.search(rf"[:/]{re.escape(repo)}(?:\.git)?/?\s*$", url):
+                return cand
+    return None
+
+
+def read_holds(repo: str, policy: dict, runner=None) -> dict:
+    """{read, holds, note}. Runs the repo's hold_check in a local clone; nothing is read without one."""
+    cmd = policy.get("hold_check")
+    if not cmd:
+        return {"read": False, "holds": [], "note": None}
+    if not HOLD_CMD.fullmatch(str(cmd).strip()):
+        return {"read": False, "holds": [], "note": f"holds not read (hold_check {cmd!r} is not `node scripts/<file>.mjs`)"}
+    where = _clone_of(repo)
+    if not where:
+        return {"read": False, "holds": [], "note": f"holds not read (no clone of {repo} here)"}
+    try:
+        if runner is None:
+            r = subprocess.run(str(cmd).split(), cwd=where, capture_output=True, text=True, timeout=60)
+            out, rc = r.stdout, r.returncode
+        else:
+            out, rc = runner(cmd, where)
+    except Exception as e:  # a timeout or a missing node: say so, keep the redeploy remedy
+        return {"read": False, "holds": [], "note": f"holds not read ({type(e).__name__})"}
+    if rc != 0:
+        return {"read": False, "holds": [], "note": f"holds not read (`{cmd}` exit {rc})"}
+    return {"read": True, "holds": parse_holds(out), "note": None}
+
+
+def hold_remedy(holds: list[dict]) -> str | None:
+    if not holds:
+        return None
+    rank = lambda h: HOLD_ORDER.index(h["state"]) if h["state"] in HOLD_ORDER else -1
+    first = min(holds, key=rank)
+    held = ", ".join(f"{h['batch']} {h['state']}" for h in holds)
+    remedy = HOLD_REMEDY.get(first["state"],
+                             f"an unknown hold state '{first['state']}': read the repo's hold_check output before any redeploy")
+    return f"held: {held}; {remedy}"
+
+
 def build_report(repo: str) -> dict:
     rep = {"repo": repo, "checked_at": _now().strftime("%Y-%m-%dT%H:%M:%SZ"), "reachable": False,
            "reason": None, "transport": None, "policy": None, "policy_source": None,
@@ -478,6 +571,12 @@ def build_report(repo: str) -> dict:
                                "row": "G2" if bad else None,
                                "recommendation": "redeploy" if bad else None,
                                "redeploy": policy.get("redeploy") if bad else None}
+        if bad and policy.get("hold_check"):
+            hr = read_holds(repo, policy)
+            dh = rep["default_head"]
+            dh.update(holds=hr["holds"], holds_read=hr["read"], holds_note=hr["note"])
+            if hr["holds"]:  # a held build fails on purpose: report the hold and its state's remedy, not a redeploy
+                dh.update(recommendation="hold", redeploy=hold_remedy(hr["holds"]))
         prs = c.pages(f"/repos/{repo}/pulls?state=open&base={default}")
         for p in sorted(prs, key=lambda x: x["number"]):
             rep["prs"].append(classify(c, p["number"], policy))
@@ -583,7 +682,11 @@ def to_table(rep: dict) -> str:
         lines.append(f"- Policy: merge_policy policy (.claude/policy.json v{ver}; ruled upkeep merges itself, direction keeps the tap)")
     dh = rep["default_head"]
     if dh and dh["row"]:
-        lines.append(f"- G2 {ROW_TEXT['G2']}: {dh['sha'][:7]} Vercel {dh['deploy_state']}; remedy `{dh['redeploy']}`")
+        if dh.get("recommendation") == "hold":
+            lines.append(f"- G2 {ROW_TEXT['G2']}: {dh['sha'][:7]} Vercel {dh['deploy_state']}; {dh['redeploy']}")
+        else:
+            note = f" ({dh['holds_note']})" if dh.get("holds_note") else ""
+            lines.append(f"- G2 {ROW_TEXT['G2']}: {dh['sha'][:7]} Vercel {dh['deploy_state']}; remedy `{dh['redeploy']}`{note}")
     elif dh and dh.get("deploy_state") == "pending":
         lines.append(f"- Deploy of {dh['sha'][:7]} still building; re-check after orientation")
     if not rep["prs"]:

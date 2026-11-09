@@ -5,7 +5,7 @@ description: >
   "routine-fire X". Not for inline scoring/scouting
   (→ idea-scout) or sync delegation (→ delegate-*).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-11-05-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -184,6 +184,12 @@ he knows what to do once the routine finishes. The routine runs asynchronously
   may have failed silently — check the session log."
 
 ## Queueing skill-worker tasks — verify lines are mandatory
+
+A `routine:skill-worker` task changes exactly one file in `fairbay/ops`: a
+skill's `SKILL.md` or `references/*.md`, or a `docs/**/*.md` (`worker.py precheck`
+refuses anything else, and the routine then holds it for Baylee). A script, hook,
+workflow or several files is an ops-session task without the tag
+(chat-archive `references/encoding-gate.md`).
 
 When creating a `routine:skill-worker` task ("queue this for the worker"),
 the task notes MUST include at least one machine-readable verify line:

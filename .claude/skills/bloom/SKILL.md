@@ -1,10 +1,11 @@
 ---
+name: bloom
+description: >-
+  Strategic task triage — "bloom", "what should I work on", "plan the work".
+  Cross-project mission-weighted grouping into work packages. Not capture
+  (→ add-to-do) or onboarding (→ session-start).
 metadata:
-  version: "2026-10-22-01"
-  description: >-
-    Strategic task triage — "bloom", "what should I work on", "plan the work".
-    Cross-project mission-weighted grouping into work packages. Not capture
-    (→ add-to-do) or onboarding (→ session-start).
+  version: "2026-11-05-01"
 ---
 
 # bloom — mission-weighted task triage and work planning

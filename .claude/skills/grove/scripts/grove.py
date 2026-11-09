@@ -9,6 +9,8 @@ Seven operations exposed:
     grove.complete(id, source=...)               → POST   /api/tasks/:id/complete
     grove.drop(id, source=...)                   → POST   /api/tasks/:id/drop
     grove.events(entity_type=None, ...)          → GET    /api/events
+    grove.edit_next_actions(project_id, ops)     → GET + PATCH + GET /api/projects/:id
+        (CLI `lines`: set/drop/rewrite named next_actions lines, verified; b22bca05)
 
 `complete` and `drop` are task-only ergonomic sugar over PATCH — same
 underlying write path (RPC wraps mutation + event insert atomically, FR-005
@@ -28,6 +30,7 @@ Claude's container egress.
 from __future__ import annotations
 import json
 import os
+import sys
 import time
 import urllib.request
 import urllib.error
@@ -52,7 +55,7 @@ VALID_IDEA_VERDICTS = {
     "workhorse", "fools_gold", "lark", "pass",
 }
 VALID_ENTITIES = {"task", "idea"}            # create / update / complete / drop
-READ_ENTITIES = {"task", "idea", "decision", "project"}  # list / get / events (decisions are append-only; projects: MCP writes)
+READ_ENTITIES = {"task", "idea", "decision", "project"}  # list / get / events (decisions are append-only; projects: MCP writes, plus edit_next_actions)
 DECISION_LIMIT = 500                           # /api/decisions accepts up to 500 rows per call
 
 # Default source tag for calls made from Claude.ai web chat. Override per-call.
@@ -375,6 +378,103 @@ def update(
 
 
 # ----------------------------------------------------------------------------
+# next_actions line edits — one project row, re-read and verified (b22bca05)
+# ----------------------------------------------------------------------------
+
+def _one_match(lines: list[str], prefix: str) -> list[int]:
+    return [i for i, line in enumerate(lines) if line.startswith(prefix)]
+
+
+def apply_line_ops(lines: list[str], ops: Iterable[tuple]) -> tuple[list[str], list[str]]:
+    """Pure edit of a next_actions list. Returns (new_lines, report).
+
+    ops, applied in order:
+      ("set", prefix, text)      replace the one line starting with prefix by text;
+                                 prepend text when no line matches (a new marker)
+      ("replace", prefix, text)  as set, but no match is an error (a line that must exist,
+                                 such as a lane line: a typo never adds a duplicate)
+      ("drop", prefix)           remove the one line starting with prefix
+      ("rewrite", old, new)      the one line starting with old gets new in place of
+                                 that prefix; the rest of the line is kept
+    A prefix matching two or more lines is an error (nothing is written), as is a
+    drop or rewrite matching none, and a text holding a newline.
+    """
+    out = list(lines)
+    report: list[str] = []
+    for op in ops:
+        kind, prefix = op[0], op[1]
+        if not prefix:
+            raise ValueError(f"{kind}: empty prefix")
+        hits = _one_match(out, prefix)
+        if len(hits) > 1:
+            raise ValueError(f"{kind}: {len(hits)} lines start with {prefix[:60]!r}; make the prefix unique")
+        if kind in ("set", "replace"):
+            text = op[2]
+            if "\n" in text or not text.strip():
+                raise ValueError(f"{kind}: the line must be one non-empty line")
+            if not text.startswith(prefix):
+                raise ValueError(f"{kind}: the new line must start with its prefix {prefix[:60]!r}")
+            if kind == "replace" and not hits:
+                raise ValueError(f"replace: no line starts with {prefix[:60]!r}")
+            if hits:
+                out[hits[0]] = text
+                report.append(f"{kind} (replaced line {hits[0] + 1}): {prefix[:60]}")
+            else:
+                out.insert(0, text)
+                report.append(f"set (prepended): {prefix[:60]}")
+        elif kind == "drop":
+            if not hits:
+                raise ValueError(f"drop: no line starts with {prefix[:60]!r}")
+            del out[hits[0]]
+            report.append(f"drop (line {hits[0] + 1}): {prefix[:60]}")
+        elif kind == "rewrite":
+            new = op[2]
+            if not hits:
+                raise ValueError(f"rewrite: no line starts with {prefix[:60]!r}")
+            if "\n" in new:
+                raise ValueError("rewrite: the new prefix must be one line")
+            out[hits[0]] = new + out[hits[0]][len(prefix):]
+            report.append(f"rewrite (line {hits[0] + 1}): {prefix[:60]} -> {new[:60]}")
+        else:
+            raise ValueError(f"unknown op {kind!r}")
+    return out, report
+
+
+def edit_next_actions(
+    project_id: str,
+    ops: Iterable[tuple],
+    *,
+    source: str = DEFAULT_SOURCE,
+    dry_run: bool = False,
+) -> dict:
+    """Change named lines of a project's next_actions without sending the array by hand.
+
+    Re-reads the row right before the write, applies `ops` (see apply_line_ops),
+    PATCHes the whole array, re-reads and compares. Raises RuntimeError when the
+    stored array differs from what was sent. There is no compare-and-swap: the
+    window for another session's write is one API round trip, narrowed, not closed
+    (f2826d9d). A Code session uses source 'claude-web' (the API has no claude-code
+    source).
+    """
+    if source not in VALID_SOURCES:
+        raise ValueError(f"source must be one of {sorted(VALID_SOURCES)}")
+    before = list(get("project", project_id).get("next_actions") or [])
+    after, report = apply_line_ops(before, list(ops))
+    result = {"before": len(before), "after": len(after), "ops": report, "written": False}
+    if dry_run or after == before:
+        return result
+    _request("PATCH", f"/api/projects/{project_id}",
+             body={"next_actions": after, "source": source})
+    stored = list(get("project", project_id).get("next_actions") or [])
+    if stored != after:
+        raise RuntimeError(
+            f"next_actions write not verified: sent {len(after)} lines, stored {len(stored)}"
+        )
+    result["written"] = True
+    return result
+
+
+# ----------------------------------------------------------------------------
 # complete / drop — task-only shortcuts
 # ----------------------------------------------------------------------------
 
@@ -489,6 +589,24 @@ def _cli() -> int:
     p_drop.add_argument("id")
     p_drop.add_argument("--source", default=DEFAULT_SOURCE)
 
+    p_lines = sub.add_parser(
+        "lines", help="Edit named next_actions lines of one project (re-read, write, verify)")
+    class _Op(argparse.Action):  # keeps the ops in the order typed
+        def __call__(self, parser, ns, values, option_string=None):
+            ns.ops = (getattr(ns, "ops", None) or []) + [(self.dest, *([values] if isinstance(values, str) else values))]
+
+    p_lines.add_argument("project_id")
+    p_lines.add_argument("--set", nargs=2, action=_Op, metavar=("PREFIX", "FILE"),
+                         help="replace the line starting PREFIX by FILE's text (one line), or prepend it")
+    p_lines.add_argument("--replace", nargs=2, action=_Op, metavar=("PREFIX", "FILE"),
+                         help="as --set, but the line must exist")
+    p_lines.add_argument("--drop", action=_Op, metavar="PREFIX")
+    p_lines.add_argument("--rewrite", nargs=2, action=_Op, metavar=("OLD", "NEW"),
+                         help="swap a line's prefix OLD for NEW, keeping the rest")
+    p_lines.set_defaults(ops=None)
+    p_lines.add_argument("--source", default=DEFAULT_SOURCE)
+    p_lines.add_argument("--dry-run", action="store_true")
+
     p_events = sub.add_parser("events", help="Read audit log")
     p_events.add_argument("--entity-type", choices=sorted(READ_ENTITIES))
     p_events.add_argument("--entity-id")
@@ -534,6 +652,25 @@ def _cli() -> int:
         print(json.dumps(complete(args.id, source=args.source), indent=2))
     elif args.op == "drop":
         print(json.dumps(drop(args.id, source=args.source), indent=2))
+    elif args.op == "lines":
+        ops: list[tuple] = []
+        for op in args.ops or []:
+            if op[0] in ("set", "replace"):
+                with open(op[2], encoding="utf-8") as fh:
+                    ops.append((op[0], op[1], fh.read().rstrip("\n")))
+            else:
+                ops.append(op)
+        if not ops:
+            parser.error("lines: give at least one --set, --replace, --drop or --rewrite")
+        try:
+            out = edit_next_actions(args.project_id, ops, source=args.source, dry_run=args.dry_run)
+        except ValueError as e:
+            print(f"lines: {e} (nothing written)", file=sys.stderr)
+            return 2
+        except (RuntimeError, GroveError) as e:
+            print(f"lines: {e}", file=sys.stderr)
+            return 1
+        print(json.dumps(out, indent=2))
     elif args.op == "events":
         rows = events(
             entity_type=args.entity_type,

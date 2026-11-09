@@ -1,11 +1,11 @@
 ---
 name: init-repo
 description: >
-  Set up .claude/ infrastructure in a repo — "init claude", "set up skills",
+  Set up .claude/ in a repo — "init claude", "set up skills",
   "add claude config". Auto-fires from ship-it when .claude/ is missing.
   Not for deployment (→ ship-it) or skill editing (→ skill-creator-b).
 metadata:
-  version: "2026-10-22-01"
+  version: "2026-11-05-01"
 ---
 
 # init-repo — bootstrap .claude/ infrastructure in a repository

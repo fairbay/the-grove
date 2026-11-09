@@ -495,7 +495,7 @@ def _branch_prs(owner_repo, branch):
 
 
 def push_to_pr(owner_repo, branch, message, files, title=None, body="",
-               base="main"):
+               base="main", draft=True):
     """Push files to a claude/* branch and make sure a PR is open for it.
 
     The default push for every surface (ruling 3fa9a61e). Creates the branch
@@ -541,7 +541,7 @@ def push_to_pr(owner_repo, branch, message, files, title=None, body="",
         "body": body or message,
         "head": branch,
         "base": base,
-        "draft": True,
+        "draft": draft,
     })
     if code >= 300:
         raise RuntimeError(
@@ -563,6 +563,14 @@ def push_and_merge(owner_repo, message, files, base_branch="main"):
     squash-merges it, and deletes the branch — all in one call. Any other
     repo refuses: it lands through push_to_pr and close-at-land.
 
+    With a local clone (every Code session and any chat that cloned the repo)
+    the branch, commit and PR go through push_to_pr: native git plus one REST
+    call, because the session proxy refuses the Git Data API's write path
+    (403 "not permitted through this proxy", ops 1209b587). Without a clone
+    the Git Data API path below is the only one, and it works only where that
+    path is open. A failed merge raises with the PR URL; the clone is then
+    left on the temp branch, which the open PR continues.
+
     Returns (commit_sha, diff_url) of the merge commit on the base branch.
     """
     import hashlib
@@ -575,37 +583,45 @@ def push_and_merge(owner_repo, message, files, base_branch="main"):
 
     slug = hashlib.md5(message.encode()).hexdigest()[:8]
     temp_branch = f"claude/auto-{slug}-{int(time.time()) % 10000}"
+    clone_path = _find_repo_clone(owner_repo)
 
-    # 1. Get base branch SHA
-    code, ref = api("GET", f"/repos/{owner_repo}/git/ref/heads/{base_branch}")
-    if code >= 300:
-        raise RuntimeError(f"get base ref failed: {code} {ref}")
-    base_sha = ref["object"]["sha"]
+    if clone_path:
+        start = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=clone_path,
+                               capture_output=True, text=True).stdout.strip()
+        push_sha, _, pr_url = push_to_pr(owner_repo, temp_branch, message, files,
+                                         base=base_branch, draft=False)
+        pr_number = int(pr_url.rstrip("/").rsplit("/", 1)[1])
+    else:
+        # 1. Get base branch SHA
+        code, ref = api("GET", f"/repos/{owner_repo}/git/ref/heads/{base_branch}")
+        if code >= 300:
+            raise RuntimeError(f"get base ref failed: {code} {ref}")
+        base_sha = ref["object"]["sha"]
 
-    # 2. Create temp branch
-    code, new_ref = api("POST", f"/repos/{owner_repo}/git/refs", {
-        "ref": f"refs/heads/{temp_branch}",
-        "sha": base_sha,
-    })
-    if code >= 300:
-        raise RuntimeError(f"create branch failed: {code} {new_ref}")
+        # 2. Create temp branch
+        code, new_ref = api("POST", f"/repos/{owner_repo}/git/refs", {
+            "ref": f"refs/heads/{temp_branch}",
+            "sha": base_sha,
+        })
+        if code >= 300:
+            raise RuntimeError(f"create branch failed: {code} {new_ref}")
 
-    # 3. Push files to temp branch (reuse existing API push logic)
-    push_sha, _ = _push_via_api(owner_repo, temp_branch, message, files)
+        # 3. Push files to temp branch (reuse existing API push logic)
+        push_sha, _ = _push_via_api(owner_repo, temp_branch, message, files)
 
-    # 4. Create PR
-    code, pr = api("POST", f"/repos/{owner_repo}/pulls", {
-        "title": message.split("\n")[0][:72],
-        "body": message,
-        "head": temp_branch,
-        "base": base_branch,
-    })
-    if code >= 300:
-        # Clean up branch on PR failure
-        api("DELETE", f"/repos/{owner_repo}/git/refs/heads/{temp_branch}")
-        raise RuntimeError(f"create PR failed: {code} {pr}")
+        # 4. Create PR
+        code, pr = api("POST", f"/repos/{owner_repo}/pulls", {
+            "title": message.split("\n")[0][:72],
+            "body": message,
+            "head": temp_branch,
+            "base": base_branch,
+        })
+        if code >= 300:
+            # Clean up branch on PR failure
+            api("DELETE", f"/repos/{owner_repo}/git/refs/heads/{temp_branch}")
+            raise RuntimeError(f"create PR failed: {code} {pr}")
 
-    pr_number = pr["number"]
+        pr_number = pr["number"]
 
     # 5. Squash-merge
     code, merge = api("PUT", f"/repos/{owner_repo}/pulls/{pr_number}/merge", {
@@ -620,8 +636,22 @@ def push_and_merge(owner_repo, message, files, base_branch="main"):
 
     merge_sha = merge.get("sha", push_sha)
 
-    # 6. Delete temp branch
-    api("DELETE", f"/repos/{owner_repo}/git/refs/heads/{temp_branch}")
+    # 6. Delete temp branch (best effort: the merge has landed either way), go back to
+    #    the branch the clone was on (base for a detached HEAD), and bring base up to date.
+    if clone_path:
+        def _g(*args):
+            return subprocess.run(["git", *args], cwd=clone_path, capture_output=True, text=True)
+        if _g("push", "origin", "--delete", temp_branch).returncode != 0:
+            print(f"warning: merged, but deleting {temp_branch} on origin failed; delete it on GitHub",
+                  file=sys.stderr)
+        back = start if start and start not in ("HEAD", temp_branch) else base_branch
+        _g("switch", back)
+        if back == base_branch:
+            _g("fetch", "origin", base_branch)
+            _g("merge", "--ff-only", f"origin/{base_branch}")
+        _g("branch", "-D", temp_branch)
+    else:
+        api("DELETE", f"/repos/{owner_repo}/git/refs/heads/{temp_branch}")
 
     return merge_sha, f"https://github.com/{owner_repo}/commit/{merge_sha}"
 

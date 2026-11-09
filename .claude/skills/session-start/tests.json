@@ -1,7 +1,7 @@
 {
   "target_skill": {
     "name": "session-start",
-    "description": "Session onboarding — \"work on [project]\", \"continue X\", a pasted handoff; \"dispatch [project]\", \"check the lanes\"; \"run the sitting\". Not mid-session (→ chat-status) or archive (→ chat-archive)."
+    "description": "Session onboarding — \"work on [project]\", \"continue X\", a pasted handoff; \"dispatch [project]\", \"check the lanes\". Not mid-session (→ chat-status) or archive (→ chat-archive)."
   },
   "competing_skills": [
     {
@@ -27,9 +27,7 @@
     "Pick up where we left off on ops",
     "Work on the auth rewrite — pull the handoff",
     "dispatch MBN",
-    "Check the lanes on the navigator and give me the prompt for each one so I can kick off the sessions",
-    "run the sitting",
-    "Time for the weekly sitting — show me what's waiting"
+    "Check the lanes on the navigator and give me the prompt for each one so I can kick off the sessions"
   ],
   "negative_cases": [
     "Where are we on the rebuild right now? (expect chat-status)",

@@ -11,6 +11,7 @@ that consumes the records is `scripts/ops_read.py` (project-health, "Ops read").
 - Reversals and wrong questions — the tags, with needless asks
 - At entry (session-start Phase 0) — a missing record for the previous session
 - MBN data-batch close — guard-record.json, guard.mjs, the verdict line, the Go
+- PR subscriptions — unsubscribe from every PR that outlives the session
 - Agent state — the output-file check before any report about an agent
 
 ## The record (Step 3e)
@@ -25,7 +26,7 @@ row's metadata is overwritten each session, so it cannot hold a series).
  "asks": 0, "refusals": 0, "refused": [], "merges": 0,
  "prs": [{"pr": "fairbay/<repo>#<n>", "via": "self|ask|github|pending|open", "tapped": false}],
  "start": "pasted|typed|none", "opening_chars": 0, "interrupts": 0,
- "calls_logged": ["<rung-3 decision ids>"], "calls_shown": ["<ids of the random fifth>"],
+ "calls_logged": ["<rung-3 decision ids>"], "calls_shown": ["<ids of the random fifth, and of the contested calls shown with it>"],
  "cards": ["<adjudication ids filed>"], "tasks_for_baylee": ["<task ids for him>"],
  "cache_read_m": {"opus": 12.3}, "source": "transcript", "lane": "<x>"}
 ```
@@ -59,23 +60,30 @@ number is counted in `unchecked_merges`.
 | `session` | `--session`: this session's URL; the archive also writes it as the handoff's `meta.session`, which is how the next entry finds this record |
 | `date` | UTC date of the archive |
 | `kind` | `--kind`: a data batch: its `ops.change_batches.kind`; else the goal line: a ledger item is `upkeep` unless the goal marked it `direction` |
-| `asks` | AskUserQuestion and `ask_user_input_v0` calls in the transcript, plus `--asks-prose` for questions put to Baylee in prose (the transcript cannot tell a prose question from prose) |
+| `asks` | AskUserQuestion and `ask_user_input_v0` calls in the transcript, plus `--asks-prose` for questions put to Baylee in prose: the script never counts prose, the archiving session adds them by hand (the transcript cannot tell a prose question from prose) |
 | `refusals`, `refused` | tool results carrying a permission or classifier refusal, or his rejection of a tool call, each refused command in `refused` |
-| `merges` | PR merge calls (`gh api -X PUT …/merge`, `gh pr merge`, git-ops merge), whatever their outcome |
+| `merges` | PR merge attempts (`gh api -X PUT …/merge`, `gh pr merge`, git-ops merge), whatever their outcome: one per PR a call names, so a `for n in 100 431; do …` loop or two chained merges count two, each with the outcome its own success line or the call's answer shows; a failed attempt retried to a merge stays in the count but needs no `--not-merged` |
 | `prs` | `--prs`: **every PR this session opened, merged or left for his tap**, with how it stands. `self`: the session merged ruled upkeep, no tap. `ask`: the session merged under his answer (close-at-land's merge request). `github`: he merged it himself. `pending`: ready and waiting for his tap at archive. `open`: a draft the work continues on. `tapped` is `ask`, `github` or `pending` |
 | `start`, `opening_chars` | from the transcript's first human message (meta records, compaction summaries and "being continued" openers skipped): `pasted` only on positive evidence of a printed prompt (a `Go:` sentence at a line start or after `lane X:`, a dispatch prompt), else `typed`; `none` when there is none, and always for a routine (its prompt is not his). The length rides beside it |
 | `interrupts` | `asks + refusals − merge-call refusals + github/pending PRs + cards + 1 for a pasted start`: a refused merge costs him its tap, counted once on its PR (an ask, or `github`/`pending`); a merge under his answer is inside the ask; ruled upkeep costs nothing |
 | `calls_logged` | `--calls`: Grove decisions this session logged at rung 3 (not the record itself, not reversals) |
-| `calls_shown`, `cards`, `tasks_for_baylee` | `--shown`, `--cards`, `--tasks`: the random fifth below; Grove ids filed this session |
+| `calls_shown`, `cards`, `tasks_for_baylee` | `--shown`, `--cards`, `--tasks`: the random fifth below plus the contested calls shown with it; Grove ids filed this session |
 | `cache_read_m` | the session's cache-read tokens in millions by model family. The weekly read's S10 line sums it per day (`ops_read.py`) |
 | `source` | `transcript`; an entry stub is `no-transcript` (At entry, below) |
 | `lane` | `--lane`: in a lanes repo, the lane the session worked (`"a"`); the record also takes the tag `lane-<x>`, which is how dispatch finds each lane's last session (session-start `references/dispatch.md`). Omitted outside lanes and for a dispatch record (tag `dispatch` instead) |
+| `opening_hash` | eight hex characters of the opening message with white space collapsed; equal to a dispatch record's prompt `hash` when he pasted that prompt unchanged |
+| `dispatch` | `--dispatch <file> --lanes <declared lanes>`: a dispatch run's own block, what it printed (every lane's state, each prompt with its text, `first` print time, `since` the first offer, `offered` count and hash, his steps, his calls, the waiting and running lines, the cleanup); the next dispatch reads it to tell a prompted lane from a ready one (session-start `references/dispatch.md` Step 4) |
 
 **What reads it.** The weekly read's "Counter" line (`ops_read.py`, Budgets) counts
 the week's whole records (record 2, built by `--record`), sums their interrupts,
 starts and PR taps, and, over every record with a cost (record 1 included), prints
 the process share: cache-read of ops sessions and lane H. Record 1 (written by hand
-before 2026-10-28) still counts for S1, S2, S4 and S10.
+before 2026-10-28) still counts for S1, S2, S4 and S10. Under it, "Dispatch prompts"
+counts the week's dispatch runs' printed prompts (ready lanes, once per session),
+how many were pasted unchanged (a record whose `opening_hash` equals a prompt's hash,
+logged after its first print) and the strict count of `docs/dispatch/DESIGN.md` §1.2; and
+"Lane overlaps" names a lane's session that logged again after another session of
+the lane (a restated record still counts as a time it logged). Both report-only.
 
 **No transcript at all** (a surface without the harness): count asks, refusals and
 merges from the conversation, `source: self-reported`, `cache_read_m: null`,
@@ -87,18 +95,24 @@ asks A, refusals R, merges M, calls L (shown S), cards C", project_ref=…,
 context=<the JSON>, tags=["session-record", "lane-<meta.lane>"] (the lane tag
 from the baton's `meta.lane`; in a repo without lanes the list is
 ["session-record"] alone), confidence="high", reversible="yes", rung=3)`. Then
-read it back once (`grove_get`) and check `context` parses and the tags carry
-the lane; if the tag is missing, log the record again with
+read it back once: where `GROVE_TOKEN` is set (Code, routines), run
+`python3 .claude/skills/chat-archive/scripts/session_report.py --check-record <full decision id> [--lane <x>]`
+(exit 0 = the weekly reads count it; "cannot read" is a failed read, so retry it and do not log again;
+"superseded" means a newer record already counts, so do nothing); in chat, `grove_get` and check `context`
+parses and the tags carry the lane. On any other exit 2 or a failed check, log the record again with
 `supersedes=<first id>` (the weekly read counts a superseding record once;
-five lane A records of 2026-10 missed the tag when it was a parenthesis).
+five lane A records of 2026-10 missed the tag when it was a parenthesis, and in
+the week to 2026-11-03 four had a null or prose `context`, one hiding 142.5M
+from S10: ledger 6e5aa00e).
 
 **No close without it.** The archive does not write the summary (Step 4), the
 Next-step line or Step 9's write-back until the record's id is in hand. If
-Grove refuses twice, the git handoff still goes out (it is the baton that does
-not depend on Grove) with the record JSON in a top-level `pending_record:`
-field, the summary says "Session record pending: Grove refused (<error>)", and
-the next session's entry logs it. A session-only chat with no handoff file
-puts the JSON in the response and says the next entry will write a stub.
+Grove refuses twice and a work PR is still open, its handoff carries the record
+JSON in a top-level `pending_record:` field (the baton that does not depend on
+Grove), the summary says "Session record pending: Grove refused (<error>)", and
+the next session's entry logs it. With no work PR open (no PR is opened for a
+handoff alone, close-at-land "Land-at-push"), or in a session-only chat, the
+archive puts the JSON in the response and says the next entry will write a stub.
 
 ## The random fifth
 
@@ -116,16 +130,19 @@ Print the picked calls in the Step 4 summary and in the Grove session line
 - 5f2c1a90 — <the decision's first 90 characters> — reply "reverse 5f2c1a90" to undo
 ```
 
-Their ids go in the record's `calls_shown` (ids only, never prose: the sitting looks
-them up). No rung-3 calls → the line reads "Calls to check: none this session" and
-`calls_shown` is empty.
+Their ids go in the record's `calls_shown` (ids only, never prose: the weekly read's
+S4 counts reversals against them). No rung-3 calls → the line reads "Calls to check:
+none this session" and `calls_shown` is empty.
 
-**Contested calls go to the sitting.** A rung-3 call made against a reviewer's
+**Contested calls are shown, never batched.** A rung-3 call made against a reviewer's
 blocking or high finding, against what a card for it would have recommended, or on a
 reading of one of his rulings that its words do not plainly settle (when he is not in
-the session to ask) gets the tag `contested` when it is logged. The weekly sitting
-shows every contested call, and every call the archives showed, once more, for keep or
-reverse (session-start `references/sitting.md`).
+the session to ask) gets the tag `contested` when it is logged and is listed in the
+close-out beside the random fifth, whatever the draw, with the same "reverse <id>"
+reply; its id goes into `calls_shown` with the fifth's (so S4's denominator counts it;
+the fifth itself is unchanged, contested calls ride on top of it). The weekly
+sitting's digest of these calls is retired (Baylee, 2026-11-06, becb3a31: no batched
+list of calls put to him at once).
 
 ## Reversals and wrong questions
 
@@ -189,13 +206,18 @@ applied and published this session), before the handoff is written:
    `from-mNNNN` tasks, each with its one class tag and status). Unknown → `null`,
    never a guess.
 2. **Run the guard:** `node scripts/batch/guard.mjs --batch mNNNN`, adding
-   `--pairs <file>` when the pairs output is at hand, and `--tasks <file>` only
-   with a dump of **every** batch in the record: `--tasks` replaces the
-   follow-ups of all batches, so a dump of the new batch alone erases older
-   leaks and can turn a pause into `continue`. Build it with one
-   `grove_list_tasks(tag="from-<id>", compact=false, limit=100)` per batch id in
-   guard-record.json, concatenated into one JSON array; without that, run
-   without `--tasks` (the record's snapshot). Exit 0, 3 and 4 are verdicts
+   `--pairs <file>` when the pairs output is at hand, and `--tasks <file>` with
+   a dump of the batches whose follow-ups changed since the record was written:
+   for each batch included, **all** of its tasks, every status, dropped ones
+   too (one `grove_list_tasks(tag="from-<id>", compact=false, limit=100)` per
+   batch, concatenated into one JSON array). `--tasks` replaces the follow-ups
+   only of the batches the dump holds a task for and keeps the record's
+   snapshot for the rest, so a dump of the new batch alone leaves older leaks
+   in place (MBN guard.mjs since c1352d0a; a repo whose guard.mjs header still
+   says it REPLACES every batch's follow-ups needs a dump of every batch in the
+   record). stderr names both sets and any follow-up the record lists that the
+   dump lacks: a partial dump for that batch, so dump it again in full. The
+   verdict is stdout's one line; never capture it with `2>&1`. Exit 0, 3 and 4 are verdicts
    (continue, pause-and-repair, escalate); exit 2 is an input error: fix the
    record or the tags and run again, never write a verdict from an exit 2.
 3. **Write the verdict line** verbatim into HANDOFF `progress:` (with lanes: the lane file's
@@ -211,12 +233,26 @@ applied and published this session), before the handoff is written:
 
 **The Go in the Next-step line.** When the next session is a data batch, the
 Step 5 line carries `.claude/policy.json` `harness.go` verbatim with `mNNNN`
-replaced by the next batch's migration number: the highest `mNNNN` across
-`scripts/m*/` and `db/migrations/*_m*.sql`, plus one, or the number the plan
-names for the next batch. When the two disagree, write no Go: name the
-mismatch in the Next-step line for Baylee to settle. Read the sentence from the file,
+replaced by the next batch's migration number: one more than the highest
+`mNNNN` in any of (1) `ops.change_batches` (read it), (2) the content branches
+(`git ls-remote --heads origin 'claude/data-*'`; since PLAN Step 27 a content
+batch never merges, so its id is never on main), (3) `db/migrations/*_m*.sql`
+on main and on every open PR's head (a schema file in a draft claims its id),
+(4) `scripts/m*/` on main; or the number the plan names for the next batch.
+The next session checks the id is still free before its first commit (another
+lane may take it first; ops d13fbd48). When the rule and the plan disagree,
+write no Go: name the mismatch in the Next-step line for Baylee to settle. Read the sentence from the file,
 never from memory: what it covers is Baylee's consent and changes only by his
 ruling.
+
+## PR subscriptions
+
+For every PR this session opened or was subscribed to that stays open after it (a
+draft later sessions continue, a branch waiting on a card, a PR left for his
+tap), call `unsubscribe_pr_activity` once per PR before the summary: a CI event on
+it otherwise wakes the finished session and spends a turn (2026-11-03, MBN #446;
+ops 2a9021d0). Not for a PR that merged or closed here (the subscription ends
+itself), or one Baylee asked this session to watch.
 
 ## Agent state
 

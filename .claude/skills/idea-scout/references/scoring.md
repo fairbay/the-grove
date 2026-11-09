@@ -96,9 +96,10 @@ Report as percentage: score ÷ 72.
 and cap Domain Fit at ≤3.
 
 **Context assumption:** All sustainability scores assume Baylee's current
-situation: solo builder, iPhone-primary, Claude-as-coder pipeline, two young
-kids, mid-relocation. If circumstances change significantly, re-score
-sustainability.
+situation: solo builder, iPhone-primary, Claude-as-coder pipeline, limited
+building time beside family life (the personal specifics live in Claude's
+memory, not in this synced file). If circumstances change significantly,
+re-score sustainability.
 
 ## 5. Score Anchors
 

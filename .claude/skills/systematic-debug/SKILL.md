@@ -1,11 +1,11 @@
 ---
 name: systematic-debug
 description: >
-  Fix bugs systematically — "X is broken", "isn't working", "fix didn't work",
+  Fix bugs — "X is broken", "isn't working", "fix didn't work",
   "still failing", "why is X happening", deploy failures, build errors. Not for
   features (→ build) or architecture (→ architect).
 metadata:
-  version: "2026-06-16-01"
+  version: "2026-11-05-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 

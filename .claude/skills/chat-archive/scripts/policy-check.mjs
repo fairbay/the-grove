@@ -28,6 +28,9 @@
 //               (the migration), when the change edits the lane list, or when the base cannot be resolved
 //               (--require-base, as CI passes it, makes that last one a failure). Each progress line is at
 //               most 200 characters. Lane files with no lanes declared fail.
+//   (f) go      where policy.json has harness.go: a baton this change touches whose START HERE (first `next:`
+//               item) is "a data batch" or "a data session" carries `Opening line: "lane <x>: Go: <harness.go>"`,
+//               mNNNN filled, so dispatch can copy it into the prompt (Grove 6179636b).
 // The rule files are signals.S7_uncited_routing_sentences.files in policy.json. .claude/global.md
 // is never linted here: it is a synced copy, linted in fairbay/ops only.
 // Dependency-free (Node's own modules), so rules.yml runs it without an install.
@@ -371,7 +374,62 @@ function checkLanes(root, base, requireBase = false) {
   if (touched.length > 1)
     fails.push(`lanes: this change edits the batons of lanes ${touched.join(", ")} (against ${ref}); a lane writes only its own ` +
       `handoffs/lane-<x>.yaml and its own progress line. After a merge of main, resolve with handoff-merge.mjs --lane <x>.`);
+  const harnessGo = policyGo(read(POLICY));
+  for (const x of touched) fails.push(...checkGoCarried(read(`handoffs/lane-${x}.yaml`), x, harnessGo));
   return { fails, notes };
+}
+
+// (f) go: the Go rides in the baton, where dispatch reads it (Grove 6179636b; ruling 7fd4b24e).
+// Dispatch copies a Go only from a lane's baton or row line and never composes one, so a data
+// lane whose baton carries none starts without consent and stalls on a question (lane A,
+// 2026-11-08 01:19Z to ~10:40Z).
+const DATA_START = /\ba data (batch|session)\b/i;
+
+function policyGo(text) {
+  if (!text) return null;
+  try {
+    const g = JSON.parse(text)?.harness?.go;
+    return typeof g === "string" && g.trim() ? g.trim() : null;
+  } catch {
+    return null; // (a) reports the parse failure
+  }
+}
+
+// The first `next:` item of a baton, YAML folding undone (lines joined, '' unescaped).
+export function startHere(baton) {
+  if (!baton) return null;
+  const lines = baton.split("\n");
+  const i = lines.findIndex((l) => /^next:\s*$/.test(l));
+  if (i < 0) return null;
+  const out = [];
+  for (let j = i + 1; j < lines.length; j++) {
+    const l = lines[j];
+    if (/^\s*-(\s|$)/.test(l)) {
+      if (out.length) break; // the second item
+    } else if (/^\S/.test(l)) break; // the next top-level key
+    out.push(l.replace(/^\s*-\s/, "").trim());
+  }
+  if (!out.length) return null;
+  let s = out.join(" ").replace(/\s+/g, " ").trim();
+  if (/^'.*'$/.test(s)) s = s.slice(1, -1).replace(/''/g, "'");
+  else if (/^".*"$/.test(s)) s = s.slice(1, -1).replace(/\\"/g, '"');
+  return s;
+}
+
+// A baton whose START HERE is a data batch or data session carries the Opening line with the
+// policy's harness.go, the batch id filled in: `Opening line: "lane A: Go: … m1368 …"`.
+export function checkGoCarried(baton, lane, harnessGo) {
+  if (!harnessGo) return [];
+  const s = startHere(baton);
+  if (!s || !DATA_START.test(s)) return [];
+  const go = harnessGo.replace(/^Go:\s*/i, "");
+  const esc = go.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/mNNNN/g, "m\\d{4}").replace(/\s+/g, "\\s+");
+  if (new RegExp(`Opening line: "lane ${lane}: Go: ${esc}"`, "i").test(s)) return [];
+  return [
+    `go: handoffs/lane-${lane}.yaml's START HERE is a data batch with no Go: end it with ` +
+      `Opening line: "lane ${lane.toUpperCase()}: Go: ${go}" (mNNNN filled with the batch id). ` +
+      `Dispatch copies a Go only from the baton or the row line (close-at-land step 8).`,
+  ];
 }
 
 export function run(root, { s8 = true, base = null, requireBase = false } = {}) {

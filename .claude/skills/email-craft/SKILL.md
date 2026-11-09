@@ -5,7 +5,7 @@ description: >
   "respond to", or confirming Claude's suggestion to email. Not for pitch
   docs (→ pitch-crafter) or Slack.
 metadata:
-  version: "2026-06-09-01"
+  version: "2026-11-04-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -63,14 +63,15 @@ is still present-inline-first.
   justification paragraphs, no "I hope this email finds you well."
 - **Default to brevity.** Baylee can always add more.
 
-## Family emails to elderly relatives
+## Family emails to older relatives
 
-Recipients: Ma, Baba, other elderly family.
+Recipients: older family members. Who they are, what Baylee calls them and
+what to leave out are personal context: read them from Claude's
+memory or ask; this file names no one (it syncs into repos that may be public).
 
-- Familiar names — Ma, Baba, not surnames.
+- Familiar names, the ones Baylee uses for them, not surnames.
 - Simplify friend references — "a friend" beats names they won't recognize.
 - TBD plans go in honestly — "we're still figuring out X" is fine.
-- Omit Baylee's own birthday in family update emails.
 - Warm, clear tone. Short sentences. No jargon.
 
 ## External pushback or negotiation

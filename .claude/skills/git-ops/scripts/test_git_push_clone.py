@@ -310,5 +310,60 @@ class ReadFileBranchTests(unittest.TestCase):
         self.assertEqual(git_push.read_file("fairbay/x", "a.txt", branch="claude/far"), "far\n")
 
 
+class PushAndMergeCloneTests(unittest.TestCase):
+    """ops 1209b587: with a clone, push_and_merge never calls the Git Data API (the session
+    proxy answers its write path with 403 "not permitted through this proxy")."""
+
+    def setUp(self):
+        CloneTests.setUp(self)
+        self.calls, self.merge_status = [], 200
+        self._saved = (git_push.api, git_push._find_repo_clone, git_push.SELF_LANDING_REPOS)
+
+        def fake_api(method, path, body=None):
+            self.calls.append((method, path, body))
+            if "/git/" in path:
+                return 403, {"message": "Write access to this GitHub API path is not permitted through this proxy."}
+            if method == "GET" and "/pulls?" in path:
+                return 200, []
+            if method == "POST" and path.endswith("/pulls"):
+                return 201, {"html_url": "https://github.com/fairbay/x/pull/9", "number": 9}
+            if method == "PUT" and path.endswith("/pulls/9/merge"):
+                return self.merge_status, ({"sha": "f" * 40} if self.merge_status < 300 else {"message": "refused"})
+            return 404, {}
+        git_push.api = fake_api
+        git_push._find_repo_clone = lambda _r: self.clone
+        git_push.SELF_LANDING_REPOS = {"fairbay/x"}
+
+    def tearDown(self):
+        git_push.api, git_push._find_repo_clone, git_push.SELF_LANDING_REPOS = self._saved
+        CloneTests.tearDown(self)
+
+    def test_lands_through_the_clone_with_no_git_data_api_call(self):
+        sha, url = git_push.push_and_merge("fairbay/x", "add b", [("b.txt", b"b")])
+        self.assertEqual(sha, "f" * 40)
+        self.assertFalse([c for c in self.calls if "/git/" in c[1]])
+        posts = [b for m, p, b in self.calls if m == "POST"]
+        self.assertEqual(len(posts), 1)
+        self.assertFalse(posts[0]["draft"])  # a draft cannot be merged
+        self.assertTrue(posts[0]["head"].startswith("claude/auto-"))
+        self.assertEqual(git(self.remote, "branch", "--list", "claude/auto-*"), "")  # temp branch deleted
+        self.assertEqual(git(self.clone, "rev-parse", "--abbrev-ref", "HEAD"), "main")
+        self.assertEqual(git(self.clone, "branch", "--list", "claude/auto-*"), "")
+
+    def test_detached_head_returns_to_base(self):
+        git(self.clone, "checkout", "--detach")
+        git_push.push_and_merge("fairbay/x", "add c", [("c.txt", b"c")])
+        self.assertEqual(git(self.clone, "rev-parse", "--abbrev-ref", "HEAD"), "main")
+        self.assertEqual(git(self.clone, "branch", "--list", "claude/auto-*"), "")
+
+    def test_failed_merge_raises_with_the_pr_and_keeps_the_branch(self):
+        self.merge_status = 405
+        with self.assertRaises(RuntimeError) as cm:
+            git_push.push_and_merge("fairbay/x", "add b", [("b.txt", b"b")])
+        self.assertIn("pull/9", str(cm.exception))
+        self.assertNotEqual(git(self.remote, "branch", "--list", "claude/auto-*"), "")
+        self.assertTrue(git(self.clone, "rev-parse", "--abbrev-ref", "HEAD").startswith("claude/auto-"))
+
+
 if __name__ == "__main__":
     unittest.main()

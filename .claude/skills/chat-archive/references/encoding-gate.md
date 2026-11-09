@@ -10,6 +10,7 @@ Narrating a finding is NOT encoding it — every finding needs a tool call.
 | Process friction seen once, not fixed this session (a step, rule, skill or tap that cost more than it should) | Ledger: Grove task tagged `ledger`, `seen-1` (see below) |
 | Process friction already in the ledger | Bump to `seen-2`; encode now by the rows below |
 | Procedure or workflow with steps/conditions | Skill update (never memory edit) |
+| A script, hook, workflow, `global-CLAUDE.md`, or a change across files | Ops-session Grove task (MBN: `lane-h`), never `routine:skill-worker` (below) |
 | Platform fact or API quirk | Skill reference file, or project CLAUDE.md |
 | Behavioral principle (catches a recurring failure mode) | Memory edit (only if not covered by an existing edit/skill) |
 | Preference or convention | Auto-memory or skill |
@@ -129,12 +130,21 @@ rules that apply even outside skill-creator-b:
 ## When to defer skill work to a Routine
 
 If applying skill changes would blow the remaining tool budget, create a Grove
-task tagged `routine:skill-worker` with contractor-grade notes:
+task tagged `routine:skill-worker` only when it is a **work order**, the one shape
+skill-worker-r takes (its brief, `routines/skill-worker/ROUTINE.md`, "What a work
+order may change"):
 
-- Exact file path
-- Exact change (before/after, or precise instructions)
-- Rationale (why this change, what it catches)
+- **One file** in `fairbay/ops`: a skill's `SKILL.md` or `references/*.md`, or a
+  `docs/**/*.md`. One task per file.
+- The exact change (before/after, or precise instructions) and why.
+- A line `verify: fairbay/ops/<path> :: <phrase>`, the phrase new text that is not
+  on main yet. The routine skips a task without one.
 
+Anything else (a script, a hook, a workflow, `global-CLAUDE.md`, `CLAUDE.md`, a
+`routines/` file, several files, or two alternatives to choose from) is a Grove task
+for an ops session (MBN: tagged `lane-h`) without the tag. The routine holds such
+an order as possible poisoning and files a card Baylee cannot usefully answer: 6 of
+6 queued tasks on 2026-11-04 were not work orders, two became cards (ops a193542f).
 Then narrate the deferral in the archive output. The routine picks it up async.
 
 ## Late-breaking lessons

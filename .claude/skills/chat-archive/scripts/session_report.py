@@ -18,8 +18,8 @@ the weekly ops read's S10 line sums it per day).
 Optional: --routing adds a "routing" section (last JSON key, one "Routing:" Markdown line, and a record line on stdout after the
 summary line: asks, refusals, merges, source and cache_read_m): the AskUserQuestion calls of the main thread (when asked, when answered,
 when the next tool call came, number of questions and their header labels), the tool results that are a harness permission refusal
-(classifier, safety check, rule, user rejection; main thread and sub-agents) and the pull-request merge calls with their outcome (merged,
-refused, failed). It copies no question text and no answer; the only free text kept is the first 200 characters of a classifier's reason,
+(classifier, safety check, rule, user rejection; main thread and sub-agents) and the pull-request merge attempts with their outcome (merged,
+refused, failed), one per PR a call names (a loop over two PRs is two; merges_of). It copies no question text and no answer; the only free text kept is the first 200 characters of a classifier's reason,
 redacted like every other label. Without it the output is as before.
 
 --record (its own options; see record_main) prints the whole session record as one JSON line, ready for the Grove session-record
@@ -27,13 +27,16 @@ decision's context: the routing counts, cache_read_m, the start (pasted, typed o
 (self, ask, github, pending, open) and whether that cost Baylee a tap. It exits 2, printing nothing on stdout, when the record would
 be partial or inconsistent (a PR this session opened or merged that --prs does not name, say). chat-archive references/session-record.md.
 
+--check-record <decision id> [--lane x] reads the logged record back from Grove (GROVE_TOKEN) and exits 2, naming each problem,
+when the weekly reads would skip it (no context, context not the record JSON, no session-record or lane tag).
+
 A repo wraps this script for its own extras (MBN scripts/session-usage/report.py; it puts the synced
 .claude/skills/chat-archive/scripts on sys.path and imports the module): `session_report.PATH_PATTERNS.insert(0, …)` adds the repo's
 path generalizations, `session_report.COPY_WATCH = "…"` (assigned on the module, not an imported name) names a path substring whose
 copy-command destinations are counted, parse_args(argv, opts, usage) parses its own valued options, and main(..., sections=[...])
 appends sections (each callable takes the report dict and returns (key, value, markdown line)) after the base report and before routing.
 """
-import json, os, re, sys, collections, datetime
+import json, os, re, shlex, sys, collections, datetime, hashlib
 
 CWD_PREFIX = None  # set from the first record's cwd
 
@@ -235,26 +238,82 @@ def shell_segments(cmd):
 
 ENV_PREFIX = re.compile(r"""^[({\s]*(?:(?:command|env|\w+=(?:"[^"]*"|'[^']*'|\S*))\s+)*""")
 
-def merge_of(name, inp):
-    """(is_merge, pr) for a tool call that merges a pull request. A Bash call counts only when gh pr merge or gh api ... PUT .../pulls/<n>/merge
-    starts a shell command segment (not inside a heredoc body or a quoted string)."""
+SHELL_KEYWORD = re.compile(r"^\s*(?:(?:do|then|else|elif)\s+|[({]\s*)*")
+FOR_LOOP = re.compile(r"^\s*for\s+([A-Za-z_]\w*)\s+in\s+(.*)$", re.S)
+PR_REF = r"(\d+|\$\{?[A-Za-z_]\w*\}?)"  # a literal number or a shell variable ($n, ${n})
+VALUE_FLAGS = {"-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file", "-A", "--author-email", "--match-head-commit"}
+
+def loop_words(spec):
+    """A for loop's words; [None] when the list is not plain words ($(seq …), {1..3}, $VAR, backticks): one unchecked entry, never a guess."""
+    words = [w.strip("'\"") for w in re.sub(r"(?:^|\s)#.*", "", spec).split()]
+    return [None] if any(re.search(r"[$(){}`]", w) for w in words) else words
+
+def pr_numbers(tok, loops):
+    """The PR numbers one token names: a number, or a loop variable expanded to each of its numeric words (None for a word that is not a number)."""
+    tok = tok.strip("'\"").rstrip(");")
+    if tok.isdigit(): return [int(tok)]
+    v = re.fullmatch(r"\$\{?([A-Za-z_]\w*)\}?", tok)
+    if v and v.group(1) in loops: return [int(w) if w and w.isdigit() else None for w in loops[v.group(1)]]
+    return [None]
+
+def merges_of(name, inp):
+    """[(pr, repo)] for a tool call that merges pull requests, one entry per PR it names: a merge tool, or a Bash call whose shell segment
+    starts with gh pr merge or gh api ... PUT .../pulls/<n>/merge (not inside a heredoc body or a quoted string, after do/then/( keywords).
+    Several merge segments give several entries, and a merge inside `for n in 100 431; do …; done` gives one per number of the loop
+    (a loop variable counts only until its done or a new assignment). pr is None when the call names no number it can read, or the repo
+    is a variable; repo is None when the segment names none (record_main falls back to --repo). xargs and bash -c are not read."""
     inp = inp if isinstance(inp, dict) else {}
     if name.endswith("merge_pull_request"):
         n = inp.get("pullNumber")
-        return True, int(n) if str(n).isdigit() else None
-    if name != "Bash": return False, None
+        return [(int(n) if str(n).isdigit() else None, repo_of(name, inp))]
+    if name != "Bash": return []
+    out, loops, open_loops = [], {}, []
     for seg in shell_segments(strip_heredocs(str(inp.get("command", "")))):
+        seg = seg[SHELL_KEYWORD.match(seg).end():]
+        f = FOR_LOOP.match(seg)
+        if f:
+            loops[f.group(1)] = loop_words(f.group(2)); open_loops.append(f.group(1)); continue
+        if re.match(r"done\b", seg.strip()):
+            if open_loops: loops.pop(open_loops.pop(), None)
+            continue
+        a = re.match(r"\s*([A-Za-z_]\w*)=", seg)
+        if a: loops.pop(a.group(1), None)
         seg = seg[ENV_PREFIX.match(seg).end():]
-        m = re.search(r"/pulls/(\d+)/merge", seg)
-        if re.match(r"gh\s+api\b", seg) and re.search(r"(?:-X\s*|--method[\s=]+)PUT\b", seg) and m: return True, int(m.group(1))
+        r = repo_of("Bash", {"command": seg})
+        if re.search(r"repos/(?:[^\s/]*\$|[^\s/]+/[^\s/]*\$)|(?:-R|--repo)[\s=]+\S*\$", seg): r = "$"  # a variable repo: one unchecked entry
+        m = re.search(r"/pulls/" + PR_REF + r"/merge", seg)
+        if re.match(r"gh\s+api\b", seg) and re.search(r"(?:-X\s*|--method[\s=]+)PUT\b", seg) and m:
+            out += [(None, None)] if r and "$" in r else [(n, r) for n in pr_numbers(m.group(1), loops)]; continue
         m = re.match(r"gh\s+pr\s+merge\b(.*)", seg, re.S)
         if m:
-            for tok in m.group(1).split():
+            try: toks = shlex.split(m.group(1))
+            except ValueError: toks = m.group(1).split()
+            nums, skip = [None], False
+            for tok in toks:
+                if skip: skip = False; continue
+                if tok in VALUE_FLAGS: skip = True; continue
                 if tok.startswith("-"): continue
-                n = re.fullmatch(r"\d+", tok) or re.search(r"/pull/(\d+)", tok)
-                return True, int(n.group(n.lastindex or 0)) if n else None
-            return True, None
-    return False, None
+                u = re.search(r"/pull/" + PR_REF, tok)
+                nums = pr_numbers(u.group(1) if u else tok, loops); break
+            out += [(None, None)] if r and "$" in r else [(n, r) for n in nums]
+    return out
+
+MERGE_OK = re.compile(r'"merged":\s*true|successfully merged|merged pull request', re.I)
+
+def merge_outcomes(entries, name, text, is_error):
+    """Sets outcome on a call's merge entries from its one result. With several entries: gh pr merge's own line ("Merged pull request
+    o/r#<n>", the number before any title) settles the last entry for that PR; a gh api PUT answer ("Pull Request successfully merged",
+    which a GET of the PR never prints) is shared out to the remaining entries only when there is one for each, else they stay failed."""
+    if len(entries) == 1:
+        if MERGE_OK.search(text) or (name.endswith("merge_pull_request") and not is_error and "merged" in text.lower()): entries[0]["outcome"] = "merged"
+        return
+    named = {int(n) for n in re.findall(r"merged pull request\s+(?:[\w.-]+/[\w.-]+)?#(\d+)", text, re.I)}
+    for n in named:
+        last = [e for e in entries if e["pr"] == n][-1:]
+        for e in last: e["outcome"] = "merged"
+    rest = [e for e in entries if e["outcome"] != "merged"]
+    if rest and len(re.findall(r"successfully merged", text, re.I)) >= len(rest):
+        for e in rest: e["outcome"] = "merged"
 
 def minutes(a, b):
     if not a or not b: return None
@@ -332,10 +391,10 @@ def scan_routing(path, agent):
                     asks.append({"asked_at": ts, "answered_at": None, "next_tool_at": None, "wait_min": None, "gap_min": None, "questions": len(qs),
                                  "headers": [redact(str(q.get("header", "")))[:12] for q in qs], "_answered_n": None})
                     ask_by_id[b.get("id")] = asks[-1]
-                is_merge, pr = merge_of(name, inp)
-                if is_merge:
-                    merges.append({"at": ts, "agent": agent, "tool": name, "pr": pr, "repo": repo_of(name, inp), "outcome": "failed", "result_at": None})
-                    merge_by_id[b.get("id")] = merges[-1]
+                found = merges_of(name, inp)
+                if found:
+                    entries = [{"at": ts, "agent": agent, "tool": name, "call": b.get("id"), "pr": pr, "repo": r, "outcome": "failed", "result_at": None} for pr, r in found]
+                    merges += entries; merge_by_id[b.get("id")] = entries
             elif t == "user" and b.get("type") == "tool_result":
                 tid = b.get("tool_use_id"); name, target = pending.get(tid, ("?", ""))
                 text = result_text(b.get("content")); ref = refusal_of(text, bool(b.get("is_error")))
@@ -345,12 +404,12 @@ def scan_routing(path, agent):
                 if name.endswith("grove_create_adjudication") and not ref and not b.get("is_error"): cards.append(tid)
                 a = ask_by_id.get(tid)
                 if a and a["answered_at"] is None: a["answered_at"], a["_answered_n"] = ts, n
-                mg = merge_by_id.get(tid)
-                if mg:
-                    mg["result_at"] = ts
-                    if ref: mg["outcome"] = "refused"
-                    elif re.search(r'"merged":\s*true|successfully merged|merged pull request', text, re.I) or (name.endswith("merge_pull_request") and not b.get("is_error") and "merged" in text.lower()):
-                        mg["outcome"] = "merged"
+                entries = merge_by_id.get(tid)
+                if entries:
+                    for e in entries:
+                        e["result_at"] = ts
+                        if ref: e["outcome"] = "refused"
+                    if not ref: merge_outcomes(entries, name, text, bool(b.get("is_error")))
     for a in asks:
         if a["_answered_n"] is not None:
             a["next_tool_at"] = next((ts for n, ts in tool_uses if n > a["_answered_n"]), None)
@@ -538,7 +597,95 @@ VIAS = ("self", "ask", "github", "pending", "open")
 TAPPED = ("ask", "github", "pending")
 SYSTEM_REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 GO_SENTENCE = re.compile(r"(?:^|\blane [a-z]:\s*)Go:", re.I | re.M)  # close-at-land's Next-step Go, alone on a line or after "lane X:"
-DISPATCH_PROMPT = re.compile(r"^\s*work on [^\n,]+, lane [a-z]\b", re.I)  # session-start references/dispatch.md Step 3
+# session-start references/dispatch.md Step 3: "Work on MBN, lane D: …" and the other-repo form "Work on fairbay/ops for MBN lane H: …"
+# (the comma form alone read every lane H opening as typed: docs/dispatch/DESIGN.md §9 finding 1)
+DISPATCH_PROMPT = re.compile(r"^\s*work on [^\n]*?\blane [a-z][a-z0-9]*\b", re.I)
+LANE_ID = re.compile(r"[a-z][a-z0-9]*")
+DISPATCH_STATES = ("ready", "prompted", "step", "call", "waiting", "running")
+DISPATCH_LISTS = ("steps", "calls", "waiting", "running", "cleanup")
+def parse_utc(s):
+    """An ISO-8601 UTC time with a trailing Z (2026-11-05T00:55Z or with seconds), or None."""
+    if not isinstance(s, str): return None
+    for fmt in ("%Y-%m-%dT%H:%MZ", "%Y-%m-%dT%H:%M:%SZ"):
+        try: return datetime.datetime.strptime(s, fmt).replace(tzinfo=datetime.timezone.utc)
+        except ValueError: pass
+    return None
+
+def text_hash(text):
+    """Eight hex characters of the text with white space collapsed: a printed prompt and a session's opening message
+    hash the same when he pasted it unchanged (docs/dispatch/DESIGN.md §4.3)."""
+    return hashlib.sha256(" ".join(text.split()).encode()).hexdigest()[:8]
+
+def parse_dispatch(path, lanes):
+    """The dispatch block of a dispatch record (session-start references/dispatch.md Step 4): what the run printed, checked
+    for shape so the next run can reprint a prompt verbatim and tell a prompted lane from a ready one. Refuses (RecordError)
+    rather than storing a block the next run cannot read."""
+    try:
+        with open(path) as fh: d = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise RecordError(f"--dispatch {path}: {e}")
+    if not isinstance(d, dict): raise RecordError("--dispatch: want a JSON object")
+    extra = sorted(set(d) - {"lanes", "prompts", *DISPATCH_LISTS})
+    if extra: raise RecordError(f"--dispatch: unknown keys {extra}")
+    if not lanes: raise RecordError("--dispatch needs --lanes <the declared lanes, comma-separated> (landing.yaml), so the block names each once")
+    states = d.get("lanes")
+    if not isinstance(states, dict) or not states: raise RecordError("--dispatch: lanes must be an object lane -> state")
+    for lane, state in states.items():
+        if not LANE_ID.fullmatch(lane): raise RecordError(f"--dispatch: {lane!r} is not a lane id (lower case: a, a2)")
+        if state not in DISPATCH_STATES: raise RecordError(f"--dispatch: lane {lane} state {state!r} is not one of {', '.join(DISPATCH_STATES)}")
+    want = {x.lower() for x in lanes}
+    if set(states) != want: raise RecordError(f"--dispatch: lanes must name every declared lane once: want {sorted(want)}, got {sorted(states)}")
+    prompts = d.get("prompts", {})
+    if not isinstance(prompts, dict): raise RecordError("--dispatch: prompts must be an object lane -> {text, first, since, offered}")
+    out_prompts = {}
+    for lane, p in prompts.items():
+        if lane not in states or states[lane] not in ("ready", "prompted"):
+            raise RecordError(f"--dispatch: prompts names lane {lane!r}, which is not a ready or prompted lane")
+        if not isinstance(p, dict): raise RecordError(f"--dispatch: prompt for lane {lane} must be an object")
+        text = p.get("text")
+        if not isinstance(text, str) or not text.strip(): raise RecordError(f"--dispatch: prompt for lane {lane} is empty")
+        m = DISPATCH_PROMPT.match(text)
+        if not (m or GO_SENTENCE.search(text)):
+            raise RecordError(f"--dispatch: prompt for lane {lane} is not in the template (Work on …, lane X: …) or a Go sentence")
+        named = re.search(r"\blane ([a-z][a-z0-9]*)\b", text, re.I)
+        if named and named.group(1).lower() != lane:
+            raise RecordError(f"--dispatch: prompt for lane {lane} names lane {named.group(1)}")
+        first, since = p.get("first"), p.get("since", p.get("first"))
+        if parse_utc(first) is None: raise RecordError(f"--dispatch: prompt for lane {lane} needs first as UTC with a Z (2026-11-05T00:55Z)")
+        if parse_utc(since) is None: raise RecordError(f"--dispatch: prompt for lane {lane} needs since as UTC with a Z")
+        if parse_utc(since) > parse_utc(first): raise RecordError(f"--dispatch: prompt for lane {lane} has since after first")
+        offered = p.get("offered", 1)
+        if not isinstance(offered, int) or isinstance(offered, bool) or offered < 1: raise RecordError(f"--dispatch: prompt for lane {lane} needs offered as an integer of 1 or more")
+        out_prompts[lane] = {"text": text, "first": first, "since": since, "offered": offered, "hash": text_hash(text)}
+    for lane, state in states.items():
+        if state in ("ready", "prompted") and lane not in out_prompts:
+            raise RecordError(f"--dispatch: lane {lane} is {state} but prompts carries no prompt for it")
+    out = {"lanes": states, "prompts": out_prompts}
+    # which states a list may name (session-start references/dispatch.md Step 4): a step or call inside a Start entry
+    # names a ready lane; waiting names waiting lanes; running names running and prompted lanes
+    allowed = {"steps": ("step", "ready"), "calls": ("call", "ready"), "waiting": ("waiting",), "running": ("running", "prompted")}
+    for k in DISPATCH_LISTS:
+        v = d.get(k, [])
+        if not isinstance(v, list): raise RecordError(f"--dispatch: {k} must be a list")
+        items = []
+        for x in v:
+            if k == "cleanup":
+                if not isinstance(x, str) or not x.strip(): raise RecordError(f"--dispatch: {k} items are non-empty strings")
+                items.append(x); continue
+            if not isinstance(x, dict) or not isinstance(x.get("text"), str) or not x["text"].strip():
+                raise RecordError(f"--dispatch: {k} items are objects {{lane, text}} with a non-empty text")
+            lane = x.get("lane")
+            if lane is not None and (not isinstance(lane, str) or lane not in states):
+                raise RecordError(f"--dispatch: {k} item names lane {lane!r}, which is not in lanes")
+            if lane is not None and states[lane] not in allowed[k]:
+                raise RecordError(f"--dispatch: {k} item names lane {lane}, whose state is {states[lane]} (want {' or '.join(allowed[k])})")
+            items.append({"lane": lane, "text": x["text"]})
+        out[k] = items
+    listed = {x["lane"] for k in ("waiting", "running") for x in out[k] if x["lane"]}
+    for lane, state in states.items():
+        if state in ("waiting", "running", "prompted") and lane not in listed:
+            raise RecordError(f"--dispatch: lane {lane} is {state} but no waiting or running line names it")
+    return out
 CONTINUED = re.compile(r"^This session is being continued from a previous conversation")
 
 class RecordError(Exception):
@@ -596,14 +743,15 @@ def check_prs(prs, routing, repo, not_merged):
     """The transcript decides what it can: every merge call that did not merge is explained, every PR merged here is named
     self or ask, every PR opened here is named, and no PR named self or ask lacks a merge here."""
     named = {x["pr"]: x for x in prs}
-    errs, merged, unchecked = [], set(), 0
+    errs, unchecked = [], 0
+    merged = {merge_key(m, repo) for m in routing["merge_list"] if m["outcome"] == "merged"} - {None}  # a failed attempt retried to a merge needs no note
     for m in routing["merge_list"]:
         k = merge_key(m, repo)
         if m["outcome"] == "refused": continue
         if k is None:
             unchecked += 1; continue
-        if m["outcome"] == "merged": merged.add(k)
-        elif k not in not_merged and not (k in named and named[k]["via"] in ("self", "ask")):
+        if m["outcome"] == "merged" or k in merged: continue
+        if k not in not_merged and not (k in named and named[k]["via"] in ("self", "ask")):
             errs.append(f"merge call on {k} shows no merge in its result: name it in --prs (self or ask) if it merged, else --not-merged {k}")
     for k in sorted(merged - set(named)): errs.append(f"{k} was merged by this session but is not in --prs (as self or ask)")
     for k in routing.get("prs_opened", []):
@@ -619,7 +767,7 @@ def check_prs(prs, routing, repo, not_merged):
 def interrupts_of(rec, routing):
     """Baylee's interrupts: asks + refusals that were not of a merge call (a refused merge's cost is his tap, counted on its PR) +
     PRs he merged or has yet to merge + cards + a pasted start. A merge under his answer is inside the ask; ruled upkeep costs nothing."""
-    merge_refusals = sum(1 for m in routing["merge_list"] if m["outcome"] == "refused")
+    merge_refusals = len({(m["agent"], m.get("call", m["at"])) for m in routing["merge_list"] if m["outcome"] == "refused"})  # calls, not PRs: a refused loop is one refusal
     taps = sum(1 for x in rec["prs"] if x["via"] in ("github", "pending"))
     return rec["asks"] + rec["refusals"] - merge_refusals + taps + len(rec["cards"]) + (1 if rec["start"] == "pasted" else 0)
 
@@ -653,9 +801,13 @@ def build_record(a, prefix, scratch):
            "prs": [{"pr": x["pr"], "via": x["via"], "tapped": x["via"] in TAPPED} for x in prs],
            "start": "none" if a.surface == "routine" else start_of(opening), "opening_chars": len(opening or ""),  # a routine's prompt is not his
            "calls_logged": ids(a.calls), "calls_shown": ids(a.shown), "cards": cards, "tasks_for_baylee": ids(a.tasks),
-           "cache_read_m": report["cache_read_m"] or None, "source": "transcript"}
+           "cache_read_m": report["cache_read_m"] or None, "source": "transcript",
+           "opening_hash": text_hash(opening) if opening else None}  # matches a dispatch record's prompt hash when he pasted it unchanged
     if unchecked: rec["unchecked_merges"] = unchecked
     if a.lane: rec["lane"] = a.lane.lower()
+    if a.dispatch:
+        if a.lane: raise RecordError("a dispatch record takes no --lane (its tag is dispatch)")
+        rec["dispatch"] = parse_dispatch(a.dispatch, ids(a.lanes))
     rec["interrupts"] = interrupts_of(rec, r)
     return rec
 
@@ -681,6 +833,8 @@ def record_main(argv):
     p.add_argument("--not-merged", default="", help="PRs whose merge call shows no merge and did not merge")
     p.add_argument("--asks-prose", type=int, default=0, help="questions put to Baylee in prose (the transcript counts the ask tools only)")
     for f in ("calls", "shown", "cards", "tasks"): p.add_argument("--" + f, default="")
+    p.add_argument("--dispatch", help="a dispatch run: the JSON file of what it printed (session-start references/dispatch.md Step 4)")
+    p.add_argument("--lanes", default="", help="with --dispatch: the declared lanes (landing.yaml), comma-separated; the block must name each once")
     a = p.parse_args(argv)
     try:
         prefix = newest_prefix() if a.prefix == "auto" else a.prefix
@@ -692,6 +846,49 @@ def record_main(argv):
         print(f"session_report.py --record: {e}", file=sys.stderr)
         return 2
     print(json.dumps(rec, separators=(",", ":")))
+    return 0
+
+# ---------------------------------------------------------------- the read-back (--check-record <decision id>)
+# Ledger 6e5aa00e: records logged with a null or prose context are skipped by both weekly reads (4 of 30 in the
+# week to 2026-11-03, one hiding 142.5M from S10). The archive's read-back runs this instead of checking by eye.
+
+def check_record(decision, lane=None):
+    """Problems that keep the weekly reads from counting this session-record decision (empty list = it counts)."""
+    import ops_read
+    tags = ops_read.tags_of(decision)
+    problems = []
+    if "session-record" not in tags:
+        problems.append("no session-record tag")
+    else:
+        recs, bad = ops_read.parse_records([decision])
+        problems += [u["reason"] for u in bad]
+        if not recs and not bad:
+            problems.append("superseded: the newer record is the one that counts")
+    if lane and f"lane-{str(lane).lower()}" not in tags:
+        problems.append(f"no lane-{str(lane).lower()} tag")
+    return problems
+
+def check_main(argv):
+    """--check-record <decision id> [--lane x]: exit 0 when the weekly reads count the record, 2 with each problem when not."""
+    import argparse
+    p = argparse.ArgumentParser(prog="session_report.py --check-record")
+    p.add_argument("--check-record", required=True, metavar="DECISION_ID")
+    p.add_argument("--lane")
+    a = p.parse_args(argv)
+    from ops_gather import load_grove
+    try:
+        d = load_grove().get("decision", a.check_record)
+    except Exception as e:  # noqa: BLE001 — a failed read is a failed check, never a pass
+        print(f"session_report.py --check-record: cannot read {a.check_record}: {e}", file=sys.stderr)
+        return 2
+    problems = check_record(d, a.lane)
+    for x in problems:
+        print(f"session_report.py --check-record {a.check_record}: {x}", file=sys.stderr)
+    if problems:
+        if not all(x.startswith("superseded") for x in problems):
+            print("log it again with supersedes=<this id> and the record JSON as context", file=sys.stderr)
+        return 2
+    print(f"record {a.check_record}: counted")
     return 0
 
 USAGE = __doc__.split("\n")[2]
@@ -712,5 +909,6 @@ def parse_args(argv, opts=None, usage=USAGE):
 
 if __name__ == "__main__":
     if "--record" in sys.argv[1:]: sys.exit(record_main(sys.argv[1:]))
+    if any(a == "--check-record" or a.startswith("--check-record=") for a in sys.argv[1:]): sys.exit(check_main(sys.argv[1:]))
     (prefix, out_json, out_md), routing, _ = parse_args(sys.argv[1:])
     main(prefix, out_json, out_md, routing)

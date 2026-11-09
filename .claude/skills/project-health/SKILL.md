@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-11-06-02"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -193,6 +193,43 @@ unit model makes those lists projections.
 - Confirmed % counts distinct listings.
 - Only `plan_document` counts as a handbook.
 
+## Operational health (ten lines, pass or fail)
+
+"Operationally healthy" is these ten lines and nothing else (Grove f21b91ed step 2,
+2026-11-06; Baylee's frame: "address the impactful known issues with the site and get
+it operationally healthy"). Every run scores all ten from the gather above, prints
+them as a table (line, pass/fail, the figure), and writes the score as the **first
+line** of the run's Grove decision, `health: N/10 (red: <line names, comma-separated,
+no parentheses>)` or `health: 10/10`, so the weekly ops read can print it
+(`ops_read.py`, "Operational health"; it reads the first line that starts `health:`).
+A line that cannot be measured is a fail that says why, never a pass. A scheduled run
+GitHub skipped or delayed past the window is a fail (the window gives about eight
+hours of slack past a daily schedule). Every figure is observed from the source named;
+nothing is inferred from a clock time.
+
+| # | Line | Pass when (source) |
+|---|---|---|
+| 1 | Publish gate green | Q7: `holds` 0 and `applied_unpublished` 0; the last `publish.yml` run succeeded (`actions/workflows/publish.yml/runs?per_page=1`) |
+| 2 | Live site current | `exported_at` in `https://www.medicaidrewards.com/data/manifest.json` is later than Q7's `last_published` (a publish run always rebuilds the export; a code build need not); the latest production deployment is READY (`list_deployments`) |
+| 3 | Smoke green | the last scheduled `smoke.yml` run (`…/runs?event=schedule&per_page=1`) succeeded and started within the last 26 hours (it runs daily at 11:17 UTC) |
+| 4 | Backup green | the last scheduled `backup.yml` run (same query) succeeded and started within the last 26 hours |
+| 5 | Feedback triage clean | `feedback` has no row with status `new`: Q7's `feedback_untriaged` (member rows) is 0 **and** the smoke run's own rows (`page_path` `/__smoke` or `issue_type` `smoke_test`) with status `new` are 0; the figure names both counts. The smoke rows count on purpose: they are what buried the queue (f21b91ed; the fix is the suite clearing its rows, 867688fe) |
+| 6 | data-draft-r drafting unattended | the newest decision tagged `session-record` and `data-draft-r` is at most 7 days old and the PR its `prs` names exists on GitHub (`pulls/<n>`: open, or closed after its batch was applied). A routine stopped at a precondition leaves no record, so a week of stops reads red, which is right; the record cannot tell a scheduled firing from Baylee's Run now, so neither is claimed |
+| 7 | Source re-check cadence running | a scheduled run of `scripts/fingerprint-sources.py` exists (task 323b4415 names the workflow when built) and its last run succeeded within its schedule plus 26 hours; until one exists, fail. Q5's `checked_120d_pct` and `never_checked` are the figures, not the pass ("Last checked" rule e182335f: only a confirmed check moves the date) |
+| 8 | Admin guide fresh | `select status, start_time from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname = 'guide-daily-rebuild' order by start_time desc limit 1` is `succeeded` within the last 26 hours, **and** the guide's Vercel project (`medicaid-benefits-navigator-g9t4`) has a READY production deployment created within 10 minutes after that `start_time` (`list_deployments` with `target=production`; the hook POST is what creates it, and a failed POST still reads succeeded in cron). Read `cron.job_run_details` only, never `net.http_request_queue` |
+| 9 | Dormancy notice wired | the site reads a check-run record and shows the approved notice (card 21daad5c) when none is recent; until the record exists (line 7, task 323b4415), fail |
+| 10 | Security advisors clean | `get_advisors(security)` returns no ERROR and no WARN |
+
+**Reds first.** A red line is the only lane H and lane E work until it is green
+(f21b91ed step 2; its step 5, the four-week process freeze on rule and skill work,
+exempts the reds). Each red is one open Grove task tagged `health-red`, its lane
+(`lane-e`, `lane-h`, or the lane that owns the fix) and the run's
+`health-check-YYYY-MM-DD`, filed or updated at the run, outside the five-task cap
+below, and never a duplicate (search `health-red` first). A line whose fix waits on
+another line says so in its task (line 9 waits on line 7). The checklist changes only
+by a ruling; a line is never dropped because it stays red. The first score and its
+figures are in the Grove decision tagged `project-health` of 2026-11-06, not here.
+
 ## Report
 
 Lead with the answer: what is red, what moved since the baseline, and launch
@@ -230,7 +267,8 @@ Each finding gives the metric, what members see because of it, its scope
   - Anything smaller goes in the decision.
 - **One decision per run.**
   - The text starts `Health check YYYY-MM-DD:` and holds every metric's value and
-    the watch-list state codes; it is the next run's baseline.
+    the watch-list state codes; it is the next run's baseline. Its first line is
+    the operational-health score, `health: N/10 (red: …)`.
   - Under 2,000 characters.
   - Tags `project-health` and `health-check-YYYY-MM-DD`.
 - **Two tracks:** a finding that needs Baylee in the real world (an account, a
@@ -260,6 +298,8 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
      say S4's window may be truncated for that repo.
    - `cards.json`: `grove_list_tasks(tag="wrong_question", compact=false,
      limit=100)` (adjudication listings carry no tags; the task read does).
+   - `gaps.json`: `grove_list_tasks(tag="guide-gap", status="open",
+     compact=false, limit=100)`, the MBN administrator guide's gap tasks.
    - `activity.json`: `{repo, date, kind, ref, message}` rows from
      `gh api "repos/fairbay/<repo>/commits?since=<ISO>&per_page=100"` (commits)
      and `grove_events` in the window (Grove writes, repo from the entity's
@@ -276,15 +316,17 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
      session; name the private repos that were not read.
 2. **Run** `python3 .claude/skills/chat-archive/scripts/ops_read.py --decisions
    decisions.json --cards cards.json --activity activity.json --runs runs.json
-   --minutes minutes.json
+   --minutes minutes.json --gaps gaps.json
    --policy fairbay/ops=<path> --policy fairbay/medicaid-benefits-navigator=<path>`
    (`--json` for the actions). Thresholds come from each policy; a "not judged"
    line is reported as is, never filled with a default.
 3. **File what it lists**, searching each action's `dedup_key` first
    (`grove_list_tasks(q=<dedup_key>)`; never a duplicate) and filing its body
    unchanged, so the `dedup:` line it ends with is in the notes next week: one Grove task per
-   S1/S2 breach (list `ops`, tags `decision-routing`, `ops-read-YYYY-MM-DD`;
+   S1 breach (list `ops`, tags `decision-routing`, `ops-read-YYYY-MM-DD`;
    after one design round on an edge, the edge goes to Baylee as a ruling);
+   an S2 breach is listed, not filed, while the policy marks it `report_only`
+   (the refusal already fell back to the tap; the script files no action for it);
    one adjudication card per S4/S5 breach with the script's recommendation and
    stakes; each S5 postmortem as one line in the repo's project `next_actions`.
    "Activity with no record" is reported, never read as a quiet week.
@@ -295,7 +337,12 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    `max_per_day` until Baylee names one: the line prints the observed figures and
    "not judged", and the first real-week figures are what he is shown when he is
    asked once for the flag (a number offered to him gets its consequence in
-   numbers first). Record what each line said in the run's report.
+   numbers first). Record what each line said in the run's report. The
+   **Guide gaps** line (report-only) counts the open `guide-gap` tasks and the
+   guide pages they name (notes lines `page: <section>/<slug or name>`, else
+   a guide path with its `docs/admin-guide/…` prefix or `.md`); guide-r takes
+   each as a work order, so the line files nothing. "At least" means
+   gaps.json hit the 100-row cap.
 4. **Print** the script's section verbatim under the health report, including
    the interactions and the last sync.yml and rules.yml conclusions.
 5. **Process gate read** (`fairbay/ops` docs/process-governance/DESIGN.md), every

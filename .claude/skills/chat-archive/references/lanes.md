@@ -1,6 +1,6 @@
 # Lanes — one baton per lane
 
-Only for a repo whose `.claude/landing.yaml` declares `lanes:` (MBN: `[a, b, c, d, e, f, h]`).
+Only for a repo whose `.claude/landing.yaml` declares `lanes:` (MBN: `[a, b, c, d, e, h]`; F merged into A on 2026-11-06, Grove f21b91ed step 5).
 Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` docs/lanes/DESIGN.md.
 
 ## Contents
@@ -8,6 +8,7 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
 - Layout
 - Entry (session-start)
 - Exit (chat-archive Step 9, close-at-land)
+- No archive-only PR
 - After ready
 - Limits and residuals
 
@@ -22,18 +23,25 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
   that lane last measured them (MBN: launch readiness, wording) and a date. Detail (guard,
   detector, session) goes in the lane file's own `progress:`.
 - The Grove project row's lane line is the live cross-surface view (MBN PLAN.md "Tracks and lanes").
+  An archive rewrites only its own line: `grove.py lines <project id> --replace "Lane <X>, " <file>`
+  (close-at-land step 4; re-read, write and compare in one call; the line must exist).
   When it and the lane file disagree, the newer one wins (session-start Phase 3's timestamp rule).
 - Lanes run one session at a time. Work found for another lane is a Grove task tagged `lane-<x>`,
   never a line in that lane's file.
 - **Dispatch** ("dispatch MBN" as a first message, session-start `references/dispatch.md`) reads
-  these files, the row and the PRs in one turn and prints each lane's next prompt; it writes no baton.
+  these files, the row, the PRs and the last dispatch's record in one turn and prints the lanes in
+  five groups by what Baylee does with them (Start with its prompt, Your step, Your call, Waiting
+  not on you, Running); it writes no baton. A lane's later `next:` items are read too: one that
+  does not depend on what the first item waits on is the lane's ready item (the escape).
 
 ## Entry (session-start)
 
 1. **The lane is named in the first message** ("lane A", "lane A2"). The SessionStart hook shows
    HANDOFF.yaml's `progress` and a lane index (each lane's first `next:` item). The lane gate
    (`fairbay-managed:lane-gate`, a UserPromptSubmit hook: `session_handoff.py lane`) then injects
-   that lane's `meta`, `next` and `carried_forward`, once per session.
+   that lane's `meta`, `next` and `carried_forward`, once per session. When an open PR's head
+   carries a newer copy of that baton (a lane working on a long-lived draft writes it only there),
+   the gate injects the head's copy and says so in one line; write the next baton on top of it.
 2. **No baton injected** (a multi-repo or chat session, no lane named, the hook did not run): read
    `handoffs/lane-<x>.yaml` yourself for the lane the work belongs to. If the lane is unclear, the
    index and the project row's lane lines settle it; ask only if they do not.
@@ -55,8 +63,11 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
    lane's own file or line since the merge base: another session of the lane landed. Read main's
    copy and write the baton on top of it; a re-run without that changes nothing. A branch cut
    before the split takes main's HANDOFF.yaml, and the script prints the branch's old `next:`:
-   carry this lane's items into `write --lane <x>`, the rest into Grove tasks. Any other
-   conflicted path is code, resolved as code. Never resolve a handoff file by hand.
+   carry this lane's items into `write --lane <x>`, the rest into Grove tasks. A root
+   `package.json` whose only conflict is its `"version"` line (every code PR bumps it) gets
+   main's version plus one patch, with both sides' other changes kept (MBN 0464f027); any other
+   line conflicting there leaves it as code. Any other conflicted path is code, resolved as
+   code. Never resolve a handoff file by hand.
 2. **Write only this lane's baton:**
    `python3 .claude/skills/session-start/scripts/session_handoff.py write --lane <x>`, the body as
    JSON on stdin. A body's `progress_line` replaces only `  <x>:` in HANDOFF.yaml. A plain `write`
@@ -72,7 +83,28 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
    names a declared lane; the change touches at most one lane's baton against `origin/main`.
 5. **The Next-step line names the lane:** `lane A: ` followed by the Go sentence verbatim (step 8).
    The lane word is what loads the baton next time; the Go sentence itself is Baylee's wording and
-   is not changed.
+   is not changed. A data lane's START HERE item and row line end with the same sentence as
+   `Opening line: "lane A: Go: …"`, where dispatch reads it (close-at-land step 8; policy-check (f)).
+6. **START HERE names its rank.** In a repo with `docs/ISSUES.md` (MBN), the baton's first `next:`
+   item and the row's lane line name the rank it works ("rank 23") from the list's "How lanes pull
+   from it" row: the highest rank there that waits on nothing
+   (`python3 .claude/skills/session-start/scripts/issues_next.py docs/ISSUES.md --lane <x>`), or
+   another rank with the reason in a few words ("rank 11 (m1360): the free part of a waiting rank").
+   A lane with no row in the table (lane H) names none. The session that finishes a rank re-runs
+   its measure and strikes or updates its line in the same PR (ISSUES.md, "How lanes pull from it";
+   Grove f21b91ed step 1; dispatch reads the list's pick beside the baton's into its record, read 7).
+
+## No archive-only PR
+
+Grove f21b91ed step 5 (2026-11-06; 9 of MBN's 34 merges of 2026-11-04 to 06 were an
+archive and nothing else, each a close-at-land and a merge for a baton). The baton rides the lane's work PR (Exit 1–3).
+A session with no work PR left to carry it (its work merged earlier in the session, or it
+made none) opens no PR for the baton: its archive rewrites only the lane's row line
+(`grove.py lines <project id> --replace "Lane <X>, " <file>`), leading with "Last done" and
+ending with START HERE, and logs the session record. The lane file stays as the last work
+PR left it; the row line is newer and wins at entry (Layout; Entry 3 shows the two side by
+side), and the lane's next work PR writes the baton from it. A row line names its lane file "superseded by this line" while
+the two differ.
 
 ## After ready
 

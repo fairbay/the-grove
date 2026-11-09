@@ -5,7 +5,7 @@ description: >
   "what's in fairbay/X", or any task leaving files for a fairbay/* repo.
   Not for host setup (→ ship-it) or prototyping (→ build).
 metadata:
-  version: "2026-10-26-02"
+  version: "2026-11-06-01"
 ---
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
@@ -172,7 +172,7 @@ For deleting **files** (not repos), push with `sha: null` in the tree entry — 
 
 The full push-time discipline (test → present → push → diff URL → optional verify) lives in `references/push-protocol.md` — other skills load that file when they push inside their workflows. When the user calls git-ops directly, these still apply:
 
-- **Land by PR from every surface** (ruling 3fa9a61e): `claude/*` branch, draft PR with an owner task, ready only via close-at-land (`references/push-protocol.md` §5). A handoff-only archive is a PR too.
+- **Land by PR from every surface** (ruling 3fa9a61e): `claude/*` branch, draft PR with an owner task, ready only via close-at-land (`references/push-protocol.md` §5). A handoff alone gets no PR: it rides the work PR, else the Grove row carries it.
 - **Size gate before any PR goes ready:** no regenerable output, records one per line, a file over ~2,000 added lines or a binary over 1 MB only with a stated reason (chat-archive `references/close-at-land.md` step 5).
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit.
 - **Regenerate `package-lock.json`** (`npm install`) if `dependencies` / `devDependencies` changed, before committing.

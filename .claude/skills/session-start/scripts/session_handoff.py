@@ -44,6 +44,12 @@ Commands:
              (handoffs/lane-<x>.yaml: meta, next, carried_forward) as additionalContext,
              once per session per lane (state: <git dir>/fairbay-lanes.json). Otherwise
              it prints nothing. Design: fairbay/ops docs/lanes/DESIGN.md.
+             It also reads the baton at the heads of the repo's open PRs (at most 6,
+             newest updated first, within 5 s): a copy whose meta.lane is the lane and
+             whose meta.generated is newer than the working tree's is injected instead,
+             with a line naming the PR (a lane working on a long-lived draft writes its
+             baton only there; ops 649be4f7). No remote, no gh or a timeout: the
+             working tree's copy, with a one-line note when GitHub was not read.
 
 Lanes (docs/lanes/DESIGN.md): with `lanes:` declared, HANDOFF.yaml holds only `meta`
 and `progress` (one key per lane, a blank line between keys) and `inject` adds a lane
@@ -62,12 +68,17 @@ import os
 import re
 import subprocess
 import sys
+import time
+import urllib.parse
 from pathlib import Path
 
 MAX_CONTEXT_CHARS = 10000  # Claude Code's additionalContext cap (hooks reference)
 RESERVE = 300              # room for the closing line and JSON overhead drift
 GIT_TIMEOUT = 5
 PR_STATE_TIMEOUT = 20
+HEAD_BUDGET = 5.0         # the lane gate's GitHub reads; the hook entry's timeout is 10 s
+HEAD_CALL_TIMEOUT = 3.0
+HEAD_PRS = 6              # open PRs read for a newer lane baton, newest updated first
 PR_TABLE_ROWS = 15
 NOTE_RESERVE = "Note: " + "n" * 294  # S8's allowance for entry notes (measure only)
 PR_STATE = Path(".claude/skills/session-start/scripts/pr_state.py")
@@ -239,6 +250,100 @@ def _read_lane(root: Path, x: str):
     return (_lane_rel(x), p.read_text(encoding="utf-8", errors="replace")) if p.is_file() else None
 
 
+def _meta_field(text: str, key: str) -> str:
+    """A scalar under the baton's top-level `meta:`, quotes stripped, or ''."""
+    sec = _sections(text).get("meta", "")
+    m = re.search(rf"^\s+{key}:\s*['\"]?([^'\"\n]*)", sec, re.M)
+    return re.sub(r"\s+#.*$", "", m.group(1)).strip() if m else ""
+
+
+_EPOCH = _dt.datetime(1970, 1, 1, tzinfo=_dt.timezone.utc)
+
+
+def _ts(s: str):
+    """An ISO timestamp as an aware datetime (naive = UTC), or None."""
+    try:
+        d = _dt.datetime.fromisoformat(s.strip().replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=_dt.timezone.utc)
+
+
+def _repo_full(root: Path) -> str | None:
+    """owner/repo from remote.origin.url, or None (no remote: nothing to ask GitHub)."""
+    url = _run(["git", "config", "--get", "remote.origin.url"], cwd=str(root)).rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+    parts = [p for p in url.replace(":", "/").split("/") if p]
+    return "/".join(parts[-2:]) if len(parts) >= 2 else None
+
+
+TIMED_OUT = object()  # _gh_get's answer when the call ran out of time (None: absent or failed)
+
+
+def _gh_get(path: str, raw: bool = False, timeout: float = HEAD_CALL_TIMEOUT):
+    """One `gh api` GET: parsed JSON, the raw body (raw=True), None on any failure,
+    TIMED_OUT when it ran out of time."""
+    cmd = ["gh", "api", path] + (["-H", "Accept: application/vnd.github.raw"] if raw else [])
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=max(0.5, timeout))
+    except subprocess.TimeoutExpired:
+        return TIMED_OUT
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    if raw:
+        return out.stdout
+    try:
+        return json.loads(out.stdout or "null")
+    except ValueError:
+        return None
+
+
+def _head_baton(root: Path, x: str, local_text: str | None):
+    """((name, text, note) or None, note or None). An open PR's head copy of lane x's baton,
+    when its meta.lane is x and its meta.generated is newer than the local copy's. Stops at
+    HEAD_BUDGET seconds so the 10 s hook timeout never drops the local baton. A local copy
+    whose meta.generated does not parse is never overridden."""
+    t0 = time.monotonic()
+    left = lambda: HEAD_BUDGET - (time.monotonic() - t0)
+    repo = _repo_full(root)
+    if not repo:
+        return None, None
+    local_gen = _meta_field(local_text, "generated") if local_text else ""
+    if local_text and not _ts(local_gen):
+        return None, "Open PRs not checked for a newer lane baton: the working tree's copy has no readable meta.generated."
+    prs = _gh_get(f"/repos/{repo}/pulls?state=open&sort=updated&direction=desc&per_page={HEAD_PRS}",
+                  timeout=min(HEAD_CALL_TIMEOUT, left()))
+    if not isinstance(prs, list):
+        return None, "Open PRs not checked for a newer lane baton (GitHub unreachable)."
+    best, partial = None, False
+    for pr in prs[:HEAD_PRS]:
+        if left() <= 0.5:
+            partial = True
+            break
+        head = (pr.get("head") or {}) if isinstance(pr, dict) else {}
+        ref, num = head.get("ref"), pr.get("number") if isinstance(pr, dict) else None
+        if not isinstance(ref, str) or not ref or (head.get("repo") or {}).get("full_name") != repo:
+            continue  # a fork's head (or a deleted fork's) is not ours to read
+        text = _gh_get(f"/repos/{repo}/contents/{_lane_rel(x)}?ref={urllib.parse.quote(ref, safe='/')}",
+                       raw=True, timeout=min(HEAD_CALL_TIMEOUT, left()))
+        if text is TIMED_OUT:
+            partial = True
+            continue
+        if not isinstance(text, str) or _meta_field(text, "lane").lower() != x:
+            continue
+        gen = _meta_field(text, "generated")
+        if _ts(gen) and _ts(gen) > max(_ts(local_gen) or _EPOCH, _ts(best[3]) if best else _EPOCH):
+            kind = "draft " if pr.get("draft") else ""
+            note = (f"Read from open {kind}PR #{num}'s head ({ref}; generated {gen}): the working "
+                    f"tree's copy is older (generated {local_gen or 'unknown'}). Write this lane's "
+                    f"next baton on top of the PR head's copy.")
+            best = (f"{_lane_rel(x)} @ #{num}", text, note, gen)
+    return best, ("Open PRs only partly checked for a newer lane baton (time budget)." if partial else None)
+
+
 def _first_next(text: str) -> str:
     """The first `next:` item of a baton, on one line, cut at INDEX_ITEM_CHARS. Read from
     the YAML text by section (no PyYAML needed), else from the JSON form `write` emits."""
@@ -332,18 +437,60 @@ def _is_envelope(root: Path, prompt: str) -> bool:
         return prompt.lstrip().startswith("<")
 
 
-def _lane_stats(root: Path, x: str):
-    """(payload text, stats) for one lane's baton, as the lane gate injects it."""
+def _head_cache(root: Path, x: str):
+    """Where the lane gate keeps a PR head's baton for compact/resume (beside the state file)."""
+    p = _state_path(root)
+    return p.with_name(f"fairbay-lane-{x}-head.json") if p else None
+
+
+def _cached_head(root: Path, x: str, session_id=None):
+    """(name, text) of the head copy this session's gate chose, while it is still newer
+    than the working tree's copy; else None."""
+    p = _head_cache(root, x)
+    try:
+        obj = json.loads(p.read_text(encoding="utf-8")) if p and p.is_file() else None
+        if not obj or str(obj.get("session")) != str(session_id or ""):
+            return None
+        local = _read_lane(root, x)
+        local_ts = _ts(_meta_field(local[1], "generated")) if local else None
+        head_ts = _ts(obj.get("generated", ""))
+        if local and (not head_ts or not local_ts or local_ts >= head_ts):
+            return None
+        return obj["name"], obj["text"]
+    except Exception:
+        return None
+
+
+def _lane_stats(root: Path, x: str, fetch: bool = False, session_id=None):
+    """(payload text, stats) for one lane's baton, as the lane gate injects it. fetch=True
+    (the gate only) also reads open PR heads for a newer copy (_head_baton); any failure
+    there keeps the working tree's copy."""
     limit = MAX_CONTEXT_CHARS - RESERVE
     stats = {"cut": [], "omitted": [], "chars_cut": 0}
     got = _read_lane(root, x)
+    lead = []
+    if fetch:
+        try:
+            head, note = _head_baton(root, x, got[1] if got else None)
+        except Exception as e:
+            head, note = None, f"Open PRs not checked for a newer lane baton ({type(e).__name__})."
+        if head:
+            got, lead = head[:2], [head[2]]
+            try:
+                cache = _head_cache(root, x)
+                cache and cache.write_text(json.dumps({"session": str(session_id or ""), "name": head[0],
+                                                       "text": head[1], "generated": head[3]}), encoding="utf-8")
+            except Exception:
+                pass
+        if note:
+            lead.append(note)
     if not got:
         return (f"Lane {x.upper()} is declared but {_lane_rel(x)} does not exist yet: start from the "
-                f"project row's lane {x.upper()} line."), stats
+                f"project row's lane {x.upper()} line." + "".join(f"\n{n}" for n in lead)), stats
     name, text = got
     parts = [f"Lane {x.upper()} baton ({name}), loaded because your message names lane {x.upper()}. "
              f"Read back its `next:` items (and `carried_forward:`) before starting work; show the "
-             f"project row's lane {x.upper()} line beside it."]
+             f"project row's lane {x.upper()} line beside it."] + lead
     secs = _baton_sections(text)
     for k in INJECTED_KEYS:
         if k not in secs:
@@ -382,7 +529,7 @@ def cmd_lane() -> int:
         new = [x for x in named if x not in seen]
         if not new:
             return 0
-        text, _ = _lane_stats(root, new[0])
+        text, _ = _lane_stats(root, new[0], fetch=True, session_id=sid)
         if len(new) > 1:
             text += (f"\n\nAlso named: {', '.join('lane ' + x.upper() for x in new[1:])}; "
                      f"read {', '.join(_lane_rel(x) for x in new[1:])} if this session works there.")
@@ -539,7 +686,8 @@ def _lanes_ctx(root: Path, session_id=None):
     if not lanes:
         return None
     seen = _lane_state(root).get(str(session_id or ""), []) if session_id else []
-    loaded = [(x, got[1]) for x in seen if x in lanes for got in [_read_lane(root, x)] if got]
+    loaded = [(x, got[1]) for x in seen if x in lanes
+              for got in [_cached_head(root, x, session_id) or _read_lane(root, x)] if got]
     return {"index": _lane_index(root, lanes), "loaded": loaded}
 
 
@@ -830,6 +978,11 @@ def cmd_write(lane: str | None = None) -> int:
         body = json.loads(raw) if raw.strip() else {}
     except Exception:
         body = {}
+    if not body:
+        # ledger ba7bc323 (seen-2, 2026-11-05): `write --help` with nothing on stdin rewrote ops HANDOFF.yaml to its meta
+        sys.stderr.write("refused: write takes the handoff body as JSON on stdin; nothing (or no JSON) was given, "
+                         "and an empty body would rewrite the baton to nothing.\n")
+        return 2
 
     root = _repo_root()
     lanes = _lanes(root)
@@ -884,6 +1037,9 @@ def cmd_write(lane: str | None = None) -> int:
 
 def main(argv: list[str]) -> int:
     cmd = argv[1] if len(argv) > 1 else ""
+    if "-h" in argv[1:] or "--help" in argv[1:]:
+        sys.stdout.write((__doc__ or "").strip() + "\n")  # ledger ba7bc323: a --help must never run the command
+        return 0
     if cmd == "inject":
         return cmd_inject()
     if cmd == "write":

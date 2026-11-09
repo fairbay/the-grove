@@ -29,6 +29,7 @@ The gate block (first 40 lines of the doc):
           records, PRs, batches — with today's figure and its source>
   Backtest: <N ≥ 1> past instances read; <what the change would have done to them>
   Defects: <at least one citation: a Grove id, a PR #, a record date>
+  Review route: <where the review runs and the bundle's size, on this one line; required once the doc passes 14,000 bytes (146d9cfb)>
 
 This is a shape check: it proves the lines exist and carry a number of the right kind,
 not that the number is the one the change moves. The reviewer reads the line.
@@ -44,7 +45,8 @@ from datetime import date, datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 HEAD_LINES = 40
-FIELD = re.compile(r"^[\s*_`]*(Gate|Metric|Backtest|Defects)[\s*_`]*:[\s*_`]*(.*?)\s*$")
+FIELD = re.compile(r"^[\s*_`]*(Gate|Metric|Backtest|Defects|Review route)[\s*_`]*:[\s*_`]*(.*?)\s*$")
+REVIEW_ROUTE_BYTES = 14_000   # about 20 KB once base64-wrapped: the Supabase connector's cap in chat (146d9cfb)
 CITATION = re.compile(r"\b[0-9a-f]{8}\b|#\d+|\b20\d\d-\d\d-\d\d\b")
 INTEGER = re.compile(r"\d[\d,]*")
 METRIC_NAMES = ("touch", "share", "byte", "line", "token", "minute", "dollar", "$", "tap", "card",
@@ -103,6 +105,11 @@ def check_doc(text, require_gate=True):
         misses.append("Defects: line missing")
     elif not CITATION.search(defects):
         misses.append("Defects: no citation (a Grove id, a PR #, or a date)")
+    if len(text.encode("utf-8")) > REVIEW_ROUTE_BYTES and not (fields.get("Review route") or "").strip():
+        misses.append(f"Review route: line missing from the first {HEAD_LINES} lines, value on the same line "
+                      f"(the doc passes {REVIEW_ROUTE_BYTES:,} bytes, too big for the "
+                      "doorway through the chat connector: name the route at round 0 — a Code session's "
+                      "doorway call, Baylee's manual channel, or a sub-agent)")
     return misses
 
 

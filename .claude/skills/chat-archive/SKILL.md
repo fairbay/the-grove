@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-10-28-02"
+  version: "2026-11-08-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -42,7 +42,7 @@ References used by this skill (one hop):
 **If you are about to mark a PR ready, stop.** Run
 `references/close-at-land.md` instead: handoff and Grove markers written for the
 post-merge state, `pre_ready` checks, the `Close-at-land:` commit, ready, then
-one merge tap (none for ruled upkeep, which merges itself; direction that is not a fork queues for the weekly sitting instead: close-at-land "Queue for the sitting"). It is the PR-scoped mini archive: the session goes on afterwards,
+one merge tap (none for ruled upkeep, which merges itself; direction that is not a fork files one card instead: close-at-land "File a card"). It is the PR-scoped mini archive: the session goes on afterwards,
 and this full archive still runs at session end (its Step 9 handoff is then the
 one already in the close-at-land commit). When no other work is ongoing or
 planned, the merge tap offers "Merge and archive", so one answer lands the PR
@@ -103,6 +103,9 @@ If anything is open: resolve it before continuing.
 stopped or lost, run the output-file check in `references/session-record.md`
 ("Agent state": `stat` and the last line of its `tasks/<id>.output`); relaunch a
 stopped one, take a lost notification's report from the file.
+
+**PR subscriptions.** Unsubscribe from every PR that outlives the session
+(`references/session-record.md`, "PR subscriptions").
 
 #### 2a. Doc-drift check
 
@@ -181,9 +184,11 @@ routing decision. See `references/encoding-gate.md` for the routing tree.
   (filed at crystallization). `references/encoding-gate.md`, "The ledger".
 - **Memory edit** → apply now (chat: `memory_user_edits`; Code: add to
   CLAUDE.md or create a Grove task for the next chat session to apply)
-- **Skill update** → push now, or create a Grove task tagged
-  `routine:skill-worker` with contractor-grade notes (file path, exact
-  change, rationale)
+- **Skill update** → push now, or a Grove task tagged `routine:skill-worker`
+  only in work-order shape: one SKILL.md, references/*.md or docs/**/*.md file
+  and a `verify:` line (`references/encoding-gate.md`, "When to defer")
+- **Script, hook, workflow or several files** → an ops-session Grove task
+  (MBN: `lane-h`), never `routine:skill-worker` (ops a193542f)
 - **Grove task** → create now; a batch follow-up (`from-mNNNN`) is refused
   without exactly one class tag (`references/encoding-gate.md`)
 - **Adjudication item** → a source conflict no rule settles, an unreachable/
@@ -213,36 +218,10 @@ add-to-do and grove.
 
 #### 3d. Permissions audit (chat only)
 
-Scan the session for every permission request, tool denial, or capability gap
-that required Baylee's intervention or degraded the response. Three categories:
-
-1. **Tool permission prompts.** Any time Claude requested access to a tool
-   and Baylee had to grant it (location, calendar, reminders, etc.). Note
-   which tool triggered the prompt and whether it could be pre-authorized.
-2. **Missing or disconnected connectors.** Any time Claude suggested
-   connecting an MCP app, searched the registry, or fell back to web search
-   because a connector wasn't available. Note the connector name.
-3. **Settings-gated capabilities.** Any time a response was limited because
-   a setting was off — web search disabled, code execution unavailable,
-   memory/past-chat search toggled off, artifacts disabled, etc.
-
-For each item found, determine the **preventive action** — the one-time
-setup step that would eliminate the permission request in future sessions:
-
-| Gap type | Preventive action |
-|----------|-------------------|
-| Tool permission prompt | Grant persistent access in Claude Settings → Privacy |
-| Missing MCP connector | Connect it in Claude Settings → Connected apps |
-| Setting toggled off | Enable in Claude Settings → Feature controls |
-| Connector auth expired | Re-authenticate in Connected apps |
-| No preventive action possible | Note as inherent (e.g., first-use tool grants on iOS) |
-
-**Output goes in Step 4** under "Permissions & setup gaps." If zero items
-found, skip — don't mention permissions in the summary.
-
-**Encoding:** If a gap recurred across multiple sessions (check
-`conversation_search`), create a memory edit or Grove task to track it.
-One-time grants don't need encoding — the summary is sufficient.
+Scan the session for every permission prompt, missing connector and settings-gated
+capability that needed Baylee or degraded a response, with each one's preventive
+action: `references/permissions-audit.md`. Its output goes in Step 4 under
+"Permissions & setup gaps"; none found, say nothing.
 
 #### 3e. Session record (refusal: no close without it)
 
@@ -251,7 +230,9 @@ Before the summary, log the session-record decision (`references/session-record.
 opened, merged or left for his tap in `--prs`, the rung-3 ids, the random fifth (Step 4, 9b),
 cards and tasks; its JSON line is the `context`. Exit 2: fix the input, never the JSON. **No summary
 or Next-step line until its id is in hand.** If Grove refuses twice, the record
-JSON goes into the handoff's `pending_record:` (Phase 0 logs it) and the archive says so.
+JSON goes into the handoff's `pending_record:` when a work PR is still open to carry it
+(Phase 0 logs it); with none, the archive prints the JSON and says so (Phase 0 then
+counts the transcript or writes a stub).
 
 ### 4. Session summary
 
@@ -310,6 +291,8 @@ Good examples:
 is a data batch (guard verdict `continue`), the line carries the repo's
 `.claude/policy.json` `harness.go` read from the file, `mNNNN` filled with the
 next migration number (`references/session-record.md`, "MBN data-batch close").
+The same sentence ends the lane's baton START HERE and row line as
+`Opening line: "lane A: Go: …"`, where dispatch copies it from (close-at-land step 8).
 Pause, escalate or a library session: the line names that work and no Go.
 
 ### 6. Outstanding action items (only when there are >1)
@@ -389,7 +372,10 @@ Two paths depending on what this session touched:
 - **Build handoff** — session involved code changes in a product repo.
   Write `HANDOFF.yaml` at the repo root (with `lanes:` declared, only this lane's baton: `references/lanes.md`).
   Work in a PR: the handoff rides the close-at-land commit (`references/close-at-land.md`), not a later push, and is not
-  pushed while `session_handoff.py measure` fails (S8). See `references/handoff-schema.md`
+  pushed while `session_handoff.py measure` fails (S8). No work PR left to carry it (the
+  work merged earlier, or there was none): no PR for the handoff alone; the Grove
+  write-back below is the handoff (lanes: the lane's row line; `references/lanes.md`
+  "No archive-only PR"). See `references/handoff-schema.md`
   for the YAML schema, CLAUDE.md maintenance, and the no-blurb convention.
 - **Session-only work** (audits, skill updates, research, architectural
   decisions not tied to a single build) — no separate handoff file. The
@@ -450,8 +436,9 @@ from concluding the artifact doesn't exist because the repo search returned empt
    to stop.
 
 Skip only if the session touched no project (pure Q&A). If Grove MCP fails,
-report the error, retry once, and note the gap in the handoff (with the
-session record as `pending_record:`, Step 3e) — never silently skip.
+report the error, retry once, and note the gap in the handoff when a work PR
+is still open (with the session record as `pending_record:`, Step 3e), else in
+the response — never silently skip.
 
 ### 10. Rename chat (chat only; skip in Code / Routines)
 
@@ -480,7 +467,7 @@ fails, say so explicitly.
 - [ ] Encoding gate cleared — every finding has a routing decision?
 - [ ] Memory edits applied — folds attempted first, count under 12?
 - [ ] `decisions_made:` populated with all Rung 3 decisions from session?
-- [ ] Build handoff pushed to repo root (if code changes)? Session-only → Grove write-back is sufficient.
+- [ ] Build handoff on the work PR (if code changes)? No work PR left, or session-only → Grove write-back is sufficient.
 - [ ] Grove write-back done (9b) — project row refreshed, Rung-3 decisions logged via grove_log_decision?
 - [ ] CLAUDE.md updated (if architecture/stack/structure changed)?
 - [ ] Summary written from verified read-backs, not memory?
@@ -491,6 +478,7 @@ fails, say so explicitly.
 - [ ] Session-record decision logged (3e), random fifth printed with "reverse <id>"?
 - [ ] MBN data session: guard-record appended, guard.mjs verdict in `progress:` and the batch decision, Go in Next-step?
 - [ ] Agent states checked against their output files before naming them?
+- [ ] Subscriptions to PRs that outlive the session removed?
 - [ ] Watchlist items checked (only the ones whose condition fired)? Code: repo copy committed + merge-back line in `next:`?
 - [ ] Standing rules: every ruling this session is in CLAUDE.md "Baylee's standing rules" with a superseding Grove decision?
 - [ ] Chat rename suggested?

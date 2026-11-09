@@ -64,7 +64,7 @@ One commit, all files, on a `claude/*` branch with a draft PR (opened if the bra
 
 CLAUDE.md push conventions — apply on every push from any skill:
 
-- **Land by PR from every surface**: chat, Code and routines push `claude/*` branches and land through the PR (below). A handoff-only archive is a PR too.
+- **Land by PR from every surface**: chat, Code and routines push `claude/*` branches and land through the PR (below). A handoff alone gets no PR: it rides the work PR, and with none left the Grove row is the handoff (chat-archive `references/close-at-land.md`, Land-at-push).
 - **Bump the patch version** in `package.json` and any visible UI version display in the same commit. Without this, "is my new code live?" is guesswork.
 - **Regenerate `package-lock.json`** (`npm install`) if dependency sections changed, before committing — Vercel installs from the lockfile.
 
@@ -79,7 +79,10 @@ sha, url = push_and_merge("fairbay/<repo>", "<message>", files)
 ```
 
 This creates a temp `claude/auto-*` branch, pushes, creates a PR, squash-merges,
-and deletes the branch — all in one call. The returned SHA and URL point to the
+and deletes the branch — all in one call. With a local clone it pushes through
+`push_to_pr` (native git, PR over REST); clone first in a chat, because the
+session proxy refuses the Git Data API's write path that the no-clone path uses
+(403 "not permitted through this proxy"). The returned SHA and URL point to the
 merge commit on `main`. If the merge fails (merge conflict, a refusal), the
 error message includes the PR URL: hand it off with close-at-land, or ask the
 merge tap at once.

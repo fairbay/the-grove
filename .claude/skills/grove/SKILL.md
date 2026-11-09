@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-10-26-02"
+  version: "2026-11-05-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -137,7 +137,11 @@ carry `phase`, `blockers`, `next_actions`, `last_session`, `docs` status, and
 `notes` (the planning-doc body for non-code projects). Create with
 `grove_create_project` — omit `repo` for non-code projects; update with
 `grove_update_project(...)`. chat-archive refreshes the row at
-session end; session-start's briefing reads it.
+session end; session-start's briefing reads it. To change one or two
+`next_actions` lines of a long row (a marker, a lane line), don't resend the
+array through tool arguments: `scripts/grove.py lines <project id> --set <prefix> <file>`
+(also `--replace` for a line that must exist, `--drop`, `--rewrite`; in the order
+typed) re-reads the row, writes, and verifies (needs `$GROVE_TOKEN`; b22bca05).
 
 **The project RECORD (`grove_get(entity_type="project", id=...)`) is the
 authoritative source for what's been drafted, parked, or deferred.** The `notes`
@@ -146,6 +150,21 @@ artifacts (mission/spec/plan/brief) are drafted. Reading `grove_list_decisions`
 or `grove_list_tasks` does NOT satisfy "check the project" — those are separate
 objects. An empty repo search ≠ artifact doesn't exist: check the project record
 first.
+
+### An MBN question the administrator guide should have answered (`guide-gap`)
+
+When Baylee asks where something in MBN lives, what was decided, or how to do
+something, and the answer came from the stores (Grove, the repos) rather than
+a page of the administrator guide (`docs/admin-guide/` in
+`fairbay/medicaid-benefits-navigator`), record the gap in the same turn: first
+`grove_list_tasks(tag="guide-gap", status="open")`; a task already naming that
+page gets one notes line for this question, otherwise tag the task you file for
+the question `guide-gap`, or file one (list `medicaid-benefits-navigator`), with
+a notes line `page: <section>/<slug>` naming the page that should have answered
+it (sections `start`, `system`, `how-to`, `launch`, `maintain`; a page the guide
+lacks gets your proposed slug). A question a page already answers is no gap.
+The weekly ops read counts these and guide-r takes each as a work order (the
+guide's counter, page `maintain/freshness-and-the-routine`, adopted with MBN #434).
 
 ## Adjudications
 

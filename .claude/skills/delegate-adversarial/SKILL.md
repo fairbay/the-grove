@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-11-05-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -38,6 +38,14 @@ Vault and never returns it, refuses by Baylee's limits (never retries), and
 records every call and refusal in `llm.calls`. `scripts/gemini.py` does this
 for you in Code sessions and Routines (`SUPABASE_ACCESS_TOKEN` in the
 environment). There is no direct provider call and no key file.
+**Read-only or no token (C4):** in a session with an MBN checkout, `llm_doorway.call()`
+sends the call through MBN's `db-apply` `doorway` mode instead. It prices the body
+first when the token can read, commits the request to a throwaway
+`claude/doorway-*` branch, and returns the same result plus `route` and
+`workflow_run`. The round trip takes about 80 s. The cloud git proxy refuses
+branch deletion, so the result names a leftover branch as `branch_left`. Choose
+a route with `LLM_DOORWAY_ROUTE` or `route=`: `auto` (the default), `direct`
+or `workflow`.
 
 Model: the review default is the `llm.prices` row with `default_for = 'review'`
 (`gemini-3.1-pro-preview` as seeded; `MODEL_PRO` mirrors it) and the research
@@ -87,7 +95,9 @@ channel. Never retry a `refused` or `error` result; report it.
 **Size the deliverable before a chat design run:** one that will pass about 14 KB raw (20 KB once base64-wrapped, the connector's cap) plans its
 adversarial review as the next Code session's first step (the task filed with the brief and
 the bundle on the PR, before the cards) or as Baylee's manual channel; discovering this at the
-end wastes the run's review slot (MBN #400, 2026-10-21).
+end wastes the run's review slot (MBN #400, 2026-10-21). Since 146d9cfb a `Gate: process` doc
+over 14,000 bytes fails `process_gate.py check` until its gate block carries a `Review route:`
+line, so the route is named at round 0, not at the review step.
 
 ## What "adversarial" means
 
@@ -386,7 +396,7 @@ in chat, `.claude/skills/delegate-adversarial/scripts/` in Claude Code:
 
 | Script | Purpose |
 |--------|---------|
-| `llm_doorway.py` | The doorway client: call, estimate, default_model, report_line |
+| `llm_doorway.py` | The doorway client: call (direct, or the MBN workflow route), estimate, default_model, report_line |
 | `gemini.py` | Gemini helpers over the doorway: call, call_with_urls, research (caching and files raise until routed) |
 | `review_package.py` | Assemble structured review packages from project data |
 | `project_review.py` | Multi-pass review orchestrator with caching |

@@ -11,13 +11,20 @@ block, and a missing key is reported as "not judged: <repo> policy lacks signals
 Usage:
   python3 ops_read.py --decisions FILE [--cards FILE] [--activity FILE] [--runs FILE]
       --policy REPO=PATH [--policy REPO=PATH ...] [--default-policy PATH]
-      [--minutes FILE] [--until YYYY-MM-DD] [--days 7] [--json]
+      [--minutes FILE] [--gaps FILE] [--until YYYY-MM-DD] [--days 7] [--json]
 
 --minutes FILE: JSON array of {repo, date, minutes}, one row per Actions run in the billing month
 (minutes = the run's duration rounded up to whole minutes). It feeds S11, the account-wide Actions
 minutes line; S10 (cache-read tokens per day) reads the optional `cache_read_m` of the records.
 The Budgets section also prints a report-only "Counter" line from record-2 fields (session_report.py
---record): whole records, interrupts, starts, PR taps and the process share of cache-read.
+--record): whole records, interrupts, starts, PR taps and the process share of cache-read; then a
+"Dispatch prompts" line (the week's printed prompts, how many were pasted unchanged by opening_hash,
+and the strict count of docs/dispatch/DESIGN.md §1.2) and a "Lane overlaps" line (a lane's session that
+logged again after another session of the lane), both report-only.
+
+--gaps FILE: JSON array of the open Grove tasks tagged guide-gap (ops_gather.py writes gaps.json). It feeds
+the report-only "Guide gaps" line: how many are open and the administrator-guide pages they name (MBN
+docs/admin-guide maintain/freshness-and-the-routine.md, "The counter"). Without it the line says "not read".
 
 Exit 0 normally; 2 on an input error (unreadable file, bad JSON, --policy without '=').
 Python 3.11, stdlib only.
@@ -39,6 +46,18 @@ BUDGET_REPO = "fairbay/ops"  # the two budget lines are account-wide; their thre
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 ROW_RE = re.compile(r"^table-row-(\d+)$")
 WRAP_KEYS = ("decisions", "tasks", "items", "results", "data", "workflow_runs")
+HASH_RE = re.compile(r"[0-9a-f]{8}")  # session_report.py text_hash
+SESSION_RE = re.compile(r"session_[A-Za-z0-9]+")
+LANE_TAG = re.compile(r"lane-[a-z][0-9]?", re.I)  # a lane id (a, a2), not a word such as lane-sweep
+GAP_TAG = "guide-gap"  # a task naming a page the MBN administrator guide lacks or must fix
+GAP_LIMIT = 100  # ops_gather.py reads at most this many (its GAP_LIMIT); a full file is printed as "at least"
+GAP_PAGE_LINE = re.compile(r"^[ \t]*(?:[-*>][ \t]*)?page:[ \t]*(\S.*?)[ \t]*$", re.I | re.M)  # `page: <slug or plain name>`, bullet allowed
+GUIDE_SECTIONS = "start|system|how-to|launch|maintain"  # docs/admin-guide/src/content/docs/<section>/<slug>.md
+GUIDE_PREFIX = "docs/admin-guide/src/content/docs/"
+GUIDE_SLUG = r"((?:" + GUIDE_SECTIONS + r")/[a-z0-9][a-z0-9-]*)"
+# a guide path in prose: the full prefix (also inside a GitHub URL), or a bare <section>/<slug> only with its .md, so that
+# prose such as "start/stop" or "the system/design question" is not read as a page
+GUIDE_PAGE = re.compile(r"(?:" + re.escape(GUIDE_PREFIX) + GUIDE_SLUG + r"(?:\.mdx?)?|(?<![\w/-])" + GUIDE_SLUG + r"\.mdx?)(?![\w-])")
 
 
 class InputError(Exception):
@@ -143,20 +162,25 @@ def short(x):
 
 # ---------------------------------------------------------------- records
 
-def parse_records(decisions):
+def parse_records(decisions, keep_restated=False):
+    """Session records. keep_restated: also return the records a later record superseded, marked restated (the lane-overlap
+    line needs every time a session logged; every count reads only the records that are not restated)."""
     records, unreadable = [], []
     for d in decisions:
         if "session-record" not in tags_of(d):
             continue
         # a record restated by a later record (supersedes) counts once: the newer one
-        if d.get("superseded_by") or any(same_id(str(o.get("supersedes") or ""), str(d.get("id"))) for o in decisions
-                                         if "session-record" in tags_of(o) and o.get("supersedes")):
+        restated = bool(d.get("superseded_by") or any(same_id(str(o.get("supersedes") or ""), str(d.get("id"))) for o in decisions
+                                                      if "session-record" in tags_of(o) and o.get("supersedes")))
+        if restated and not keep_restated:
             continue
         did = d.get("id")
         title = d.get("decision") or ""
 
         def bad(reason):
-            unreadable.append({"kind": "record", "id": did, "title": title, "reason": reason})
+            if not restated:  # a restated record's newer copy is the one judged
+                unreadable.append({"kind": "record", "id": did, "title": title, "reason": reason,
+                                   "created": (d.get("created_at") or "")[:10]})
 
         raw = d.get("context")
         if isinstance(raw, dict):
@@ -220,8 +244,40 @@ def parse_records(decisions):
             "prs": [x for x in prs if isinstance(x, dict)],
             "cards": len(ctx.get("cards") or []) if isinstance(ctx.get("cards"), list) else 0,
             "interrupts": ctx.get("interrupts") if isinstance(ctx.get("interrupts"), int) and not isinstance(ctx.get("interrupts"), bool) else None,
+            # dispatch counter (5b925af6; docs/dispatch/DESIGN.md §4.3): the opening's hash, the session id, the printed block
+            "opening_hash": ctx.get("opening_hash") if isinstance(ctx.get("opening_hash"), str) and HASH_RE.fullmatch(ctx["opening_hash"]) else None,
+            "sid": session_id(ctx.get("session")) or f"record:{did or len(records)}", "restated": restated,
+            "dispatch": dispatch_prompts(ctx.get("dispatch"), created or datetime.min.replace(tzinfo=timezone.utc)) if ("dispatch" in tags_of(d) or isinstance(ctx.get("dispatch"), dict)) else None,
         })
+        if not records[-1]["lane"]:  # a record 1 may carry its lane only as a lane-<x> tag
+            records[-1]["lane"] = next((t[5:].lower() for t in tags_of(d) if LANE_TAG.fullmatch(t)), None)
     return records, unreadable
+
+
+def session_id(s):
+    """The session_… id inside a session URL or id; None when the field names none (a chat label, a record 1 without one)."""
+    m = SESSION_RE.search(str(s or ""))
+    return m.group(0) if m else None
+
+
+def dispatch_prompts(block, created):
+    """What a dispatch record printed, read tolerantly (session_report.py --dispatch writes the checked form; the 10-28 record
+    was written by hand). Returns {"printed": [{lane, hash, at}], "known": bool}: printed = the lanes whose state is ready
+    (a prompted lane's prompt is carried under Running, not printed again), or every prompt lane when the block has no
+    states; hash None when the block carries no text; known False for a dispatch record with no prompt list (record 1).
+    at is the record's time: the run printed it then (a reprint's `first` names the earlier print)."""
+    if not isinstance(block, dict) or not isinstance(block.get("prompts"), (dict, list)):
+        return {"printed": [], "known": False}
+    prompts, states = block["prompts"], block.get("lanes") if isinstance(block.get("lanes"), dict) else None
+    items = prompts.items() if isinstance(prompts, dict) else ((str(x), None) for x in prompts)
+    printed = []
+    for lane, p in items:
+        lane = str(lane).lower()
+        if states is not None and states.get(lane) != "ready":
+            continue
+        h = p.get("hash") if isinstance(p, dict) else None
+        printed.append({"lane": lane, "hash": h if isinstance(h, str) and HASH_RE.fullmatch(h) else None, "at": created})
+    return {"printed": printed, "known": True}
 
 
 def sortkey(r):
@@ -325,7 +381,9 @@ def signal_s2(repo, pol, week_recs, actions):
     line = f"S2 harness refusals per session this week (max {fmt_num(mx)}{', report-only' if report_only else ''}): {len(over)} over -> {res['status']}"
     if over:
         line += "; " + "; ".join(f"{r['session']} refused {r['refused'] or ['(none listed)']}" for r in over)
-    for r in over:
+    # report-only: the refusal already fell back to the tap; the line and res["records"]
+    # list it, and no task is filed (ledger 2e3d7eb2: a weekly pile for a no-action signal)
+    for r in ([] if report_only else over):
         cmds = "\n".join(f"- {c}" for c in r["refused"]) or "- (the record lists none)"
         actions.append({"type": "task", "signal": "S2", "repo": repo,
                         "dedup_key": f"routing-breach S2 {repo} {r['session']}",
@@ -501,6 +559,159 @@ def counter_line(records, since, until):
     return res
 
 
+def dispatch_line(every, since, until):
+    """Prompts that started a session (5b925af6; docs/dispatch/DESIGN.md §1.2 and §4.3). Report-only. For the week's dispatch
+    runs (one session; its turns' records, a restated turn included, are one run): the prompts printed (lanes in state ready, once
+    per run), how many distinct, how many were pasted unchanged (a record whose opening_hash equals the prompt's hash, logged
+    after its first print; records are logged at a session's end, so no upper bound), and the strict count of §1.2 (a record of
+    that lane with start pasted, logged after the print and before the repo's next dispatch run). Lane ids are read without the
+    repo: only MBN declares lanes, and its lane H records may name fairbay/ops. `every` includes restated records."""
+    disp = sorted((r for r in every if r["dispatch"] is not None), key=lambda r: r["created"])
+    week = [r for r in disp if since < r["date"] <= until]
+    live = [r for r in every if not r["restated"]]
+    lane_recs = [r for r in live if r["lane"] and r["dispatch"] is None]
+    runs = {}
+    for d in week:
+        runs.setdefault(d["sid"], []).append(d)
+    unknown = sum(1 for ds in runs.values() if not any(d["dispatch"]["known"] for d in ds))
+    prints = {}  # (run, lane, hash) -> the run's first print of it
+    for sid, ds in runs.items():
+        for d in ds:
+            for p in d["dispatch"]["printed"] if d["dispatch"]["known"] else []:
+                key = (sid, p["lane"], p["hash"])
+                if key not in prints:
+                    prints[key] = {**p, "repo": d["repo"]}
+    strict, newest, groups = 0, 0, {}
+    for (sid, lane, h), p in prints.items():
+        nxt = next((o["created"] for o in disp if o["repo"] == p["repo"] and o["sid"] != sid and o["created"] > p["at"]), None)
+        newest += nxt is None
+        if any(r["lane"] == lane and r["start"] == "pasted" and p["at"] < r["created"] and (nxt is None or r["created"] <= nxt) for r in lane_recs):
+            strict += 1
+        if h:
+            groups.setdefault((lane, h), []).append(p["at"])
+    pasted = sum(1 for (lane, h), ats in groups.items() if any(r["opening_hash"] == h and min(ats) < r["created"] for r in live))
+    printed, hashed = len(prints), sum(len(a) for a in groups.values())
+    res = {"dispatches": len(runs), "no_prompt_list": unknown, "printed": printed, "distinct": len(groups),
+           "reprinted": hashed - len(groups), "no_text": printed - hashed, "pasted": pasted, "strict": strict, "newest": newest}
+    if not week:
+        res["line"] = "Dispatch prompts: no dispatch record this week"
+        return res
+    res["line"] = (f"Dispatch prompts: {len(runs)} dispatch runs" + (f" ({unknown} with no prompt list)" if unknown else "")
+                   + f"; {printed} printed ({len(groups)} distinct, {hashed - len(groups)} reprinted"
+                   + (f", {printed - hashed} with no text" if printed - hashed else "") + "); "
+                   + f"pasted unchanged {pasted} of {len(groups)} (a record's opening_hash after the first print); "
+                   + f"strict {strict} of {printed} (a pasted record of the lane before the next dispatch"
+                   + (f"; {newest} printed by the newest run, whose sessions may not have logged yet" if newest else "") + ")")
+    return res
+
+
+def overlap_line(records, since, until):
+    """Two sessions of one lane open at once (docs/dispatch/DESIGN.md defect 6), read after the fact: a session logs a record of
+    its lane, another session logs one of the same lane, and the first logs again; reported when that return is this week."""
+    by_lane = {}
+    for r in sorted((r for r in records if r["lane"] and r["dispatch"] is None), key=lambda r: r["created"]):
+        by_lane.setdefault(r["lane"], []).append(r)
+    found, seen = [], set()
+    for lane, rs in sorted(by_lane.items()):
+        for i, r in enumerate(rs):
+            if not since < r["date"] <= until:
+                continue
+            j = next((j for j in range(i - 1, -1, -1) if rs[j]["sid"] == r["sid"]), None)
+            if j is None:
+                continue
+            between = [o for o in rs[j + 1:i] if o["sid"] != r["sid"]]
+            if not between or (lane, r["sid"]) in seen:
+                continue
+            seen.add((lane, r["sid"]))
+            t = lambda o: o["created"].strftime("%m-%d %H:%M")
+            found.append({"lane": lane, "session": r["sid"], "first": t(rs[j]), "again": t(r), "between": [o["sid"] for o in between],
+                          "text": f"lane {lane.upper()}: {r['sid']} logged {t(rs[j])} and again {t(r)}, after "
+                                  + ", ".join(f"{o['sid']} ({t(o)})" for o in between)})
+    res = {"overlaps": found}
+    res["line"] = ("Lane overlaps: " + "; ".join(f["text"] for f in found)) if found else "Lane overlaps: none (no lane's session logged again after another session of the lane)"
+    return res
+
+
+def gap_line(gaps):
+    """The guide-gap counter (MBN task 9a9911a9 item 4(iii); the guide's maintain/freshness-and-the-routine.md, "The counter").
+    Report-only: the open Grove tasks tagged guide-gap and the guide pages they name. A task names a page by notes lines
+    `page: <slug or plain name>`, one page a line, a bullet allowed (they win); else by guide paths in its title or notes (the
+    full docs/admin-guide/src/content/docs/ prefix, a GitHub URL included, or a bare <section>/<slug>.md). Pages are keyed
+    without the prefix, .md and case, shown as first spelled. A task that names none is listed by id and title. Grove tasks
+    are open, done or dropped; only open ones count. `gaps` None means the file was not given: "not read", never 0."""
+    if gaps is None:
+        return {"status": "not_read", "open": None, "pages": {}, "unnamed": [],
+                "line": "Guide gaps: not read (no --gaps input; ops_gather.py writes gaps.json)"}
+    rows, ids = [], set()
+    for t in gaps:
+        tid = t.get("id")
+        if GAP_TAG in tags_of(t) and (t.get("status") or "open") == "open" and not (tid and tid in ids):
+            ids.add(tid)
+            rows.append(t)
+    pages, shown, unnamed = {}, {}, []
+    one_line = lambda s: " ".join(str(s).split())
+    for t in rows:
+        notes = t.get("notes") or ""
+        named = [m.group(1) for m in GAP_PAGE_LINE.finditer(notes)] or \
+                [m.group(1) or m.group(2) for m in GUIDE_PAGE.finditer(f"{t.get('title') or ''}\n{notes}")]
+        tid = short(t.get("id") or "?")
+        if not named:
+            unnamed.append({"id": tid, "title": one_line(t.get("title") or "")})
+        for p in named:
+            p = one_line(re.sub(r"\.mdx?$", "", p.split(GUIDE_PREFIX)[-1], flags=re.I))
+            key = p.lower()
+            shown.setdefault(key, p)
+            if tid not in pages.setdefault(key, []):
+                pages[key].append(tid)
+    pages = {shown[k]: v for k, v in pages.items()}
+    full = len(gaps) >= GAP_LIMIT
+    res = {"status": "ok", "open": len(rows), "truncated": full, "pages": pages, "unnamed": unnamed}
+    line = f"Guide gaps: {'at least ' if full else ''}{len(rows)} open task{'s' if len(rows) != 1 else ''} tagged {GAP_TAG}"
+    if pages:
+        line += "; pages named: " + ", ".join(f"{p} ({len(v)}: {', '.join(v)})" for p, v in sorted(pages.items(), key=lambda kv: (-len(kv[1]), kv[0].lower())))
+    if unnamed:
+        line += f"; {len(unnamed)} with no page named: " + ", ".join(f"{u['id']} '{u['title'][:60]}'" for u in unnamed)
+    if full:
+        line += f" (the read's {GAP_LIMIT}-row cap: more may be open)"
+    res["line"] = line
+    return res
+
+
+HEALTH_TAG = "project-health"  # the decision project-health logs each run; its text carries `health: N/10 (red: …)`
+HEALTH_RE = re.compile(r"^health: (\d+)/(\d+)(?: \(red: ([^)]*)\))?", re.M)  # a line of its own: a quoted old score never counts
+
+
+def health_line(decisions, since, until):
+    """The operational-health score (project-health SKILL.md "Operational health", MBN f21b91ed step 2). Report-only:
+    the newest decision in the window tagged project-health whose text has a line `health: N/10 (red: …)` (the first such
+    line; the skill writes it first), printed with its date and red lines; an older score outside the window is named as
+    stale, never reprinted as this week's; none → say so. Newest by the full created_at, so two runs on one day keep order."""
+    scored = []
+    for d in decisions:
+        if HEALTH_TAG not in tags_of(d):
+            continue
+        m = HEALTH_RE.search(d.get("decision") or "")
+        when = to_dt(d.get("created_at"))
+        if not m or when is None:
+            continue
+        scored.append({"id": short(d.get("id") or "?"), "day": when.date(), "when": when, "score": int(m.group(1)),
+                       "of": int(m.group(2)), "red": [x.strip() for x in (m.group(3) or "").split(",") if x.strip()]})
+    scored.sort(key=lambda s: s["when"], reverse=True)
+    week = [s for s in scored if since < s["day"] <= until]
+    if week:
+        s = week[0]
+        red = f"; red: {', '.join(s['red'])}" if s["red"] else "; nothing red"
+        line = f"Operational health: {s['score']}/{s['of']} on {s['day']} ({s['id']}){red}"
+        return {"status": "ok", "score": s["score"], "of": s["of"], "red": s["red"], "day": str(s["day"]), "id": s["id"], "line": line}
+    if scored:
+        s = scored[0]
+        line = (f"Operational health: no check this week; last {s['score']}/{s['of']} on {s['day']} ({s['id']})"
+                + (f", red: {', '.join(s['red'])}" if s["red"] else ""))
+        return {"status": "stale", "score": s["score"], "of": s["of"], "red": s["red"], "day": str(s["day"]), "id": s["id"], "line": line}
+    return {"status": "none", "score": None, "of": None, "red": [], "day": None, "id": None,
+            "line": "Operational health: no check on record"}
+
+
 def signal_s11(pol, minutes, until, actions):
     """GitHub Actions minutes used this billing month (UTC calendar month) against the plan's limit."""
     vals, bad = thresholds(pol, BUDGET_REPO, K_S11, [("limit_per_month", "num"), ("flag_at_fraction", "num")]) if pol else ({}, [f"not judged: no {BUDGET_REPO} policy"])
@@ -529,10 +740,11 @@ def signal_s11(pol, minutes, until, actions):
     return res
 
 
-def build(decisions, cards, activity, runs, policies, default_policy, until, days, minutes=None):
+def build(decisions, cards, activity, runs, policies, default_policy, until, days, minutes=None, gaps=None):
     since = until - timedelta(days=days)
     in_week = lambda d: since < d <= until
-    records, unreadable = parse_records(decisions)
+    every, unreadable = parse_records(decisions, keep_restated=True)
+    records = [r for r in every if not r["restated"]]
     seen = set()
     uniq = []
     for r in records:
@@ -660,7 +872,11 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
     budget_pol = (policies[BUDGET_REPO][0] if BUDGET_REPO in policies else (default_policy[0] if default_policy else None))
     budgets = {"S10": signal_s10(budget_pol, records, since, until, actions),
                "S11": signal_s11(budget_pol, minutes, until, actions),
-               "counter": counter_line(records, since, until)}
+               "counter": counter_line(records, since, until),
+               "dispatch": dispatch_line(every, since, until),
+               "overlap": overlap_line(every, since, until),
+               "gaps": gap_line(gaps),
+               "health": health_line(decisions, since, until)}
 
     # dedupe actions
     seen_keys, uniq_actions = set(), []
@@ -686,8 +902,12 @@ def render(res):
     L = [f"## Ops read — decision routing ({w['since']} to {w['until']})", "",
          f"Window: dates after {w['since']} through {w['until']} (UTC)."]
     if res["unreadable"]:
-        L += ["", f"Unreadable records: {len(res['unreadable'])} (skipped)"]
-        L += [f"- {u['kind']} {short(u['id'])} {u['title']}: {u['reason']}" for u in res["unreadable"]]
+        # one short line per record logged this week; older ones as a count (ledger 6e5aa00e)
+        fresh = [u for u in res["unreadable"] if not u.get("created") or w["since"] < u["created"] <= w["until"]]
+        older = len(res["unreadable"]) - len(fresh)
+        L += ["", f"Unreadable records: {len(res['unreadable'])} (skipped; {len(fresh)} logged this week"
+                  + (f", {older} older, listed in --json" if older else "") + ")"]
+        L += [f"- {u['kind']} {short(u['id'])} ({u.get('created') or 'no date'}): {u['reason']}; {u['title'][:70].strip()}" for u in fresh]
     for repo, e in res["repos"].items():
         L += ["", f"### {repo}"]
         if e.get("note"):
@@ -703,7 +923,8 @@ def render(res):
         for n in e["not_counted"]:
             L.append(f"- not counted: {n['session']} {n['date']} ({', '.join(n['fields'])} null{'; ' + n['source'] if n['source'] else ''})")
     b = res["budgets"]
-    L += ["", "### Budgets (account-wide)", f"- {b['S10']['line']}", f"- {b['S11']['line']}", f"- {b['counter']['line']}"]
+    L += ["", "### Budgets (account-wide)", f"- {b['S10']['line']}", f"- {b['S11']['line']}", f"- {b['counter']['line']}",
+          f"- {b['dispatch']['line']}", f"- {b['overlap']['line']}", f"- {b['gaps']['line']}", f"- {b['health']['line']}"]
     L += ["", "Activity with no record:"]
     if res["no_record"]:
         L += [f"- {n['text']}" for n in res["no_record"]]
@@ -728,6 +949,7 @@ def parse_args(argv):
     p.add_argument("--activity")
     p.add_argument("--runs")
     p.add_argument("--minutes")
+    p.add_argument("--gaps")
     p.add_argument("--policy", action="append", default=[], metavar="REPO=PATH")
     p.add_argument("--default-policy")
     p.add_argument("--until")
@@ -758,10 +980,11 @@ def main(argv=None):
         activity = load_list(a.activity) if a.activity else []
         runs = load_list(a.runs) if a.runs else []
         minutes = load_minutes(a.minutes) if a.minutes else None
+        gaps = load_list(a.gaps) if a.gaps else None
     except InputError as e:
         print(f"ops_read.py: {e}", file=sys.stderr)
         return 2
-    res = build(decisions, cards, activity, runs, policies, default, until, a.days, minutes)
+    res = build(decisions, cards, activity, runs, policies, default, until, a.days, minutes, gaps)
     if a.json:
         print(json.dumps(res, indent=2, ensure_ascii=False))
     else:
