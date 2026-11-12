@@ -5,7 +5,7 @@ description: >
   "how's the navigator doing". Audits DB + Grove + Vercel with real
   metrics. Not mid-session (→ chat-status) or close (→ chat-archive).
 metadata:
-  version: "2026-11-06-02"
+  version: "2026-11-12-02"
 ---
 
 # project-health — is the live MBN site trustworthy, current, and shipping?
@@ -43,7 +43,7 @@ Grove tasks and one Grove decision.
    database down before this.
 3. **Gather.** Run every block in `references/queries.md`. Then:
    - **Repo** (Code: the working tree; chat: attach the repo with read access and
-     clone it, per the global rule "Design runs read the real system first"):
+     clone it, per `.claude/global/design.md` "Design runs read the real system first"):
      - Read the launch-readiness ledger and the LR-11 row in PLAN.md. Read the
        line `launch readiness: D/12`; never recompute it.
      - Get the LR-11 rate from the `accuracy_checks` table once it exists; until
@@ -58,7 +58,8 @@ Grove tasks and one Grove decision.
      - `actions/workflows/smoke.yml/runs?event=schedule&per_page=1` and the same
        for `backup.yml` (the scheduled runs only; smoke also runs on pushes).
      - `actions/workflows/publish.yml/runs?per_page=1`.
-     - `commits/main/status` (the `Vercel` context).
+     - `commits/main/status`: the site's context, `Vercel – medicaid-benefits-navigator`
+       (each Vercel project posts its own `Vercel – <project>`; the `…-g9t4` one is the guide).
      - `pulls?state=open`: ready PRs, and drafts older than 14 days.
      - For a failed run, read `check-runs/<id>/annotations`. A billing annotation
        means the Actions minutes are gone: say so and don't retry.
@@ -156,8 +157,15 @@ unit model makes those lists projections.
 - **Publish holds** (Q7): no row, or one no older than a running apply. An old
   hold blocks every build and publish.
 - **Applied, not published** (Q7): zero, or `oldest_unpublished` within the day.
-- **Vercel:** latest production deployment READY; the `Vercel` status on main is
+- **Vercel:** latest production deployment READY; the site's Vercel status on main is
   success; no new runtime errors.
+- **Routines snapshot:** MBN's `docs/admin-guide/data/routines.yaml` has a
+  `taken_at` at most 14 days old and names every routine `list_triggers`
+  returns (one call, `recurring=true`; it returns each routine's whole brief, so
+  keep only name, schedule and enabled). Else it is a finding: refresh the file
+  from that read (name, schedule as stored, enabled, last run date, the version
+  in the pasted brief) in a lane E pull request. The guide's own rebuild is
+  health line 8.
 - **Workflows:** the last scheduled `smoke.yml` and `backup.yml` runs succeeded
   in the last 26 hours; the last `publish.yml` run succeeded and is later than
   `last_applied`.
@@ -220,9 +228,11 @@ nothing is inferred from a clock time.
 | 9 | Dormancy notice wired | the site reads a check-run record and shows the approved notice (card 21daad5c) when none is recent; until the record exists (line 7, task 323b4415), fail |
 | 10 | Security advisors clean | `get_advisors(security)` returns no ERROR and no WARN |
 
-**Reds first.** A red line is the only lane H and lane E work until it is green
-(f21b91ed step 2; its step 5, the four-week process freeze on rule and skill work,
-exempts the reds). Each red is one open Grove task tagged `health-red`, its lane
+**Reds first.** A red line is the first work of the lane that owns its fix, and it
+holds only that lane: the owner is the `lane-x` tag on its `health-red` task, and a
+lane with no red of its own is not held by another lane's red (f21b91ed step 2, as
+Baylee read it in ruling 1eb2c1f1; its step 5, the four-week process freeze on rule
+and skill work, exempts the reds). Each red is one open Grove task tagged `health-red`, its lane
 (`lane-e`, `lane-h`, or the lane that owns the fix) and the run's
 `health-check-YYYY-MM-DD`, filed or updated at the run, outside the five-task cap
 below, and never a duplicate (search `health-red` first). A line whose fix waits on
@@ -293,13 +303,15 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    - `decisions.json`: `grove_list_decisions(project_ref=…, current_only=false,
      compact=false, limit=100)` for `fairbay/ops`, `ops`,
      `fairbay/medicaid-benefits-navigator` and any repo with a
-     `.claude/policy.json`, concatenated (the script keeps the `session-record`
-     and `reversal` tags). A list that comes back with 100 rows hit the cap:
-     say S4's window may be truncated for that repo.
+     `.claude/policy.json`, concatenated (the script reads the `session-record`
+     tag). A list that comes back with 100 rows hit the cap: say the oldest
+     records may be missing for that repo.
    - `cards.json`: `grove_list_tasks(tag="wrong_question", compact=false,
      limit=100)` (adjudication listings carry no tags; the task read does).
    - `gaps.json`: `grove_list_tasks(tag="guide-gap", status="open",
      compact=false, limit=100)`, the MBN administrator guide's gap tasks.
+   - `picks.json`: the tasks of Grove lists `ops` and `grove`, any status, paged
+     (the "Lane H picks" line reads each pick's repo and whether it is done).
    - `activity.json`: `{repo, date, kind, ref, message}` rows from
      `gh api "repos/fairbay/<repo>/commits?since=<ISO>&per_page=100"` (commits)
      and `grove_events` in the window (Grove writes, repo from the entity's
@@ -316,7 +328,7 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
      session; name the private repos that were not read.
 2. **Run** `python3 .claude/skills/chat-archive/scripts/ops_read.py --decisions
    decisions.json --cards cards.json --activity activity.json --runs runs.json
-   --minutes minutes.json --gaps gaps.json
+   --minutes minutes.json --gaps gaps.json --picks picks.json
    --policy fairbay/ops=<path> --policy fairbay/medicaid-benefits-navigator=<path>`
    (`--json` for the actions). Thresholds come from each policy; a "not judged"
    line is reported as is, never filled with a default.
@@ -327,7 +339,7 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    after one design round on an edge, the edge goes to Baylee as a ruling);
    an S2 breach is listed, not filed, while the policy marks it `report_only`
    (the refusal already fell back to the tap; the script files no action for it);
-   one adjudication card per S4/S5 breach with the script's recommendation and
+   one adjudication card per S5 breach with the script's recommendation and
    stakes; each S5 postmortem as one line in the repo's project `next_actions`.
    "Activity with no record" is reported, never read as a quiet week.
    The two **budget lines** (S10 cache-read tokens per day from the week's session
@@ -349,8 +361,8 @@ the health decision. Design: `fairbay/ops` docs/decision-routing/DESIGN.md §4�
    weekly read, any repo: `python3 .claude/skills/chat-archive/scripts/process_gate.py read
    --decisions decisions.json --tasks tasks.json` (`tasks.json`:
    `grove_list_tasks(tag="ledger", status="open", limit=100)`) prints touches per week
-   (asks, refusals, cards), the share of records that are process work, the rules file's
-   bytes and lines (S12, report-only until Baylee names a max: the line is what he is
+   (asks, refusals, cards), the share of records that are process work, the global rules'
+   bytes and lines, the core and each `.claude/global/` file (S12, report-only until Baylee names a max: the line is what he is
    shown, once, when asked for it), the ledger by seen-N, and whether this month's
    consolidation is logged. When it says "not logged", run `consolidate` instead (the
    calendar month to date, likely duplicate entries, the month's rule-file commits where

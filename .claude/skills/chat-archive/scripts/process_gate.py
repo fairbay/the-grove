@@ -14,8 +14,9 @@ Design: fairbay/ops docs/process-governance/DESIGN.md (Grove ed7657bc). Three co
         [--tasks T.json]    takes (project-health "Ops read"): touches per week (asks + refusals
         [--rules FILE ...]  + cards from session records), the share of records that are process
         [--until DATE]      work (on fairbay/ops, or tagged dispatch), rules-file bytes and
-        [--days N] [--json] lines (S12), the ledger (Grove tasks tagged `ledger` with a `seen-N`
-                            tag) and whether this month's consolidation has been logged
+        [--days N] [--json] lines (S12: each file, then the core's bytes and the total over
+                            the core and .claude/global/*.md), the ledger (Grove tasks
+                            tagged `ledger` with a `seen-N` tag) and whether this month's consolidation has been logged
                             (a decision tagged `process-consolidate`).
   consolidate ...           `read` over the calendar month of --until, plus likely duplicate
                             ledger entries and the month's rules-file commits (when the clone
@@ -46,7 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 HEAD_LINES = 40
 FIELD = re.compile(r"^[\s*_`]*(Gate|Metric|Backtest|Defects|Review route)[\s*_`]*:[\s*_`]*(.*?)\s*$")
-REVIEW_ROUTE_BYTES = 14_000   # about 20 KB once base64-wrapped: the Supabase connector's cap in chat (146d9cfb)
+REVIEW_ROUTE_BYTES = 14_000   # delegate-adversarial's inline bound (about 20 KB once base64-wrapped; 146d9cfb set it from the chat connector's cap, and chat has no doorway route since 0989b72f)
 CITATION = re.compile(r"\b[0-9a-f]{8}\b|#\d+|\b20\d\d-\d\d-\d\d\b")
 INTEGER = re.compile(r"\d[\d,]*")
 METRIC_NAMES = ("touch", "share", "byte", "line", "token", "minute", "dollar", "$", "tap", "card",
@@ -107,8 +108,8 @@ def check_doc(text, require_gate=True):
         misses.append("Defects: no citation (a Grove id, a PR #, or a date)")
     if len(text.encode("utf-8")) > REVIEW_ROUTE_BYTES and not (fields.get("Review route") or "").strip():
         misses.append(f"Review route: line missing from the first {HEAD_LINES} lines, value on the same line "
-                      f"(the doc passes {REVIEW_ROUTE_BYTES:,} bytes, too big for the "
-                      "doorway through the chat connector: name the route at round 0 — a Code session's "
+                      f"(the doc passes {REVIEW_ROUTE_BYTES:,} bytes, too big to send "
+                      "to the doorway inline: name the route at round 0 — a Code session's "
                       "doorway call, Baylee's manual channel, or a sub-agent)")
     return misses
 
@@ -224,14 +225,28 @@ def is_process(rec):
     return (repo or "").endswith("/ops") or repo == "ops" or "dispatch" in tags
 
 
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+CORE_NAMES = ("global-CLAUDE.md", "global.md")
+
+
 def default_rules():
-    """The rules file where this copy runs: global-CLAUDE.md at the root in fairbay/ops (the
-    source; its own .claude/global.md is a stub), else the synced .claude/global.md."""
-    root = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
-    for cand in (os.path.join(root, "global-CLAUDE.md"), os.path.join(root, ".claude", "global.md")):
+    """The global rules where this copy runs: the core (global-CLAUDE.md at the root in
+    fairbay/ops, the source, whose own .claude/global.md is a stub; else the synced
+    .claude/global.md), then the detail files in .claude/global/ (docs/global-rules-core/DESIGN.md)."""
+    out = []
+    for cand in (os.path.join(REPO_ROOT, "global-CLAUDE.md"), os.path.join(REPO_ROOT, ".claude", "global.md")):
         if os.path.isfile(cand):
-            return [cand]
-    return []
+            out.append(cand)
+            break
+    detail = os.path.join(REPO_ROOT, ".claude", "global")
+    if os.path.isdir(detail):
+        out.extend(os.path.join(detail, f) for f in sorted(os.listdir(detail)) if f.endswith(".md"))
+    return out
+
+
+def _label(p):
+    ap = os.path.abspath(p)
+    return os.path.relpath(ap, REPO_ROOT) if ap.startswith(REPO_ROOT + os.sep) else os.path.basename(p)
 
 
 def rules_stats(paths):
@@ -242,8 +257,17 @@ def rules_stats(paths):
             continue
         with open(p, "rb") as f:
             data = f.read()
-        out.append({"file": os.path.basename(p), "bytes": len(data), "lines": data.count(b"\n")})
+        out.append({"file": _label(p), "bytes": len(data), "lines": data.count(b"\n")})
     return out
+
+
+def rules_total(stats):
+    """S12: the core's bytes (the file every session loads) and the total over core + detail files."""
+    present = [r for r in stats if not r.get("missing")]
+    core = next((r for r in present if os.path.basename(r["file"]) in CORE_NAMES), None)
+    return {"core_file": core["file"] if core else None, "core_bytes": core["bytes"] if core else None,
+            "files": len(present), "bytes": sum(r["bytes"] for r in present),
+            "lines": sum(r["lines"] for r in present)}
 
 
 def rule_commits(paths, since):
@@ -271,7 +295,7 @@ def ledger(tasks):
         tags = tags_of(t)
         if "ledger" not in tags or (t.get("status") or "open") != "open":
             continue
-        seen = max((int(m.group(1)) for g in tags for m in [SEEN.match(g)] if m), default=None)
+        seen = max((int(m.group(1)) for g in tags for m in [SEEN.fullmatch(g)] if m), default=None)
         if seen is None:
             continue
         rows.append({"id": str(t.get("id") or "?")[:8], "seen": seen, "title": (t.get("title") or "")[:90],
@@ -313,6 +337,7 @@ def build(decisions, tasks, rules, until, days):
         by_repo[r[1]] = by_repo.get(r[1], 0) + 1
     proc = sum(1 for r in recs if is_process(r))
     led = ledger(tasks)
+    stats = rules_stats(rules)
     return {
         "window": {"since": since.isoformat(), "until": until.isoformat(), "days": days},
         "records": len(recs),
@@ -322,7 +347,8 @@ def build(decisions, tasks, rules, until, days):
         "process_share": {"process_records": proc, "all_records": len(recs),
                           "fraction": round(proc / len(recs), 2) if recs else None},
         "records_by_repo": by_repo,
-        "rules": rules_stats(rules),
+        "rules": stats,
+        "rules_total": rules_total(stats),
         "ledger": led,
         "ledger_earned": [r for r in led if r["seen"] >= 2],
         "consolidated_this_month": consolidated_this_month(decisions, until),
@@ -340,6 +366,10 @@ def render(res, commits=None):
         lines.append(f"    unreadable record {str(u.get('id'))[:8]}: {u.get('reason')}")
     for r in res["rules"]:
         lines.append(f"- Rules file {r['file']}: " + ("missing" if r.get("missing") else f"{r['bytes']:,} bytes, {r['lines']} lines (S12)"))
+    tot = res.get("rules_total") or {}
+    if tot.get("files", 0) > 1:
+        lines.append(f"- Rules total: {tot['bytes']:,} bytes, {tot['lines']} lines in {tot['files']} files"
+                     + (f"; core {tot['core_file']} {tot['core_bytes']:,} bytes (S12)" if tot.get("core_file") else " (S12)"))
     if res["ledger"]:
         lines.append(f"- Ledger: {len(res['ledger'])} open entries, {len(res['ledger_earned'])} at seen-2 or more (earned encoding)")
         lines.extend(f"    seen-{r['seen']} {r['id']} {r['title']}" for r in res["ledger"])

@@ -37,7 +37,7 @@ def card_sql(card, option, notes, at, options=None, via="chat"):
     """SQL that records a card's answer as the vault page records it (metadata.adjudication.resolution with notes,
     option_id, resolved_at, resolved_by, via; status done) through task_update, keeping every other metadata key.
     It touches only a card still open with no resolution, so a ruling made on the vault page is never overwritten."""
-    if not R.UUID_RE.match(card or ""):
+    if not R.UUID_RE.fullmatch(card or ""):  # fullmatch: `$` with match lets a trailing line break through
         raise InputError("--card must be a full UUID")
     if not at or R.to_dt(at) is None:
         raise InputError("--at must be an ISO time")

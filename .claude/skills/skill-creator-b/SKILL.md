@@ -5,7 +5,7 @@ description: >
   "sync skills", "isn't triggering", "add that to [skill]." Fires on ANY skill
   file edit. Not for using skills or memory edits.
 metadata:
-  version: "2026-10-02-01"
+  version: "2026-11-12-01"
 ---
 
 # skill-creator — build and maintain skills for Baylee's system
@@ -335,7 +335,7 @@ failures.
 
 When syncing ("sync skills", "are my skills up to date?"):
 
-Cross-repo sync (phases 2–3: skills, global.md, watchlist into every repo)
+Cross-repo sync (phases 2–3: skills, global.md and `.claude/global/`, watchlist into every repo)
 runs automatically — `.github/workflows/sync.yml` on fairbay/ops fires on
 every push to `main`. Chat only handles phase 1, installing drifted skills:
 

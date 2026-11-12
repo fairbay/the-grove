@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gather the weekly ops read's inputs (project-health SKILL.md "Ops read", step 1) into one directory.
 
-Writes decisions.json, cards.json, tasks.json, gaps.json, activity.json, runs.json and minutes.json (plus
+Writes decisions.json, cards.json, tasks.json, gaps.json, picks.json, activity.json, runs.json and minutes.json (plus
 minutes-cache.json, the per-run minutes already read: keep the directory between weeks and only new
 runs are fetched), then prints
 a JSON summary with the counts, the window and every truncation or read failure it met. The read
@@ -36,6 +36,7 @@ RUN_WORKFLOWS = {"fairbay/ops": ["sync.yml"], "*": ["rules.yml"]}  # the newest 
 EVENT_TYPES = ["task", "idea", "decision", "project"]
 EVENT_PAGE = 200  # /api/events returns at most 200 rows and has no paging
 GAP_TAG, GAP_LIMIT = "guide-gap", 100  # ops_read.py's Guide gaps line; keep equal to ops_read.py's GAP_TAG and GAP_LIMIT
+PICK_LISTS = ("ops", "grove")  # lane H's infrastructure queue (session-start infra_queue.py); ops_read.py's Lane H picks line
 
 
 def load_grove():
@@ -158,15 +159,19 @@ def gather(out, repos, decision_refs, days, until, grove, gh=None):
     for ref in decision_refs:
         rows = grove.list_items("decision", project_ref=ref, current_only=False, limit=grove.DECISION_LIMIT)
         if len(rows) >= grove.DECISION_LIMIT:
-            notes.append(f"decisions {ref}: hit the {grove.DECISION_LIMIT}-row cap; S4's window may be truncated")
+            notes.append(f"decisions {ref}: hit the {grove.DECISION_LIMIT}-row cap; the oldest records may be missing")
         decisions += rows
     (out / "decisions.json").write_text(json.dumps(decisions))
-    (out / "cards.json").write_text(json.dumps(grove.list_items("task", tag="wrong_question", limit=100)))
-    (out / "tasks.json").write_text(json.dumps(grove.list_items("task", tag="ledger", status="open", limit=100)))
+    # every page: one call stopped silently at 100, and 75 ledger tasks were open on 2026-11-10 (963701ad)
+    (out / "cards.json").write_text(json.dumps(grove.list_all("task", tag="wrong_question")))
+    (out / "tasks.json").write_text(json.dumps(grove.list_all("task", tag="ledger", status="open")))
     gaps = grove.list_items("task", tag=GAP_TAG, status="open", limit=GAP_LIMIT)
     if len(gaps) >= GAP_LIMIT:
         notes.append(f"{GAP_TAG} tasks: hit the {GAP_LIMIT}-row cap; the Guide gaps line may be short")
     (out / "gaps.json").write_text(json.dumps(gaps))
+    # ops_read.py's Lane H picks line: the infrastructure queue's two lists, any status (a done pick counts as worked)
+    picks = [t for lst in PICK_LISTS for t in grove.list_all("task", list=lst)]
+    (out / "picks.json").write_text(json.dumps(picks))
 
     activity = []
     for repo in repos:
@@ -202,7 +207,7 @@ def gather(out, repos, decision_refs, days, until, grove, gh=None):
     cache_path.write_text(json.dumps(cache))
 
     return {"window": f"{since.date().isoformat()} to {until.isoformat()}", "decisions": len(decisions),
-            "gaps": len(gaps), "activity": len(activity), "runs": len(runs), "minutes_rows": len(minutes),
+            "gaps": len(gaps), "picks": len(picks), "activity": len(activity), "runs": len(runs), "minutes_rows": len(minutes),
             "minutes_total": sum(m["minutes"] for m in minutes), "notes": notes}
 
 

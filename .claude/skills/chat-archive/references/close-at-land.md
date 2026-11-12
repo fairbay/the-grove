@@ -31,6 +31,7 @@ candidates; match these patterns on each line of the full notes
 | Marker | Where | Pattern |
 |---|---|---|
 | Owner | task notes | `^owns: fairbay/<repo>#<n>$` |
+| Owned, PR gone | task notes (promotion rewrites the owner line) | `^merged: fairbay/<repo>#<n> <YYYY-MM-DD>$` or `^closed: fairbay/<repo>#<n> <YYYY-MM-DD>$` |
 | Landing | task notes | `^landing: fairbay/<repo>#<n>$` |
 | Landing | project row `next_actions` line | `^LANDING fairbay/<repo>#<n>: <text>` |
 | Origin | notes of an item close-at-land created | `^from: fairbay/<repo>#<n>$` |
@@ -42,6 +43,25 @@ Never copy an `owns:`, `landing:`, `card:` or `branch:` line into another task's
 task that quotes its parent would complete on the parent's merge). Page Grove
 searches (`limit=100`) until a page comes back short.
 
+**Writing a marker line into an existing task** (every `owns:`, `landing:`,
+`claimed:`, `card:`, `merged:` or `closed:` line below): one script call, never the
+notes in tool arguments (b22bca05; notes run to 10 KB):
+`python3 .claude/skills/grove/scripts/grove.py note-line <task id or first 8 hex> --add "<line>"`
+prepends a line that is absent, and `--replace "<old line>" "<new line>"` changes
+the one line equal to `<old line>` (whole lines, exact). It re-reads the task,
+writes, reads back and compares: exit 0 and `"written": true` is the check (`false`
+when the line was already there; exit 2 when the old line is missing). Needs
+`$GROVE_TOKEN` (Code sessions, routines). A chat without it runs one
+server-side statement through the Supabase connector on the Grove project
+(`task_update(p_id, p_owner_id, p_patch, p_source)`, migrations 0004/0009), exact
+lines, no regex: a replace is
+`select task_update(id, owner_id, jsonb_build_object('notes', array_to_string(array_replace(string_to_array(notes, E'\n'), '<old line>', '<new line>'), E'\n')), 'claude-web') from public.task where id = '<task id>' and '<old line>' = any(string_to_array(notes, E'\n'));`
+and an add is
+`select task_update(id, owner_id, jsonb_build_object('notes', '<line>' || E'\n' || coalesce(notes, '')), 'claude-web') from public.task where id = '<task id>' and not ('<line>' = any(string_to_array(coalesce(notes, ''), E'\n')));`
+(a `'` inside a line is doubled). A task whose only owner line became `merged:` or
+`closed:` reads as unowned again, so the infrastructure queue may pick it: intended,
+the work it owned has landed or stopped.
+
 ## Opening a draft (owner task, T1)
 
 Every surface pushes `claude/*` branches (Baylee's ruling 3fa9a61e). When work that changes a repo starts:
@@ -51,7 +71,8 @@ Every surface pushes `claude/*` branches (Baylee's ruling 3fa9a61e). When work t
    repo CLAUDE.md may name another call; MBN:
    `gh api repos/fairbay/<repo>/pulls -f title=… -f head=<branch> -f base=main -f body=… -F draft=true`).
 3. **Owner task, same turn.** Add the line `owns: fairbay/<repo>#<n>` to the Grove
-   task this work belongs to (`grove_update_task`, notes), or create one
+   task this work belongs to (`grove.py note-line <task id> --add "owns: fairbay/<repo>#<n>"`,
+   "Writing a marker line" above), or create one
    (`grove_create_task`, notes start with the owner line, contractor-grade body).
    Without it the next gate reports the draft as G7, unowned.
 
@@ -130,7 +151,8 @@ answer lands that PR.
      `select project_update(id, owner_id, jsonb_build_object('next_actions', to_jsonb(array_prepend('<line>', next_actions))), 'claude-web') from public.project where id = '<project id>';`
      (atomic against the current row; a replace is `array_replace(next_actions, '<old line>', '<new line>')`).
    - Every task this PR completes: add `landing: fairbay/<repo>#<n>` to its
-     notes and **leave it open**. It completes on merge (promotion).
+     notes (`grove.py note-line <task id> --add "landing: fairbay/<repo>#<n>"`)
+     and **leave it open**. It completes on merge (promotion).
    - Log decisions (`grove_log_decision`) as usual.
 5. **Commit, then run the repo's `pre_ready` commands.** First commit everything
    in an ordinary commit (`git add -A`), so the checks see every file: a file
@@ -187,7 +209,17 @@ answer lands that PR.
    R-dirty (G6).
 7. **Mark ready, then leave the branch.** Confirm the PR's remote head carries
    the trailer (`pr_state.py report` row for #n has `"cal": true`; if not, push
-   first). **Wait for the pushed head's draft-time runs first** (ledger d2c768ec: MBN
+   first). **In a lanes repo, confirm the row line too:**
+   `python3 .claude/skills/session-start/scripts/lane_state.py --row-check <x> --batons handoffs --fetch --repo fairbay/<repo>`
+   exits 0 only when the row's lane line names this session, the one in the
+   baton's `meta.session` (step 4's `--replace "Lane <X>, "` ran; a PR number
+   alone does not pass, since a continued draft keeps its number). Exit 1:
+   rewrite the line and run it again before the ready call; dispatch and the
+   data runner read that line as the lane's START HERE (d9692d9f: on 2026-11-12
+   lane A's baton had merged without it, and data-draft-r stopped on the
+   difference). Exit 2 is unread (no `$GROVE_TOKEN`, as in a chat; a wrong
+   directory; `--slug` for a project other than MBN): read the row's lane line
+   yourself and compare its session with the baton's. **Wait for the pushed head's draft-time runs first** (ledger d2c768ec: MBN
    #442, ops #114): until `gh api repos/fairbay/<repo>/commits/<head sha>/check-runs --jq .total_count`
    is above 0 (poll every 10 s, at most 2 minutes). A ready call in the same second as
    the push lets the push's run, which still sees a draft, cancel the ready run through
@@ -206,14 +238,16 @@ answer lands that PR.
    close), then starts that name again from `main`. The remote still holds the
    squashed-away commits (MBN keeps merged branches), so `git fetch origin
    <branch> && git merge FETCH_HEAD` once before the first push. Never force-push.
-8. **Next-step line:** "#n is ready. Merge to land it: <link>." From here the chat
+8. **Next-step line:** "#n is ready. Merge to land it: <link>.", followed by the
+   numbered steps of the merge (global Rule 7, 309b9f9c). From here the chat
    can be dropped. Then go to the merge request below; the session itself goes on.
 
    **The last line of every close-out is one of two sentences** (Baylee, 2026-10-23
    and 2026-10-26: he should know at a glance when a thread needs nothing more from
    him, and a failure after that point must make noise somewhere else). After the merge,
    the promotion and the session record, end the turn with exactly one of:
-   - `Safe to leave. Yours next: <one item with its page or link, or "nothing">.` —
+   - `Safe to leave. Yours next: <one item with its page or link, or "nothing">.`
+     (an item of his carries its numbered steps under the line, Rule 7) —
      only when every check this session started has finished green, the handoff is on
      main, the Grove markers are promoted and the record id is in hand.
    - `Not safe to leave: <what is still running or unverified>; a failure shows up as
@@ -238,11 +272,15 @@ answer lands that PR.
 
    **In a lanes repo the same Go also ends the baton's START HERE item and the
    row's lane line**, as `Opening line: "lane A: Go: …"`: dispatch writes the
-   prompts he pastes and copies a Go only from there, never composing one, so a
+   prompts he pastes and copies a Go only from the baton (lane_state.py's `go:`
+   line, which holds it to `harness.go` once more; the row line's copy is for
+   the reader and is never copied, 89437cec), never composing one, so a
    Go left only in the chat line never reaches the next session (Grove 6179636b:
    no baton ever carried one, and lane A sat on a Go question 01:19Z to ~10:40Z
    on 2026-11-08). policy-check (f) fails a baton whose START HERE says "a data
-   batch" or "a data session" without it. The id is the next free one at archive
+   batch" or "a data session" without it, and any Opening line in a touched
+   baton whose Go is not `harness.go` verbatim with only `mNNNN` filled (a
+   reworded, widened or stale Go; a Go-less line passes; MBN G12). The id is the next free one at archive
    time; a session that finds it taken uses the next and says so (a refusal then
    is S2, as above).
 
@@ -353,9 +391,13 @@ fork when any one holds, and the report line names which, **citing its marker**
 4. **The card** (`grove_create_adjudication`, list = the project's slug): one plain
    question, options readable without the domain, `recommendation` (option and
    reason) and `stakes` filled, the branch and the screenshots named in its context
-   or evidence links. **The owner task** (or a new one in the project's list) gets
-   the tag `card-open` and notes starting with these lines, then a contractor-grade
-   body that says what to do on each answer:
+   or evidence links. **The owner task** gets the tag `card-open` and notes
+   starting with the lines below. On an existing task, write each line with
+   `grove.py note-line <task id> --add "<line>"` (one exact line a call, re-read
+   and verified; an add prepends, so add them last line first) and the tag with
+   `grove_update_task` carrying `tags` only, never the task's notes (b22bca05); a
+   new task in the project's list takes them in its `notes` at creation. Either
+   way a contractor-grade body says what to do on each answer:
    ```
    card: <id 8> (filed <date>, recommendation <x> = <one word>)
    branch: fairbay/<repo>@<branch>
@@ -379,13 +421,14 @@ fork when any one holds, and the report line names which, **citing its marker**
 dispatch Step 2, a lane session, the chat he answered in). **Claim first, so two
 sessions never land one branch:** re-read the owner task; a `landing:` line, or a
 `claimed:` line under two hours old, means another session has it: stop. Otherwise
-add `claimed: <session URL> <UTC time>` to its notes, then look the branch up
+add `claimed: <session URL> <UTC time>` to its notes (`grove.py note-line … --add`), then look the branch up
 (`gh api "repos/fairbay/<repo>/pulls?state=all&head=fairbay:<branch>"`): a merged PR
 means it already landed (promote it); an open one is the PR to use. Then, with a yes:
 merge `main` into the branch, run `pre_ready` and the policy check, open the PR
 **ready** with the body "Ruled on card <id> <date>: <his words>" (or mark the
 existing draft ready), turn `card:` into `landing: fairbay/<repo>#<n>` on the owner
-task and give each task it completes its `landing:` line, replace the row's `CARD`
+task (`grove.py note-line <task id> --replace "<the card: line as it stands>" "landing: fairbay/<repo>#<n>"`)
+and give each task it completes its `landing:` line (`--add`), replace the row's `CARD`
 line with `LANDING fairbay/<repo>#<n>: …`, add the `Close-at-land:` trailer, and
 merge pinned to the head once the checks are green (his answer is the Go; a refused
 call, which a chat session with a repo attached should expect, falls back to the tap,
@@ -407,6 +450,12 @@ merged PR a marker names (S2: Baylee merged on GitHub after the chat ended).
    (it re-reads the row and verifies the write; step 4 says when to use SQL instead).
 3. Each open task whose notes carry `landing: fairbay/<repo>#<n>`:
    `grove_complete_task`. A task Baylee already closed stays as it is.
+   Each open task whose notes carry `owns: fairbay/<repo>#<n>` (most outlive one
+   PR): rewrite that line, and only it, with
+   `python3 .claude/skills/grove/scripts/grove.py note-line <task id> --replace "owns: fairbay/<repo>#<n>" "merged: fairbay/<repo>#<n> <YYYY-MM-DD>"`
+   (the merge date; a chat without `$GROVE_TOKEN`: "Writing a marker line"), so the task no
+   longer reads as in progress (Grove 24d71344: 9 of 13 owner lines on open MBN
+   tasks named a closed PR on 2026-11-09).
 4. Deploy, in-session right after a merge only (above). At entry the gate's G2
    checks main's head instead: a later successful build supersedes an earlier
    miss, and a merge still building is not a failure.
@@ -415,7 +464,10 @@ merged PR a marker names (S2: Baylee merged on GitHub after the chat ended).
 
 Once rewritten, the markers no longer match, so a second run does nothing.
 Closed-unmerged rollback (`NOT LANDED #n`) arrives with rollout step 4; until
-then leave a closed PR's markers alone and name them in the report.
+then leave a closed PR's markers alone and name them in the report, except the
+owner line: an open task's `owns: fairbay/<repo>#<n>` for a PR closed unmerged
+becomes `closed: fairbay/<repo>#<n> <close date>` by the same command
+(`grove.py note-line <task id> --replace "owns: fairbay/<repo>#<n>" "closed: fairbay/<repo>#<n> <YYYY-MM-DD>"`).
 
 ## Land-at-push: push_and_merge (§7.7)
 

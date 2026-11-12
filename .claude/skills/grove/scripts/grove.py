@@ -4,6 +4,7 @@ grove.py — Claude-side client for grove-api v1 (Step 4).
 Seven operations exposed:
     grove.create(entity_type, title, ...)        → POST   /api/{tasks,ideas}
     grove.list_items(entity_type, q=None, ...)   → GET    /api/{tasks,ideas,decisions,projects}
+    grove.list_all(entity_type, **filters)       → GET    /api/{tasks,ideas}, every page (offset)
     grove.get(entity_type, id)                   → GET    /api/{tasks,ideas,decisions,projects}/:id
     grove.update(entity_type, id, **patch)       → PATCH  /api/{tasks,ideas}/:id
     grove.complete(id, source=...)               → POST   /api/tasks/:id/complete
@@ -11,6 +12,8 @@ Seven operations exposed:
     grove.events(entity_type=None, ...)          → GET    /api/events
     grove.edit_next_actions(project_id, ops)     → GET + PATCH + GET /api/projects/:id
         (CLI `lines`: set/drop/rewrite named next_actions lines, verified; b22bca05)
+    grove.edit_task_notes(task_id, ops)          → GET + PATCH + GET /api/tasks/:id
+        (CLI `note-line`: add or rewrite one exact line of a task's notes, verified; 24d71344)
 
 `complete` and `drop` are task-only ergonomic sugar over PATCH — same
 underlying write path (RPC wraps mutation + event insert atomically, FR-005
@@ -181,6 +184,7 @@ def create(
     due_at: str | None = None,
     project_ref: str | None = None,
     priority: int | None = None,
+    allow_duplicate: bool = False,   # past the API's near-duplicate refusal (409)
     # Idea-only
     scores: dict | None = None,
     verdict: str | None = None,
@@ -223,6 +227,8 @@ def create(
             body["due_at"] = due_at
         if project_ref is not None:
             body["project_ref"] = project_ref
+        if allow_duplicate:
+            body["allow_duplicate"] = True
     else:  # idea
         if status is None:
             status = "raw"
@@ -256,6 +262,7 @@ def list_items(
     current_only: bool = True,       # decision filter: exclude superseded
     slug: str | None = None,         # project filter
     limit: int = 50,
+    offset: int = 0,                 # task and idea lists: rows to skip (list_all pages with it)
 ) -> list[dict]:
     """
     List this owner's tasks, ideas, decisions or projects, newest first. All filters optional.
@@ -274,6 +281,12 @@ def list_items(
         raise ValueError(f"limit must be 1–{max_limit}")
 
     query: dict[str, Any] = {"limit": limit}
+    if offset:
+        if entity_type not in ("task", "idea"):
+            raise ValueError("offset pages task and idea lists only")
+        if offset < 0:
+            raise ValueError("offset must be 0 or more")
+        query["offset"] = offset
     if q is not None:
         query["q"] = q
     if tag is not None:
@@ -318,6 +331,37 @@ def list_items(
 
     result = _request("GET", _route(entity_type), query=query)
     return result[envelope_key]
+
+
+PAGE = 200  # rows per page for list_all; grove-api's idea cap (tasks take up to 500)
+
+
+def list_all(entity_type: str, *, page: int = PAGE, **filters: Any) -> list[dict]:
+    """
+    Every task or idea that matches the filters, newest first, read page by page with offset
+    (grove-api 0014; Grove 963701ad: a single call returns at most 200, and 374 tasks were open on
+    2026-11-10). Stops at the first short page. A full page that adds no new id means the API
+    ignored the offset (a deploy older than grove#32): that raises GroveError instead of silently
+    returning the first page. An id seen twice (a row created mid-walk shifts the pages) is kept once.
+    """
+    if entity_type not in ("task", "idea"):
+        raise ValueError("list_all pages task and idea lists only")
+    if "limit" in filters or "offset" in filters:
+        raise ValueError("list_all sets limit and offset itself; pass page= for the page size")
+    rows: list[dict] = []
+    seen: set[str] = set()
+    offset = 0
+    while True:
+        batch = list_items(entity_type, limit=page, offset=offset, **filters)
+        new = [r for r in batch if r.get("id") not in seen]
+        if len(batch) == page and offset and not new:
+            raise GroveError(0, {"message": f"grove-api ignored offset={offset} on /api/{entity_type}s: "
+                                            "the page repeats earlier rows (deploy grove#32 first)"})
+        rows.extend(new)
+        seen.update(r.get("id") for r in new)
+        if len(batch) < page:
+            return rows
+        offset += len(batch)
 
 
 # ----------------------------------------------------------------------------
@@ -450,26 +494,125 @@ def edit_next_actions(
     """Change named lines of a project's next_actions without sending the array by hand.
 
     Re-reads the row right before the write, applies `ops` (see apply_line_ops),
-    PATCHes the whole array, re-reads and compares. Raises RuntimeError when the
-    stored array differs from what was sent. There is no compare-and-swap: the
-    window for another session's write is one API round trip, narrowed, not closed
-    (f2826d9d). A Code session uses source 'claude-web' (the API has no claude-code
-    source).
+    PATCHes the whole array with the row's updated_at as `expected_updated_at`, so
+    a write another session landed in between is refused (HTTP 409, grove
+    migration 0013, f2826d9d); then re-reads, re-applies the ops to the new row and
+    tries again, at most CAS_TRIES times. Re-reads after the write and raises
+    RuntimeError when the stored array differs from what was sent. A Code session
+    uses source 'claude-web' (the API has no claude-code source).
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"source must be one of {sorted(VALID_SOURCES)}")
-    before = list(get("project", project_id).get("next_actions") or [])
-    after, report = apply_line_ops(before, list(ops))
-    result = {"before": len(before), "after": len(after), "ops": report, "written": False}
-    if dry_run or after == before:
-        return result
-    _request("PATCH", f"/api/projects/{project_id}",
-             body={"next_actions": after, "source": source})
+    ops = list(ops)
+    for attempt in range(1, CAS_TRIES + 1):
+        row = get("project", project_id)
+        before = list(row.get("next_actions") or [])
+        after, report = apply_line_ops(before, ops)
+        result = {"before": len(before), "after": len(after), "ops": report, "written": False}
+        if dry_run or after == before:
+            return result
+        body = {"next_actions": after, "source": source}
+        if row.get("updated_at"):
+            body["expected_updated_at"] = row["updated_at"]
+        try:
+            _request("PATCH", f"/api/projects/{project_id}", body=body)
+        except GroveError as e:
+            if e.status == 409 and attempt < CAS_TRIES:
+                continue  # another session wrote the row: re-read and re-apply
+            raise
+        break
     stored = list(get("project", project_id).get("next_actions") or [])
     if stored != after:
         raise RuntimeError(
             f"next_actions write not verified: sent {len(after)} lines, stored {len(stored)}"
         )
+    result["written"] = True
+    result["attempts"] = attempt
+    return result
+
+
+CAS_TRIES = 3  # a 409 means another lane wrote between our read and write; the third is a real pile-up
+
+
+# ----------------------------------------------------------------------------
+# task notes line edits — one exact line, re-read and verified (b22bca05, 24d71344)
+# ----------------------------------------------------------------------------
+
+def apply_note_ops(notes: str, ops: Iterable[tuple]) -> tuple[str, list[str]]:
+    """Pure edit of a task's notes by whole lines. Returns (new_notes, report).
+
+    ops, applied in order:
+      ("add", line)           prepend line unless a line already equals it (then nothing changes)
+      ("replace", old, new)   the one line equal to old becomes new; no such line is an error
+    A line is matched whole and exactly, never by prefix: `owns: fairbay/x#1` does not
+    match `owns: fairbay/x#12`. An empty line, a line holding a newline, or an `old`
+    equal to two lines is an error (nothing is written).
+    """
+    lines = notes.split("\n") if notes else []
+    report: list[str] = []
+    for op in ops:
+        kind = op[0]
+        for text in op[1:]:
+            if not isinstance(text, str) or not text.strip() or "\n" in text or "\r" in text:
+                raise ValueError(f"{kind}: each line must be one non-empty line")
+        if kind == "add":
+            line = op[1]
+            if line in lines:
+                report.append(f"add (already present): {line[:60]}")
+            else:
+                lines.insert(0, line)
+                report.append(f"add (prepended): {line[:60]}")
+        elif kind == "replace":
+            old, new = op[1], op[2]
+            hits = [i for i, l in enumerate(lines) if l == old]
+            if len(hits) != 1:
+                raise ValueError(f"replace: {len(hits)} lines equal {old[:60]!r}; exactly one must")
+            lines[hits[0]] = new
+            report.append(f"replace (line {hits[0] + 1}): {old[:60]} -> {new[:60]}")
+        else:
+            raise ValueError(f"unknown op {kind!r}")
+    return "\n".join(lines), report
+
+
+def resolve_task_id(id_or_prefix: str) -> str:
+    """A full task UUID as given; an 8+ hex prefix resolved against every task (any status), paged.
+    No task or two tasks with the prefix is an error."""
+    s = (id_or_prefix or "").strip().lower()
+    if len(s) == 36:
+        return s
+    if len(s) < 8 or any(c not in "0123456789abcdef-" for c in s):
+        raise ValueError("task id: give the full UUID or at least its first 8 hex characters")
+    hits = [t["id"] for t in list_all("task") if t["id"].startswith(s)]
+    if len(hits) != 1:
+        raise ValueError(f"task id: {len(hits)} tasks start with {s!r}")
+    return hits[0]
+
+
+def edit_task_notes(
+    task_id: str,
+    ops: Iterable[tuple],
+    *,
+    source: str = DEFAULT_SOURCE,
+    dry_run: bool = False,
+) -> dict:
+    """Add or rewrite exact lines of one task's notes without an LLM carrying the notes.
+
+    Re-reads the task right before the write, applies `ops` (see apply_note_ops), PATCHes
+    the notes, re-reads and raises RuntimeError when the stored notes differ from what was
+    sent. Tasks have no compare-and-swap: the window for another writer is one round trip.
+    """
+    if source not in VALID_SOURCES:
+        raise ValueError(f"source must be one of {sorted(VALID_SOURCES)}")
+    tid = resolve_task_id(task_id)
+    before = get("task", tid).get("notes") or ""
+    after, report = apply_note_ops(before, list(ops))
+    result = {"task": tid, "before": len(before), "after": len(after), "ops": report, "written": False}
+    if dry_run or after == before:
+        return result
+    update("task", tid, source=source, notes=after)
+    stored = get("task", tid).get("notes") or ""
+    if stored != after:
+        raise RuntimeError(f"notes write not verified: sent {len(after)} characters, stored {len(stored)}")
     result["written"] = True
     return result
 
@@ -563,6 +706,8 @@ def _cli() -> int:
     p_create.add_argument("--source", default=DEFAULT_SOURCE)
     p_create.add_argument("--status")
     p_create.add_argument("--verdict")
+    p_create.add_argument("--allow-duplicate", action="store_true",
+                          help="create even when an open task of the list nearly repeats the title")
 
     p_list = sub.add_parser("list", help="List tasks, ideas, decisions or projects")
     p_list.add_argument("entity_type", choices=sorted(READ_ENTITIES))
@@ -607,6 +752,17 @@ def _cli() -> int:
     p_lines.add_argument("--source", default=DEFAULT_SOURCE)
     p_lines.add_argument("--dry-run", action="store_true")
 
+    p_note = sub.add_parser(
+        "note-line", help="Add or rewrite one exact line of a task's notes (re-read, write, verify)")
+    p_note.add_argument("task_id", help="the task's UUID, or its first 8 or more hex characters")
+    p_note.add_argument("--add", action=_Op, metavar="LINE",
+                        help="prepend LINE unless a line of the notes already equals it")
+    p_note.add_argument("--replace", nargs=2, action=_Op, metavar=("OLD", "NEW"),
+                        help="the one line equal to OLD becomes NEW (the line must exist)")
+    p_note.set_defaults(ops=None)
+    p_note.add_argument("--source", default=DEFAULT_SOURCE)
+    p_note.add_argument("--dry-run", action="store_true")
+
     p_events = sub.add_parser("events", help="Read audit log")
     p_events.add_argument("--entity-type", choices=sorted(READ_ENTITIES))
     p_events.add_argument("--entity-id")
@@ -620,7 +776,7 @@ def _cli() -> int:
             notes=args.notes, list=args.list,
             priority=args.priority, tags=args.tags,
             source=args.source, status=args.status,
-            verdict=args.verdict,
+            verdict=args.verdict, allow_duplicate=args.allow_duplicate,
         )
         print(json.dumps(row, indent=2))
     elif args.op == "list":
@@ -669,6 +825,18 @@ def _cli() -> int:
             return 2
         except (RuntimeError, GroveError) as e:
             print(f"lines: {e}", file=sys.stderr)
+            return 1
+        print(json.dumps(out, indent=2))
+    elif args.op == "note-line":
+        if not args.ops:
+            parser.error("note-line: give at least one --add or --replace")
+        try:
+            out = edit_task_notes(args.task_id, args.ops, source=args.source, dry_run=args.dry_run)
+        except ValueError as e:
+            print(f"note-line: {e} (nothing written)", file=sys.stderr)
+            return 2
+        except (RuntimeError, GroveError) as e:
+            print(f"note-line: {e}", file=sys.stderr)
             return 1
         print(json.dumps(out, indent=2))
     elif args.op == "events":

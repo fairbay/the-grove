@@ -5,7 +5,7 @@ description: >
   "what did we decide", "project status", recent activity. Not for to-dos
   (→ add-to-do) or scoring (→ idea-scout, idea-vault).
 metadata:
-  version: "2026-11-05-01"
+  version: "2026-11-11-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -72,6 +72,8 @@ for Routines that lack MCP access — same operations, same auth flow — and th
 route for scripts: `grove.py list decision --project-ref <ref> --all --limit 500 --json`
 (also `list project`, `get decision|project`, `events --entity-type decision`) writes
 rows a file can hold, so a weekly read never pastes MCP output by hand (ledger 70c3aeb8).
+A task or idea list in a script reads every row with `grove.list_all(...)`, which pages by
+offset; one `list_items` call stops at 200 (374 tasks were open on 2026-11-10; 963701ad).
 
 ## Idea capture
 
@@ -96,6 +98,14 @@ item with zero chat context?
   with no notes (unless truly self-explanatory).
 
 Same standard applies in add-to-do and chat-archive.
+
+**Duplicate refusal (tasks).** Search the list first (`grove_list_tasks(q=…,
+list=…, status="open")`). Grove refuses an open task whose title nearly repeats
+an open task of the same list: `409 near_duplicate`, naming the match by id
+(cards are not checked; dates and ids in titles keep weekly and per-session
+lines apart). Update the named task instead; pass `allow_duplicate: true`
+(`grove.py create … --allow-duplicate`) only when the new task is a different
+item, and say why in its notes. Never retry the same create unchanged.
 
 Status progression (set by other skills, documented here for reference):
 `raw → scouted → in_dev → shipped` (or `shelved` / `gifted` / `killed`).
@@ -142,6 +152,9 @@ session end; session-start's briefing reads it. To change one or two
 array through tool arguments: `scripts/grove.py lines <project id> --set <prefix> <file>`
 (also `--replace` for a line that must exist, `--drop`, `--rewrite`; in the order
 typed) re-reads the row, writes, and verifies (needs `$GROVE_TOKEN`; b22bca05).
+The same for one line of a task's long notes (a marker such as `owns:` or `landing:`):
+`scripts/grove.py note-line <task id or its first 8 hex> --add "<line>"` or
+`--replace "<old line>" "<new line>"` (whole lines, matched exactly; 24d71344).
 
 **The project RECORD (`grove_get(entity_type="project", id=...)`) is the
 authoritative source for what's been drafted, parked, or deferred.** The `notes`

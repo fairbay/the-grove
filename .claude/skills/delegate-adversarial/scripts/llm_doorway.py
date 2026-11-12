@@ -14,15 +14,18 @@ Surfaces:
                                 committed to a throwaway claude/doorway-* branch and sent
                                 through MBN's db-apply `doorway` mode (scripts/db_apply_remote.py),
                                 which holds the write token; same result shape (ops 3477c48b).
-  Chat                        — no token: run the same two statements through the
-                                Supabase connector (SKILL.md "From chat"); this
-                                client raises DoorwayError saying so.
+  Chat                        — no route: the MBN connector is read-only (ruling 0989b72f,
+                                2026-11-08) and llm.call writes, so a chat hands the call
+                                to a Code session or Baylee's manual channel (SKILL.md
+                                "From chat"); this client raises DoorwayError saying so.
 
 Route (LLM_DOORWAY_ROUTE or call(route=...)): 'auto' (default) uses the token, and takes
 the workflow route when there is none or when llm.call fails because the token cannot
 write, but only when the working directory is the MBN checkout (the request body stays
-on an MBN branch: never route another project's material there unasked); 'direct' never
-takes the workflow route; 'workflow' always does. The workflow route waits on timeout_ms
+on an MBN branch, and the run's doorway-result artifact holds the model's answer: once
+MBN is public, both are readable by anyone from the push on, and no cleanup undoes that;
+never route another project's material there unasked, never Mission 1 material); 'direct'
+never takes the workflow route; 'workflow' always does. The workflow route waits on timeout_ms
 (plus the run's start), not wait_seconds.
 
 Never read a key, never print one, never fall back to a direct provider call:
@@ -47,12 +50,11 @@ from pathlib import Path
 
 PROJECT_REF = 'mqbnsjkeucvumdoqdeww'
 API = f'https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query'
-CHAT_BODY_LIMIT = 20_000  # bytes; larger bodies go to a Code session or the manual channel
 MBN_REPO = 'fairbay/medicaid-benefits-navigator'
 ROUTES = ('auto', 'direct', 'workflow')
 # A direct llm.call that fails with one of these is a token that cannot write (C4's Database-read-only
-# token): the auto route sends the call through the workflow instead. Inferred from Postgres and the
-# Management API's wording; not yet observed on the read-only token itself (first C4 session: check).
+# token): the auto route sends the call through the workflow instead. Observed on that token through the
+# Management API: "cannot execute INSERT in a read-only transaction" (MBN lane A, d498fd9c, 2026-11-08).
 _READ_ONLY = re.compile(r'HTTP 40[13]|read[- ]only|permission denied|insufficient privilege|must be owner', re.I)
 _ECHOED_SQL = re.compile(r'(\\n|\n)LINE \d+:')  # Postgres echoes the statement (and its purpose text) after this
 # MBN scripts/db_modes.py DOORWAY: the workflow refuses a request outside these types.
@@ -83,8 +85,8 @@ def _token() -> str:
     if not tok:
         raise DoorwayError(
             "No SUPABASE_ACCESS_TOKEN in this environment, so the doorway cannot be called from here. "
-            "From chat, run `select llm.call(...)` then `select llm.result(<id>, 25)` through the Supabase "
-            "connector (delegate-adversarial SKILL.md, \"From chat\"). Otherwise stop and tell Baylee; "
+            "From chat there is no route either (the MBN connector is read-only): hand the call to a Code session "
+            "or Baylee's manual channel (delegate-adversarial SKILL.md, \"From chat\"). Otherwise stop and tell Baylee; "
             "do not call a provider directly and do not substitute a model."
         )
     return tok
@@ -285,11 +287,13 @@ def _auto_workflow(args: dict, why: str) -> dict:
     if not _cwd_is_mbn():
         raise DoorwayError(
             f"The doorway cannot be called directly from here ({why}). The workflow route commits the request body to "
-            f"a {MBN_REPO} branch that stays there, so the auto route takes it only when the working directory is the "
-            "MBN checkout. For other work, pass route='workflow' (or LLM_DOORWAY_ROUTE=workflow) only if the body may "
-            "sit in that repository; never for personal (Mission 1) material. From chat, run `select llm.call(...)` "
-            "then `select llm.result(<id>, 25)` through the Supabase connector (delegate-adversarial SKILL.md, "
-            "\"From chat\"). Otherwise stop and tell Baylee; do not call a provider directly and do not substitute a model."
+            f"a {MBN_REPO} branch that stays there, and the run's artifact holds the model's answer; once that repository "
+            "is public, both are public from the push on. So the auto route takes it only when the working directory is "
+            "the MBN checkout. For other work, pass route='workflow' (or LLM_DOORWAY_ROUTE=workflow) only if the body "
+            "and the answer may be public; never for personal (Mission 1) material. From chat there is no route (the MBN "
+            "connector is read-only): hand the call to a Code session or Baylee's manual channel (delegate-adversarial "
+            "SKILL.md, \"From chat\"). Otherwise stop and tell Baylee; do not call a provider directly and do not "
+            "substitute a model."
         )
     return _via_workflow(**args, why=why)
 
@@ -359,9 +363,9 @@ def _via_workflow(provider, model, body, purpose, surface, session, run_id, run_
     if root is None:
         raise DoorwayError(
             f"The doorway cannot be called from here ({why}) and no {MBN_REPO} checkout was found for the workflow "
-            "route (set MBN_ROOT to one). From chat, run `select llm.call(...)` then `select llm.result(<id>, 25)` "
-            "through the Supabase connector (delegate-adversarial SKILL.md, \"From chat\"). Otherwise stop and tell "
-            "Baylee; do not call a provider directly and do not substitute a model."
+            "route (set MBN_ROOT to one). From chat there is no route (the MBN connector is read-only): hand the call "
+            "to a Code session or Baylee's manual channel (delegate-adversarial SKILL.md, \"From chat\"). Otherwise "
+            "stop and tell Baylee; do not call a provider directly and do not substitute a model."
         )
     q = _request_file(provider, model, body, purpose, surface, session, run_id, run_budget_usd, timeout_ms)
     dropped = q.pop('_session_dropped', None)

@@ -3,8 +3,10 @@ pr_state.py — land-and-leave entry-gate reader (docs/land-and-leave-SPEC.md §
 
 Commands:
 
-    report [--repo owner/name]            Classify every open PR on the default branch into
-                                          the gate rows G1–G13 (§7.5). JSON on stdout. Exit 0 always.
+    report [--repo owner/name]            Classify every open PR into the gate rows G1–G14 (§7.5);
+                                          one whose base is not the default branch is marked
+                                          stacked (base_ref, stacked_on), and a ready one is G14,
+                                          never offered for merge. JSON on stdout. Exit 0 always.
     check N[,N…] [--repo owner/name]      Per PR: state, merged_at, merge_sha, deploy_state, deploy_ok,
                                           commits_after_cal, continues_from, continued_by, converting.
                                           JSON. Exit 0 always.
@@ -41,6 +43,8 @@ DEFAULT_POLICY = {
     "redeploy": None,
     "hold_check": None,      # a command run in a clone of the repo that prints `holds: <batch> <state> since …` lines (MBN G5)
     "deploy_check": "none",
+    "deploy_context": None,  # the site's own status context(s), e.g. "Vercel – <project>", only where every main
+                             # commit posts it (see deploy_state); unset: every Vercel context
     "stale_draft_days": 14,
     "bot_prs": {"dependabot": "offer_merge_when_green", "block_major": True},
 }
@@ -147,6 +151,19 @@ def _scalar(v: str):
     return v
 
 
+def _strip_comment(line: str) -> str:
+    """The line before a ` #` comment that is outside quotes (a quoted "a #b" value is kept whole)."""
+    quote = None
+    for i, ch in enumerate(line):
+        if quote:
+            quote = None if ch == quote else quote
+        elif ch in "'\"" and (i == 0 or line[i - 1] in " \t:[,-"):  # an opening quote, not an apostrophe
+            quote = ch
+        elif ch == "#" and i > 0 and line[i - 1].isspace():
+            return line[:i]
+    return line
+
+
 def parse_policy_yaml(text: str) -> dict:
     """The landing.yaml subset: top-level scalars, inline lists, block lists, one nested map."""
     try:
@@ -158,7 +175,7 @@ def parse_policy_yaml(text: str) -> dict:
     data: dict = {}
     key = None
     for raw in text.splitlines():
-        line = re.sub(r"\s+#.*$", "", raw).rstrip()
+        line = _strip_comment(raw).rstrip()
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         indented = line.startswith(" ")
@@ -257,14 +274,21 @@ def deploy_state(c: Client, sha: str, policy: dict):
 
     A repo with one Vercel project gets the context `Vercel`; with two or more, one per project,
     `Vercel – <project>` (MBN since the admin guide's project: every G2 read "missing" until 2026-11-04).
-    Each context's newest state counts, and the worst one is the answer."""
+    landing.yaml `deploy_context` (a context or a list of them) names the site's own: only those count,
+    so another project's build (MBN's guide) never reads as main undeployed. Unset, every Vercel
+    context counts. Each context's newest state counts, and the worst one is the answer.
+    deploy_context is right only where every default-branch commit posts that context (Vercel posts
+    it for a build cancelled by the Ignored Build Step too, as success: MBN, 15 of 15 main commits,
+    2026-11-11). A renamed Vercel project makes every read "missing": G2 fires, loudly, until the key
+    is updated."""
     if policy.get("deploy_check") != "vercel":
         return None
+    wanted = deploy_contexts(policy)
     st = c.get(f"/repos/{c.repo}/commits/{sha}/status")
     newest = {}
     for s in st.get("statuses", []):  # statuses are newest first
         ctx = s.get("context") or ""
-        if is_vercel_context(ctx) and ctx not in newest:
+        if (ctx in wanted if wanted else is_vercel_context(ctx)) and ctx not in newest:
             newest[ctx] = s.get("state")
     if not newest:
         return "missing"
@@ -272,6 +296,13 @@ def deploy_state(c: Client, sha: str, policy: dict):
         if state in newest.values():
             return state
     return "success"
+
+
+def deploy_contexts(policy: dict) -> list[str]:
+    """landing.yaml deploy_context as a list of exact status contexts ([] when unset)."""
+    v = policy.get("deploy_context")
+    items = v if isinstance(v, list) else [v]
+    return [x.strip() for x in items if isinstance(x, str) and x.strip()]
 
 
 def is_vercel_context(ctx: str) -> bool:
@@ -300,6 +331,14 @@ def check_status(c: Client, sha: str, head_age_min: float, pr: dict, policy: dic
         return ("billing_failed" if billing else "failed"), summary
     if any(r["status"] != "completed" for r in named) or mergeable is None or ms == "unknown":
         return "pending", summary
+    # A check the repo names (ci_checks) that concluded skipped on this head never ran the suite: the
+    # workflow started and its job chose not to run (MBN #569: only a draft push's skipped `local` was
+    # on the head). Not Green: Pending while a ready run may still come, then Failed (Grove 7e48888a).
+    # Unnamed checks (ci_checks empty) keep skipped as passed: a path- or event-skipped job is normal.
+    if names and any(r.get("conclusion") == "skipped" for r in named):
+        if head_age_min < (policy.get("checks_start_within") or 0):
+            return "pending", summary
+        return "failed", summary + ["skipped:" + ",".join(r["name"] for r in named if r.get("conclusion") == "skipped")]
     if not named:
         if head_age_min < (policy.get("checks_start_within") or 0) and not _actions_settled(c, sha, head_age_min):
             return "pending", summary
@@ -552,6 +591,26 @@ def hold_remedy(holds: list[dict]) -> str | None:
     return f"held: {held}; {remedy}"
 
 
+def stacked_on(pr: dict, open_prs: list[dict], default: str) -> dict:
+    """{} for a PR on the default branch; else its base branch and the open PR whose head that is."""
+    base = (pr.get("base") or {}).get("ref")
+    if not base or base == default:
+        return {}
+    under = next((o["number"] for o in open_prs
+                  if o["number"] != pr["number"] and (o.get("head") or {}).get("ref") == base), None)
+    return {"base_ref": base, "stacked_on": under}
+
+
+def mark_stacked(item: dict, stack: dict) -> dict:
+    """A stacked PR keeps its draft row; a ready one gets G14 and no merge offer: merging it
+    would land on its base branch, not the default one. It waits on its base, so it does not block."""
+    item.update(stack)
+    if stack and not item.get("draft"):
+        base = f"merge #{stack['stacked_on']} first" if stack.get("stacked_on") else f"base is {stack['base_ref']}"
+        item.update(row="G14", recommendation=base, blocks=False)
+    return item
+
+
 def build_report(repo: str) -> dict:
     rep = {"repo": repo, "checked_at": _now().strftime("%Y-%m-%dT%H:%M:%SZ"), "reachable": False,
            "reason": None, "transport": None, "policy": None, "policy_source": None,
@@ -577,9 +636,9 @@ def build_report(repo: str) -> dict:
             dh.update(holds=hr["holds"], holds_read=hr["read"], holds_note=hr["note"])
             if hr["holds"]:  # a held build fails on purpose: report the hold and its state's remedy, not a redeploy
                 dh.update(recommendation="hold", redeploy=hold_remedy(hr["holds"]))
-        prs = c.pages(f"/repos/{repo}/pulls?state=open&base={default}")
+        prs = c.pages(f"/repos/{repo}/pulls?state=open")  # every base: a draft stacked on a branch shows too
         for p in sorted(prs, key=lambda x: x["number"]):
-            rep["prs"].append(classify(c, p["number"], policy))
+            rep["prs"].append(mark_stacked(classify(c, p["number"], policy), stacked_on(p, prs, default)))
         rep["reachable"] = True
     except Unreachable as e:
         rep["reason"] = str(e)
@@ -664,6 +723,7 @@ ROW_TEXT = {
     "G11": "Dependabot, checks pending",
     "G12": "Dependabot, failed",
     "G13": "other bot",
+    "G14": "ready, stacked on another branch",
 }
 
 
@@ -697,6 +757,8 @@ def to_table(rep: dict) -> str:
         extra = f" (majors: {', '.join(p['majors'])})" if p.get("majors") else ""
         if p.get("owner_required"):
             extra += " (needs an `owns:` task, else G7)"
+        if p.get("base_ref"):
+            extra += f" (stacked on #{p['stacked_on']})" if p.get("stacked_on") else f" (stacked on `{p['base_ref']}`)"
         title = p["title"].replace("|", "/")
         if len(title) > 60:
             title = title[:57] + "…"
