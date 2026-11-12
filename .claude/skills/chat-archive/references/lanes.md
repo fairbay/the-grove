@@ -32,7 +32,9 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
   these files, the row, the PRs and the last dispatch's record in one turn and prints the lanes in
   five groups by what Baylee does with them (Start with its prompt, Your step, Your call, Waiting
   not on you, Running); it writes no baton. A lane's later `next:` items are read too: one that
-  does not depend on what the first item waits on is the lane's ready item (the escape).
+  does not depend on what the first item waits on is the lane's ready item (the escape). Lane H's
+  list is the infrastructure queue (`infra_queue.py` over Grove lists `ops` and `grove`,
+  `fairbay/ops` docs/infra-queue/DESIGN.md): its pick is lane H's last escape target.
 
 ## Entry (session-start)
 
@@ -52,6 +54,9 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
 5. **Another lane's ready PR is information, not a tap.** It does not block this session's work:
    two lanes' batons never touch the same line. A ready PR of this session's own lane is handled
    as Phase 0 says for any ready PR.
+6. **A stale starting item** (lane H): when the prompt's `starting at <id>` names a task already
+   done or dropped, run `python3 .claude/skills/session-start/scripts/infra_queue.py --fetch` and
+   take its pick.
 
 ## Exit (chat-archive Step 9, close-at-land)
 
@@ -84,15 +89,30 @@ Without the key nothing here applies. Design and rule-set pass: `fairbay/ops` do
 5. **The Next-step line names the lane:** `lane A: ` followed by the Go sentence verbatim (step 8).
    The lane word is what loads the baton next time; the Go sentence itself is Baylee's wording and
    is not changed. A data lane's START HERE item and row line end with the same sentence as
-   `Opening line: "lane A: Go: …"`, where dispatch reads it (close-at-land step 8; policy-check (f)).
+   `Opening line: "lane A: Go: …"`; dispatch reads it from the baton only (close-at-land step 8; policy-check (f)).
 6. **START HERE names its rank.** In a repo with `docs/ISSUES.md` (MBN), the baton's first `next:`
    item and the row's lane line name the rank it works ("rank 23") from the list's "How lanes pull
    from it" row: the highest rank there that waits on nothing
    (`python3 .claude/skills/session-start/scripts/issues_next.py docs/ISSUES.md --lane <x>`), or
    another rank with the reason in a few words ("rank 11 (m1360): the free part of a waiting rank").
-   A lane with no row in the table (lane H) names none. The session that finishes a rank re-runs
+   A lane with no row in the table (lane H) names none; a lane whose work is in another repo (lane
+   H) runs `python3 .claude/skills/session-start/scripts/infra_queue.py --fetch` before writing
+   START HERE and names its pick there, or the reason it skipped the pick. The session that finishes a rank re-runs
    its measure and strikes or updates its line in the same PR (ISSUES.md, "How lanes pull from it";
    Grove f21b91ed step 1; dispatch reads the list's pick beside the baton's into its record, read 7).
+7. **Waits are checked, not trusted** (Grove 6c8059b0). Before writing START HERE, run
+   `python3 .claude/skills/session-start/scripts/deps_check.py --issues docs/ISSUES.md --fetch --batons handoffs --report`.
+   Every finding in this lane's own places (its row line, its baton, and the Waits-on cells of the
+   ranks whose Lane column names this lane first) is fixed in the same archive, after a
+   `grove_get` of the id: a STALE id that Grove shows done or dropped comes out of the text (or
+   is marked "done" or "'a'" as evidence); one Grove does not know is corrected to the id meant.
+   An UNOWNED blocker that is the lane's work gets this lane's tag; one that waits on Baylee or
+   the real world gets the `baylee` tag or becomes his card, never a lane tag that hides his wait.
+   An UNQUEUED one is named in START HERE's queue or its wait is struck; a MISLABELED one names its
+   real lane; a CLOSED_NOT_FREE cell becomes exactly "—", its note moved to the Count cell. A
+   finding in another lane's places is that lane's: it goes in the archive's record, not into
+   another lane's line. Where `.claude/landing.yaml` lists the command under `pre_ready` (with
+   `--report`, so it never blocks), close-at-land prints it again before the merge.
 
 ## No archive-only PR
 

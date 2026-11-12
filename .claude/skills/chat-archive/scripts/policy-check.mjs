@@ -30,9 +30,16 @@
 //               most 200 characters. Lane files with no lanes declared fail.
 //   (f) go      where policy.json has harness.go: a baton this change touches whose START HERE (first `next:`
 //               item) is "a data batch" or "a data session" carries `Opening line: "lane <x>: Go: <harness.go>"`,
-//               mNNNN filled, so dispatch can copy it into the prompt (Grove 6179636b).
+//               mNNNN filled, so dispatch can copy it into the prompt (Grove 6179636b); and any Opening line
+//               in a touched baton that carries a `Go:` carries exactly harness.go, only mNNNN filled (a
+//               reworded or widened Go fails, a Go-less line passes; MBN trust chain G12, Grove 4ec0cfba). Read
+//               after NFKC, zero-width removal and straight quotes, whatever the label's suffix or quote kind;
+//               a `Go:` outside every Opening line fails too.
 // The rule files are signals.S7_uncited_routing_sentences.files in policy.json. .claude/global.md
-// is never linted here: it is a synced copy, linted in fairbay/ops only.
+// is never linted here: it is a synced copy, linted in fairbay/ops only (as global-CLAUDE.md). The
+// same holds for the detail files in .claude/global/ (docs/global-rules-core/DESIGN.md): synced
+// copies everywhere but fairbay/ops, where they are the source. A repo is the source when it has
+// global-CLAUDE.md at its root.
 // Dependency-free (Node's own modules), so rules.yml runs it without an install.
 
 import { readFileSync, existsSync, readdirSync, realpathSync } from "node:fs";
@@ -50,6 +57,9 @@ const REQUIRED = ["version", "classes", "decision_table", "signals", "changelog"
 const ROUTE_RE = /^(proceed_log|card|card_then_owner|stop|one line to [a-z0-9-]+)$/;
 const DEFAULT_FILES = ["CLAUDE.md", "docs/rules/*.md"];
 const NEVER_LINTED = new Set([".claude/global.md"]);
+const SYNCED_DIR = ".claude/global/"; // linted only where global-CLAUDE.md, the source, sits beside it
+const neverLinted = (root, f) =>
+  NEVER_LINTED.has(f) || (f.startsWith(SYNCED_DIR) && !existsSync(join(root, "global-CLAUDE.md")));
 
 // Words that show a sentence names a route: each class's own markers, not common words, so a
 // pointer that contradicts its sentence (a "needs his OK" sentence cited as upkeep) fails.
@@ -109,7 +119,7 @@ function expand(root, patterns) {
     if (!existsSync(join(root, dir))) continue;
     for (const f of readdirSync(join(root, dir)).sort()) if (re.test(f)) files.push(dir === "." ? f : `${dir}/${f}`);
   }
-  return files.filter((f) => !NEVER_LINTED.has(f));
+  return files.filter((f) => !neverLinted(root, f));
 }
 
 // (a)
@@ -380,9 +390,9 @@ function checkLanes(root, base, requireBase = false) {
 }
 
 // (f) go: the Go rides in the baton, where dispatch reads it (Grove 6179636b; ruling 7fd4b24e).
-// Dispatch copies a Go only from a lane's baton or row line and never composes one, so a data
-// lane whose baton carries none starts without consent and stalls on a question (lane A,
-// 2026-11-08 01:19Z to ~10:40Z).
+// Dispatch copies a Go only from a lane's baton (lane_state.py's go line; never the row line,
+// Grove 89437cec) and never composes one, so a data lane whose baton carries none starts without
+// consent and stalls on a question (lane A, 2026-11-08 01:19Z to ~10:40Z).
 const DATA_START = /\ba data (batch|session)\b/i;
 
 function policyGo(text) {
@@ -416,20 +426,81 @@ export function startHere(baton) {
   return s;
 }
 
+// Text as a reader (or dispatch, a model) sees it: NFKC (a fullwidth colon is a colon), zero-width
+// characters dropped, curly quotes straight, YAML folding and quote escapes undone.
+export function normalizeBaton(text) {
+  return String(text || "").normalize("NFKC").replace(/[​-‍⁠﻿]/g, "")
+    .replace(/[“-‟″]/g, '"').replace(/[‘-‛′]/g, "'")
+    .replace(/\n[ \t]+/g, " ").replace(/''/g, "'").replace(/\\"/g, '"');
+}
+
+// Every Opening line in a text: [{ lane, body }]. The label is `Opening line`, any case, with up to 40
+// characters before its colon (`Opening line (lane A):`); the line may be quoted with " or ' or not at
+// all. A "-quoted body runs to the next "; a '-quoted one to the next ' not followed by a letter (an
+// apostrophe, "site's", stays inside); an unquoted one to the end of the line. `lane <x>:` is optional
+// and tolerates runs of spaces. lane is null when the line names none.
+export function openingLines(text) {
+  if (!text) return [];
+  const flat = normalizeBaton(text);
+  const out = [];
+  for (const m of flat.matchAll(/opening line[^:\n]{0,40}:[ \t]*/gi)) {
+    let start = m.index + m[0].length, end;
+    const q = flat[start];
+    const eol = flat.indexOf("\n", start) < 0 ? flat.length : flat.indexOf("\n", start);
+    if (q === '"') end = flat.indexOf('"', ++start);
+    else if (q === "'") {
+      start++;
+      const c = /'(?![A-Za-z])/.exec(flat.slice(start, eol));
+      end = c ? start + c.index : -1;
+    }
+    if (end === undefined || end < 0 || end > eol) end = eol;
+    let body = flat.slice(start, end).replace(/\s+/g, " ").trim();
+    if (q !== '"' && q !== "'") body = body.replace(/['"]+$/, "").trim(); // the YAML scalar's own closing quote
+    const l = /^lane\s+([a-z][a-z0-9]*)\s*:\s*/i.exec(body);
+    out.push({ lane: l ? l[1].toLowerCase() : null, body: l ? body.slice(l[0].length) : body, span: [m.index, end] });
+  }
+  return out;
+}
+
+// A Go sentence outside every Opening line (`Paste "lane A: Go: …"`, a Go after a line's closing quote):
+// dispatch could copy it, and no check would hold it to harness.go. Over MBN's 39 baton versions to
+// 2026-11-11 no `Go:` stood outside an Opening line, so any is a failure. Returns the contexts.
+export function strayGos(text) {
+  const flat = normalizeBaton(text);
+  const spans = openingLines(text).map((o) => o.span);
+  return [...flat.matchAll(/\bgo\s*:/gi)].filter((m) => !spans.some(([a, b]) => m.index >= a && m.index < b))
+    .map((m) => flat.slice(Math.max(0, m.index - 40), m.index + 60).replace(/\s+/g, " ").trim());
+}
+
 // A baton whose START HERE is a data batch or data session carries the Opening line with the
-// policy's harness.go, the batch id filled in: `Opening line: "lane A: Go: … m1368 …"`.
+// policy's harness.go, the batch id filled in: `Opening line: "lane A: Go: … m1368 …"`. And any
+// Opening line in the baton that carries a Go at all carries exactly that sentence, only mNNNN
+// filled: the Go Baylee pastes is the archive's Opening line, so a reworded or widened Go would be
+// consent the archive wrote for itself (MBN trust chain G12; Grove 4ec0cfba). A Go-less line passes.
 export function checkGoCarried(baton, lane, harnessGo) {
   if (!harnessGo) return [];
+  const go = harnessGo.replace(/^Go:\s*/i, "").replace(/\s+/g, " ");
+  const esc = go.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/mNNNN/g, "m\\d{4}");
+  const exact = new RegExp(`^Go: ${esc}$`);
+  const hasGo = (o) => /go\s*:/i.test(o.body); // any Go, whatever its case or what precedes it ("XGo:", "GO:")
+  const fails = openingLines(baton)
+    .filter((o) => hasGo(o) && !exact.test(o.body))
+    .map((o) => {
+      const L = (o.lane || lane).toUpperCase();
+      return `go: handoffs/lane-${lane}.yaml carries Opening line "${o.lane ? `lane ${L}: ` : ""}${o.body}", whose Go is not the ` +
+        `policy's harness.go: write it as Opening line: "lane ${L}: Go: ${go}" (only mNNNN filled with the ` +
+        `batch id), or drop the Go. What the Go covers changes only by Baylee's ruling (policy.json harness.go).`;
+    });
+  for (const ctx of strayGos(baton))
+    fails.push(`go: handoffs/lane-${lane}.yaml carries a Go outside an Opening line ("…${ctx}…"): a Go rides only as ` +
+      `Opening line: "lane ${lane.toUpperCase()}: Go: ${go}" (only mNNNN filled); reword the prose without "Go:" or drop it.`);
   const s = startHere(baton);
-  if (!s || !DATA_START.test(s)) return [];
-  const go = harnessGo.replace(/^Go:\s*/i, "");
-  const esc = go.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/mNNNN/g, "m\\d{4}").replace(/\s+/g, "\\s+");
-  if (new RegExp(`Opening line: "lane ${lane}: Go: ${esc}"`, "i").test(s)) return [];
-  return [
-    `go: handoffs/lane-${lane}.yaml's START HERE is a data batch with no Go: end it with ` +
-      `Opening line: "lane ${lane.toUpperCase()}: Go: ${go}" (mNNNN filled with the batch id). ` +
-      `Dispatch copies a Go only from the baton or the row line (close-at-land step 8).`,
-  ];
+  if (s && DATA_START.test(s) && !openingLines(s).some((o) => hasGo(o) && o.lane === lane))
+    fails.push(
+      `go: handoffs/lane-${lane}.yaml's START HERE is a data batch with no Go: end it with ` +
+        `Opening line: "lane ${lane.toUpperCase()}: Go: ${go}" (mNNNN filled with the batch id). ` +
+        `Dispatch copies a Go only from the baton (close-at-land step 8).`);
+  return fails;
 }
 
 export function run(root, { s8 = true, base = null, requireBase = false } = {}) {
@@ -445,7 +516,7 @@ export function run(root, { s8 = true, base = null, requireBase = false } = {}) 
   const files = expand(root, patterns || DEFAULT_FILES);
   if (!files.length) fails.push(`S7: no rule file matches ${JSON.stringify(patterns || DEFAULT_FILES)}: S7 would check nothing`);
   for (const p of patterns || DEFAULT_FILES)
-    if (!p.includes("*") && !files.includes(p) && !NEVER_LINTED.has(p)) fails.push(`S7: rule file ${p} is missing`);
+    if (!p.includes("*") && !files.includes(p) && !neverLinted(root, p)) fails.push(`S7: rule file ${p} is missing`);
   const exempt = sig && Array.isArray(sig.not_routing) ? sig.not_routing : [];
   for (const e of exempt)
     if (!e || typeof e.file !== "string" || typeof e.sentence !== "string" || typeof e.why !== "string" || !e.why.trim())

@@ -5,7 +5,7 @@ description: >
   "Gemini review", score audit, demand validation. Not for standard
   review (→ delegate-analytical) or panel (→ review-panel).
 metadata:
-  version: "2026-11-05-01"
+  version: "2026-11-12-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's
@@ -45,7 +45,11 @@ first when the token can read, commits the request to a throwaway
 `workflow_run`. The round trip takes about 80 s. The cloud git proxy refuses
 branch deletion, so the result names a leftover branch as `branch_left`. Choose
 a route with `LLM_DOORWAY_ROUTE` or `route=`: `auto` (the default), `direct`
-or `workflow`.
+or `workflow`. **Once MBN is public, the request body and the model's answer
+are public** from the push on (the branch, and the run's `doorway-result`
+artifact); no cleanup undoes that. So `auto` takes the workflow only from the
+MBN checkout; from another project, choose `workflow` only for material that
+may be public, and never for Mission 1 material.
 
 Model: the review default is the `llm.prices` row with `default_for = 'review'`
 (`gemini-3.1-pro-preview` as seeded; `MODEL_PRO` mirrors it) and the research
@@ -78,24 +82,17 @@ starting.
   builds the block; `generate_constraints`, `single_pass_review` and
   `multi_pass_review` take `rejected=[(finding, reason), …]`.
 
-**From chat** (no token): two connector calls per model call, single statements.
-`select llm.call('google', '<model>', convert_from(decode('<base64 body>', 'base64'), 'utf8')::jsonb, '<purpose>', 'chat', '<session url>', null, null, 600000) as r`
-(the nine arguments in that order: provider, model, body, purpose, surface, session, `run_id`,
-`run_budget_usd`, `timeout_ms`; a seventh positional 600000 lands in `run_id` and fails the
-signature) then `select llm.result('<call_id>'::uuid, 25) as r` (a third time if still
-`queued`). **The body is built by hand in chat, so it carries what `gemini.py` adds for you:**
-`generationConfig.maxOutputTokens` and `generationConfig.thinkingConfig` (`{"thinkingLevel":
-"low"}` on a `gemini-3*` model, `{"thinkingBudget": 1024}` otherwise), or the doorway refuses
-it ("no explicit thinking setting"; call 31a3f167, 2026-10-25). Research from chat is the same
-body plus `"tools": [{"google_search": {}}]`. Read
-`response->'candidates'->0->>'finishReason'` from a `text_only := false` result: anything but `STOP`
-means the answer is incomplete. Base64 keeps a semicolon or `$$` in a bundle from cancelling the
-connector call. Nothing over 20 KB goes from chat: a Code session or the manual
-channel. Never retry a `refused` or `error` result; report it.
-**Size the deliverable before a chat design run:** one that will pass about 14 KB raw (20 KB once base64-wrapped, the connector's cap) plans its
-adversarial review as the next Code session's first step (the task filed with the brief and
-the bundle on the PR, before the cards) or as Baylee's manual channel; discovering this at the
-end wastes the run's review slot (MBN #400, 2026-10-21). Since 146d9cfb a `Gate: process` doc
+**From chat: no route today.** Ruling 0989b72f (2026-11-08) made chat's MBN
+connector read-only ("Supabase MBN (read-only)"), and `llm.call` writes (a row in
+`llm.calls`, a request in pg_net's queue), so `select llm.call(...)` from chat is
+refused before anything is sent (inferred from Postgres semantics, not run: no row,
+no spend). A chat hands an outside call to a Code session (`gemini.py` over
+`llm_doorway.py`, or its workflow route from an MBN checkout) or to Baylee's manual channel. Do not try the
+connector, and do not route around it.
+**Plan the review route before a chat design run:** its adversarial review is the
+next Code session's first step (the task filed with the brief and the bundle on the
+PR, before the cards) or Baylee's manual channel; discovering this at the end
+wastes the run's review slot (MBN #400, 2026-10-21). Since 146d9cfb a `Gate: process` doc
 over 14,000 bytes fails `process_gate.py check` until its gate block carries a `Review route:`
 line, so the route is named at round 0, not at the review step.
 
@@ -111,7 +108,7 @@ gap-finding, score audit, demand validation. Distinguished from:
 
 ## Behavioral interrupts
 
-**If you are about to review a process design — a design doc in `fairbay/ops` docs/ — before `process_gate.py check` has passed it, stop.** Run `python3 .claude/skills/chat-archive/scripts/process_gate.py check <the DESIGN.md>` first (global-CLAUDE.md "Earning a design run"; docs/process-governance/DESIGN.md). A FAIL returns the doc to its author with the misses; round 1 does not start. This is the gate's entry check — CI only backstops it at landing.
+**If you are about to review a process design — a design doc in `fairbay/ops` docs/ — before `process_gate.py check` has passed it, stop.** Run `python3 .claude/skills/chat-archive/scripts/process_gate.py check <the DESIGN.md>` first (`.claude/global/design.md` "Earning a design run"; docs/process-governance/DESIGN.md). A FAIL returns the doc to its author with the misses; round 1 does not start. This is the gate's entry check — CI only backstops it at landing.
 
 **If you are about to flaw-find a spec, code, architecture, or scoring output
 inline, stop.** Delegate to Gemini. Pass the deliverable + the standards it
@@ -248,8 +245,8 @@ Public URLs only — no auth, no localhost.
 **Inline first, URL context only for sources already public** (Google's "File
 input methods" guide: inline for files under 100 MB / 50 MB PDF, the Files API
 for larger or reused files, URLs for data already hosted online; 4ab959be). Our
-own documents go inline: up to about 14 KB of text from any surface, larger
-from a Code session or routine (chat's connector caps a statement near 20 KB).
+own documents go inline, from a Code session or routine (chat has no route:
+"From chat" above).
 URL context is for pages that are public anyway, never a way to ship our docs:
 the doorway prices and audits only the body it sees, so a URL body has a blind
 estimate and no record of what was reviewed. Pass `content_sha256={url: sha}`
@@ -333,7 +330,7 @@ disposition each finding against the primary files: accepted (fix named),
 rejected (reason named; it rides along in the next brief) or deferred (Grove
 task). Findings are data; one the files contradict is rejected, not folded.
 A second pass on the same deliverable counts toward the three-round cap in
-the global rule "The review loop".
+the review loop (`.claude/global/design.md` "The review loop").
 
 ## Workflow: Research mode
 
@@ -386,8 +383,12 @@ Context cache storage: $1/M tokens/hour. Default TTL: 30 min.
 The key lives in the Supabase Vault of the MBN project (`google_ai_key`),
 entered by Baylee in the dashboard, never by a session and never in a file.
 Rotation is one Vault update. `secrets/gemini.env` is retired; nothing reads it.
-A Code session or Routine needs only `SUPABASE_ACCESS_TOKEN` (the MBN
-environment provides it); chat uses the Supabase connector.
+A Code session or Routine needs only `SUPABASE_ACCESS_TOKEN` set: on the
+"GitHub" environment the agent proxy attaches the read-only token for
+`api.supabase.com` (CONVENTIONS "Secrets"). The variable holds the placeholder
+`proxy-injected` (seen in fresh sessions, 2026-11-12); never print the
+environment all the same: other variables there are real values. Chat has no
+route ("From chat").
 
 ## Scripts reference
 

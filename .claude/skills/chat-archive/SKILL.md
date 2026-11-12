@@ -5,7 +5,7 @@ description: >
   stopping points. Fires even mid-build. Not for mid-session status
   (→ chat-status).
 metadata:
-  version: "2026-11-08-01"
+  version: "2026-11-12-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -27,7 +27,7 @@ References used by this skill (one hop):
 - `references/handoff-schema.md` — YAML schema, build vs session, delivery
 - `references/encoding-gate.md` — memory edit principles, finding routing
 - `references/close-at-land.md` — PR hand-off: markers, owner tasks, ready, merge tap
-- `references/session-record.md` — session record, random fifth, MBN batch close, agent state
+- `references/session-record.md` — session record, contested calls, MBN batch close, agent state
 - `references/lanes.md` — repos whose landing.yaml declares `lanes:`: one baton per lane, handoff-merge
 
 **Surface-specific steps in this skill:**
@@ -227,7 +227,7 @@ action: `references/permissions-audit.md`. Its output goes in Step 4 under
 
 Before the summary, log the session-record decision (`references/session-record.md`,
 "The record"): one `session_report.py --record` call on every surface, with every PR
-opened, merged or left for his tap in `--prs`, the rung-3 ids, the random fifth (Step 4, 9b),
+opened, merged or left for his tap in `--prs`, the rung-3 ids,
 cards and tasks; its JSON line is the `context`. Exit 2: fix the input, never the JSON. **No summary
 or Next-step line until its id is in hand.** If Grove refuses twice, the record
 JSON goes into the handoff's `pending_record:` when a work PR is still open to carry it
@@ -254,8 +254,8 @@ Concise, scannable:
 - **Key decisions** — architectural choices, ideas shelved/killed, strategy
   shifts. These feed `decisions_made:` in the handoff (Step 9).
 - **What didn't work** — failed approaches worth remembering
-- **Calls to check (random fifth)** — from Step 3e, one line each with
-  "reply 'reverse <id>' to undo"
+- **Contested calls** (only if any) — rung-3 calls tagged `contested`, one
+  line each with "reply 'reverse <id>' to undo" (`references/session-record.md`)
 - **Permissions & setup gaps** (from 3d, only if any) — what Claude
   requested permission for, what was missing, and the specific settings
   path or connector name to prevent it next time. Format each as:
@@ -277,7 +277,8 @@ Rules:
 
 - Goes in the **response body** — not exclusively in a handoff doc, not
   implied, not buried.
-- One line, imperative voice, specific.
+- One line, imperative voice, specific; a step of his is followed by its numbered
+  click-by-click steps, even if printed before (global Rule 7, 309b9f9c).
 - If nothing is needed: `"**Next step:** Nothing — this workstream is
   complete."`
 - Clickable links inline on the same line or the line immediately following.
@@ -292,7 +293,7 @@ is a data batch (guard verdict `continue`), the line carries the repo's
 `.claude/policy.json` `harness.go` read from the file, `mNNNN` filled with the
 next migration number (`references/session-record.md`, "MBN data-batch close").
 The same sentence ends the lane's baton START HERE and row line as
-`Opening line: "lane A: Go: …"`, where dispatch copies it from (close-at-land step 8).
+`Opening line: "lane A: Go: …"`; dispatch copies it from the baton only (close-at-land step 8).
 Pause, escalate or a library session: the line names that work and no Go.
 
 ### 6. Outstanding action items (only when there are >1)
@@ -475,7 +476,7 @@ fails, say so explicitly.
 - [ ] Outstanding items (if >1) verified before listing?
 - [ ] Permissions audit done (3d, chat only)? Setup gaps surfaced in summary?
 - [ ] Cost shape line (7) in the summary and the Grove session line?
-- [ ] Session-record decision logged (3e), random fifth printed with "reverse <id>"?
+- [ ] Session-record decision logged (3e), contested calls (if any) printed with "reverse <id>"?
 - [ ] MBN data session: guard-record appended, guard.mjs verdict in `progress:` and the batch decision, Go in Next-step?
 - [ ] Agent states checked against their output files before naming them?
 - [ ] Subscriptions to PRs that outlive the session removed?

@@ -5,7 +5,7 @@ description: >
   "add claude config". Auto-fires from ship-it when .claude/ is missing.
   Not for deployment (→ ship-it) or skill editing (→ skill-creator-b).
 metadata:
-  version: "2026-11-05-01"
+  version: "2026-11-12-01"
 ---
 
 # init-repo — bootstrap .claude/ infrastructure in a repository
@@ -32,7 +32,8 @@ Skip any step whose artifact already exists.
 
 | File | Purpose | Source of truth |
 |------|---------|-----------------|
-| `.claude/global.md` | Cross-project preferences | `fairbay/ops/global-CLAUDE.md` |
+| `.claude/global.md` | Cross-project preferences (the core) | `fairbay/ops/global-CLAUDE.md` |
+| `.claude/global/*.md` | The global rules' detail files | `fairbay/ops/.claude/global/` |
 | `CLAUDE.md` | Repo-level instructions | Must start with `@.claude/global.md` |
 | `.claude/settings.json` | Hooks, permissions | CONVENTIONS.md § Session-continuity gates |
 | `.claude/skills/*` | All 22+ skills | `fairbay/ops/.claude/skills/` |
@@ -41,6 +42,10 @@ Skip any step whose artifact already exists.
 
 **`.claude/global.md`** — Copy verbatim from `fairbay/ops/global-CLAUDE.md`.
 Do not customize per repo.
+
+**`.claude/global/`** — Copy every `*.md` file in `fairbay/ops/.claude/global/`
+verbatim, same names, nothing else in the folder. The core points to them; a
+repo with the core and not the folder has rules it cannot read.
 
 **`CLAUDE.md`** (if missing) — Create with:
 ```markdown
@@ -72,7 +77,8 @@ Confirm the push succeeded. Report what was created vs. what already existed.
 
 ## Gotchas
 
-- **Don't customize global.md per repo.** The sync script overwrites it.
+- **Don't customize global.md or `.claude/global/` per repo.** The sync script
+  overwrites them, and removes any file in `.claude/global/` that ops does not ship.
   Repo-specific instructions go in the root `CLAUDE.md`.
 - **Skills must land before the first Claude Code session.** A session that
   starts without skills discovers none of the workflows.

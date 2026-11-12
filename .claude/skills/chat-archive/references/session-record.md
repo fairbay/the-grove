@@ -1,4 +1,4 @@
-# Session record, random fifth, data-batch close, agent state
+# Session record, contested calls, data-batch close, agent state
 
 What the archive (and, when the archive did not run, the next session's entry)
 writes so the decision-routing signals have data: `fairbay/ops`
@@ -7,7 +7,7 @@ that consumes the records is `scripts/ops_read.py` (project-health, "Ops read").
 
 ## Contents
 - The record (Step 3e) — fields, sources, the decision call, no close without it
-- The random fifth — which calls Baylee sees, and how he reverses one
+- Contested calls — the calls Baylee sees, and how he reverses any call
 - Reversals and wrong questions — the tags, with needless asks
 - At entry (session-start Phase 0) — a missing record for the previous session
 - MBN data-batch close — guard-record.json, guard.mjs, the verdict line, the Go
@@ -26,9 +26,10 @@ row's metadata is overwritten each session, so it cannot hold a series).
  "asks": 0, "refusals": 0, "refused": [], "merges": 0,
  "prs": [{"pr": "fairbay/<repo>#<n>", "via": "self|ask|github|pending|open", "tapped": false}],
  "start": "pasted|typed|none", "opening_chars": 0, "interrupts": 0,
- "calls_logged": ["<rung-3 decision ids>"], "calls_shown": ["<ids of the random fifth, and of the contested calls shown with it>"],
+ "calls_logged": ["<rung-3 decision ids>"],
  "cards": ["<adjudication ids filed>"], "tasks_for_baylee": ["<task ids for him>"],
- "cache_read_m": {"opus": 12.3}, "source": "transcript", "lane": "<x>"}
+ "cache_read_m": {"opus": 12.3}, "source": "transcript", "lane": "<x>",
+ "global_reads": [{"file": "ladder.md", "bytes": 12127}]}
 ```
 
 **Build it with one call, on every surface** (architecture run 75cbc21d, build item 1:
@@ -41,7 +42,7 @@ python3 .claude/skills/chat-archive/scripts/session_report.py --record \
   --session <session URL> --surface chat|code|routine --repo fairbay/<repo>|null \
   --kind upkeep|direction|<kind> [--lane <x>] \
   --prs "<n>:<via>,fairbay/<other>#<n>:<via>" [--not-merged <n>] [--asks-prose N] \
-  --calls <ids> --shown <ids> --cards <ids> --tasks <ids>
+  --calls <ids> --cards <ids> --tasks <ids>
 ```
 
 It reads the newest transcript (`--prefix` to name one), prints the record as one
@@ -67,10 +68,11 @@ number is counted in `unchecked_merges`.
 | `start`, `opening_chars` | from the transcript's first human message (meta records, compaction summaries and "being continued" openers skipped): `pasted` only on positive evidence of a printed prompt (a `Go:` sentence at a line start or after `lane X:`, a dispatch prompt), else `typed`; `none` when there is none, and always for a routine (its prompt is not his). The length rides beside it |
 | `interrupts` | `asks + refusals − merge-call refusals + github/pending PRs + cards + 1 for a pasted start`: a refused merge costs him its tap, counted once on its PR (an ask, or `github`/`pending`); a merge under his answer is inside the ask; ruled upkeep costs nothing |
 | `calls_logged` | `--calls`: Grove decisions this session logged at rung 3 (not the record itself, not reversals) |
-| `calls_shown`, `cards`, `tasks_for_baylee` | `--shown`, `--cards`, `--tasks`: the random fifth below plus the contested calls shown with it; Grove ids filed this session |
+| `cards`, `tasks_for_baylee` | `--cards`, `--tasks`: Grove ids filed this session |
 | `cache_read_m` | the session's cache-read tokens in millions by model family. The weekly read's S10 line sums it per day (`ops_read.py`) |
 | `source` | `transcript`; an entry stub is `no-transcript` (At entry, below) |
 | `lane` | `--lane`: in a lanes repo, the lane the session worked (`"a"`); the record also takes the tag `lane-<x>`, which is how dispatch finds each lane's last session (session-start `references/dispatch.md`). Omitted outside lanes and for a dispatch record (tag `dispatch` instead) |
+| `global_reads` | the `.claude/global/` detail files the transcripts show read (a Read call, or a Bash `cat`/`head` of one; sub-agents included), in first-read order, each once, with its bytes on disk now (`null` when not found); `[]` when none. The global-rules lookback reads which files sessions open (`docs/global-rules-core/DESIGN.md` §7.3) |
 | `opening_hash` | eight hex characters of the opening message with white space collapsed; equal to a dispatch record's prompt `hash` when he pasted that prompt unchanged |
 | `dispatch` | `--dispatch <file> --lanes <declared lanes>`: a dispatch run's own block, what it printed (every lane's state, each prompt with its text, `first` print time, `since` the first offer, `offered` count and hash, his steps, his calls, the waiting and running lines, the cleanup); the next dispatch reads it to tell a prompted lane from a ready one (session-start `references/dispatch.md` Step 4) |
 
@@ -78,7 +80,7 @@ number is counted in `unchecked_merges`.
 the week's whole records (record 2, built by `--record`), sums their interrupts,
 starts and PR taps, and, over every record with a cost (record 1 included), prints
 the process share: cache-read of ops sessions and lane H. Record 1 (written by hand
-before 2026-10-28) still counts for S1, S2, S4 and S10. Under it, "Dispatch prompts"
+before 2026-10-28) still counts for S1, S2 and S10. Under it, "Dispatch prompts"
 counts the week's dispatch runs' printed prompts (ready lanes, once per session),
 how many were pasted unchanged (a record whose `opening_hash` equals a prompt's hash,
 logged after its first print) and the strict count of `docs/dispatch/DESIGN.md` §1.2; and
@@ -91,7 +93,7 @@ merges from the conversation, `source: self-reported`, `cache_read_m: null`,
 "needed" field: a session cannot judge its own asks).
 
 **The call.** `grove_log_decision(decision="session-record <date> <repo or slug>:
-asks A, refusals R, merges M, calls L (shown S), cards C", project_ref=…,
+asks A, refusals R, merges M, calls L, cards C", project_ref=…,
 context=<the JSON>, tags=["session-record", "lane-<meta.lane>"] (the lane tag
 from the baton's `meta.lane`; in a repo without lanes the list is
 ["session-record"] alone), confidence="high", reversible="yes", rung=3)`. Then
@@ -114,35 +116,24 @@ the next session's entry logs it. With no work PR open (no PR is opened for a
 handoff alone, close-at-land "Land-at-push"), or in a session-only chat, the
 archive puts the JSON in the response and says the next entry will write a stub.
 
-## The random fifth
+## Contested calls
 
-The random fifth is what Baylee sees of this session's rung-3 calls; without it
-S4 has no denominator and silence would read as approval.
-
-```bash
-python3 -c 'import math,random,sys; ids=sys.argv[1:]; k=math.ceil(len(ids)/5) if ids else 0; print(" ".join(random.sample(ids,k)))' <id> <id> …
-```
-
-Print the picked calls in the Step 4 summary and in the Grove session line
-(9b), one line each, under the heading **Calls to check (random fifth):**
-
-```
-- 5f2c1a90 — <the decision's first 90 characters> — reply "reverse 5f2c1a90" to undo
-```
-
-Their ids go in the record's `calls_shown` (ids only, never prose: the weekly read's
-S4 counts reversals against them). No rung-3 calls → the line reads "Calls to check:
-none this session" and `calls_shown` is empty.
+Rung-3 calls are logged, not sampled for Baylee: the sampled list and the signal
+that counted reversals against it are retired (Baylee, 2026-11-09, bcbd89f4: "isn't
+adding value"; history in `fairbay/ops` docs/decision-routing/DESIGN.md §3). Every
+call stays reversible by his note (Reversals, below).
 
 **Contested calls are shown, never batched.** A rung-3 call made against a reviewer's
 blocking or high finding, against what a card for it would have recommended, or on a
 reading of one of his rulings that its words do not plainly settle (when he is not in
 the session to ask) gets the tag `contested` when it is logged and is listed in the
-close-out beside the random fifth, whatever the draw, with the same "reverse <id>"
-reply; its id goes into `calls_shown` with the fifth's (so S4's denominator counts it;
-the fifth itself is unchanged, contested calls ride on top of it). The weekly
-sitting's digest of these calls is retired (Baylee, 2026-11-06, becb3a31: no batched
-list of calls put to him at once).
+Step 4 summary and the Grove session line (9b) under **Contested calls:**, one line each:
+
+```
+- 5f2c1a90 — <the decision's first 90 characters> — reply "reverse 5f2c1a90" to undo
+```
+
+None → no heading. No batched list of calls is put to him at once (becb3a31).
 
 ## Reversals and wrong questions
 

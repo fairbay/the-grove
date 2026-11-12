@@ -5,7 +5,7 @@ description: >
   "calibrate scores", "audit my vault". Auto-runs build Phase 7.
   Not for isolated checks (→ delegate-analytical/adversarial).
 metadata:
-  version: "2026-10-25-02"
+  version: "2026-11-12-01"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -41,7 +41,7 @@ who says "tear this apart" or "Gemini review" wants one decisive critic.
 
 ## Every brief, every panelist
 
-**If you are about to review a process design — a design doc in `fairbay/ops` docs/ — before `process_gate.py check` has passed it, stop.** Run `python3 .claude/skills/chat-archive/scripts/process_gate.py check <the DESIGN.md>` first (global-CLAUDE.md "Earning a design run"; docs/process-governance/DESIGN.md). A FAIL returns the doc to its author with the misses; round 1 does not start. This is the gate's entry check — CI only backstops it at landing.
+**If you are about to review a process design — a design doc in `fairbay/ops` docs/ — before `process_gate.py check` has passed it, stop.** Run `python3 .claude/skills/chat-archive/scripts/process_gate.py check <the DESIGN.md>` first (`.claude/global/design.md` "Earning a design run"; docs/process-governance/DESIGN.md). A FAIL returns the doc to its author with the misses; round 1 does not start. This is the gate's entry check — CI only backstops it at landing.
 
 Reviewers get the primary material, never an intermediate summary of it, and
 the whole set under a new rule, not only the items the rule changed. Give the
@@ -53,7 +53,7 @@ reviewer sent to the web carries the global rule's search-first paragraph
 verbatim. Every brief after the first round carries the findings already considered and rejected, each with its reason; the reviewer contests one only with a valid counterpoint the reason does not already answer, and otherwise does not raise it again (Baylee, 2026-10-19).
 
 **Exit criteria before round 1, disposition after every round** (Baylee,
-2026-10-25; global rule "The review loop"). State what pass means before the
+2026-10-25; `.claude/global/design.md` "The review loop"). State what pass means before the
 first brief goes out: no blocking finding, and every high dispositioned by the
 author as accepted (fix named), rejected (reason named, carried into the next
 brief) or deferred (Grove task). Findings are data: check each against the

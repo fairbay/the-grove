@@ -24,7 +24,8 @@ redacted like every other label. Without it the output is as before.
 
 --record (its own options; see record_main) prints the whole session record as one JSON line, ready for the Grove session-record
 decision's context: the routing counts, cache_read_m, the start (pasted, typed or none), and every PR opened or landed with how it merged
-(self, ask, github, pending, open) and whether that cost Baylee a tap. It exits 2, printing nothing on stdout, when the record would
+(self, ask, github, pending, open) and whether that cost Baylee a tap, and global_reads: the .claude/global/ detail files the
+transcripts show read (Read, or a Bash cat/head; sub-agents too), in first-read order with their bytes on disk now. It exits 2, printing nothing on stdout, when the record would
 be partial or inconsistent (a PR this session opened or merged that --prs does not name, say). chat-archive references/session-record.md.
 
 --check-record <decision id> [--lane x] reads the logged record back from Grove (GROVE_TOKEN) and exits 2, naming each problem,
@@ -601,8 +602,8 @@ GO_SENTENCE = re.compile(r"(?:^|\blane [a-z]:\s*)Go:", re.I | re.M)  # close-at-
 # (the comma form alone read every lane H opening as typed: docs/dispatch/DESIGN.md §9 finding 1)
 DISPATCH_PROMPT = re.compile(r"^\s*work on [^\n]*?\blane [a-z][a-z0-9]*\b", re.I)
 LANE_ID = re.compile(r"[a-z][a-z0-9]*")
-DISPATCH_STATES = ("ready", "prompted", "step", "call", "waiting", "running")
-DISPATCH_LISTS = ("steps", "calls", "waiting", "running", "cleanup")
+DISPATCH_STATES = ("ready", "prompted", "step", "call", "waiting", "running", "held")  # held: a HOLD row line (Grove 0490bec3)
+DISPATCH_LISTS = ("steps", "calls", "waiting", "running", "held", "cleanup")
 def parse_utc(s):
     """An ISO-8601 UTC time with a trailing Z (2026-11-05T00:55Z or with seconds), or None."""
     if not isinstance(s, str): return None
@@ -662,8 +663,9 @@ def parse_dispatch(path, lanes):
             raise RecordError(f"--dispatch: lane {lane} is {state} but prompts carries no prompt for it")
     out = {"lanes": states, "prompts": out_prompts}
     # which states a list may name (session-start references/dispatch.md Step 4): a step or call inside a Start entry
-    # names a ready lane; waiting names waiting lanes; running names running and prompted lanes
-    allowed = {"steps": ("step", "ready"), "calls": ("call", "ready"), "waiting": ("waiting",), "running": ("running", "prompted")}
+    # names a ready lane; waiting names waiting lanes; running names running and prompted lanes; held names held lanes
+    allowed = {"steps": ("step", "ready"), "calls": ("call", "ready"), "waiting": ("waiting",), "running": ("running", "prompted"),
+               "held": ("held",)}
     for k in DISPATCH_LISTS:
         v = d.get(k, [])
         if not isinstance(v, list): raise RecordError(f"--dispatch: {k} must be a list")
@@ -685,6 +687,8 @@ def parse_dispatch(path, lanes):
     for lane, state in states.items():
         if state in ("waiting", "running", "prompted") and lane not in listed:
             raise RecordError(f"--dispatch: lane {lane} is {state} but no waiting or running line names it")
+        if state == "held" and lane not in {x["lane"] for x in out["held"]}:
+            raise RecordError(f"--dispatch: lane {lane} is held but no held line names it (the hold and what releases it)")
     return out
 CONTINUED = re.compile(r"^This session is being continued from a previous conversation")
 
@@ -771,6 +775,50 @@ def interrupts_of(rec, routing):
     taps = sum(1 for x in rec["prs"] if x["via"] in ("github", "pending"))
     return rec["asks"] + rec["refusals"] - merge_refusals + taps + len(rec["cards"]) + (1 if rec["start"] == "pasted" else 0)
 
+GLOBAL_DETAIL = re.compile(r"(?:^|/)\.claude/global/([\w.-]+\.md)$")
+READ_COMMANDS = ("cat", "head")
+
+def global_reads(paths):
+    """The .claude/global/ detail files the transcripts show read (docs/global-rules-core/DESIGN.md §5.5): a Read call whose
+    file_path ends in /.claude/global/<name>.md, or a Bash cat/head of one; main thread and sub-agents, in first-read order
+    (by timestamp), each file once, with its size on disk now (null when the path is not found here)."""
+    hits = []  # (no timestamp, timestamp, transcript order, record order, name, path on disk)
+    for order, (_agent, path) in enumerate(paths):
+        try:
+            with open(path) as fh: lines = fh.readlines()
+        except OSError: continue
+        for n, line in enumerate(lines):
+            try: o = json.loads(line)
+            except Exception: continue
+            if o.get("type") != "assistant": continue
+            c = (o.get("message") or {}).get("content")
+            if not isinstance(c, list): continue
+            cwd, ts = o.get("cwd") or "", o.get("timestamp")
+            for b in c:
+                if not isinstance(b, dict) or b.get("type") != "tool_use": continue
+                name, inp = b.get("name"), b.get("input") or {}
+                if not isinstance(inp, dict): continue
+                found = []
+                if name == "Read":
+                    m = GLOBAL_DETAIL.search(str(inp.get("file_path", "")))
+                    if m: found.append((m.group(1), str(inp["file_path"])))
+                elif name == "Bash":
+                    for seg in shell_segments(strip_heredocs(str(inp.get("command", "")))):
+                        try: words = shlex.split(ENV_PREFIX.sub("", seg))
+                        except ValueError: words = seg.split()
+                        if not words or os.path.basename(words[0]) not in READ_COMMANDS: continue
+                        for w in words[1:]:
+                            m = GLOBAL_DETAIL.search(w)
+                            if m: found.append((m.group(1), w))
+                for fname, p in found:
+                    hits.append((ts is None, ts or "", order, n, fname, p if os.path.isabs(p) else os.path.join(cwd, p)))
+    out, seen = [], set()
+    for *_, fname, p in sorted(hits, key=lambda h: h[:4]):
+        if fname in seen: continue
+        seen.add(fname)
+        out.append({"file": fname, "bytes": os.path.getsize(p) if os.path.isfile(p) else None})
+    return out
+
 def newest_prefix(root=None):
     """The newest main-thread transcript under ~/.claude/projects (this session's own in a cloud container), without .jsonl."""
     root = root or os.path.expanduser("~/.claude/projects")
@@ -800,9 +848,10 @@ def build_record(a, prefix, scratch):
            "asks": asks, "refusals": r["refusals"], "refused": [x["target"] for x in r["refusal_list"]], "merges": r["merges"],
            "prs": [{"pr": x["pr"], "via": x["via"], "tapped": x["via"] in TAPPED} for x in prs],
            "start": "none" if a.surface == "routine" else start_of(opening), "opening_chars": len(opening or ""),  # a routine's prompt is not his
-           "calls_logged": ids(a.calls), "calls_shown": ids(a.shown), "cards": cards, "tasks_for_baylee": ids(a.tasks),
+           "calls_logged": ids(a.calls), "cards": cards, "tasks_for_baylee": ids(a.tasks),
            "cache_read_m": report["cache_read_m"] or None, "source": "transcript",
-           "opening_hash": text_hash(opening) if opening else None}  # matches a dispatch record's prompt hash when he pasted it unchanged
+           "opening_hash": text_hash(opening) if opening else None,  # matches a dispatch record's prompt hash when he pasted it unchanged
+           "global_reads": global_reads(transcript_paths(prefix))}
     if unchecked: rec["unchecked_merges"] = unchecked
     if a.lane: rec["lane"] = a.lane.lower()
     if a.dispatch:
@@ -832,7 +881,7 @@ def record_main(argv):
     p.add_argument("--prs", default="", help="every PR this session opened, merged or left for his tap: [owner/repo#]<n>:<" + "|".join(VIAS) + ">, comma-separated")
     p.add_argument("--not-merged", default="", help="PRs whose merge call shows no merge and did not merge")
     p.add_argument("--asks-prose", type=int, default=0, help="questions put to Baylee in prose (the transcript counts the ask tools only)")
-    for f in ("calls", "shown", "cards", "tasks"): p.add_argument("--" + f, default="")
+    for f in ("calls", "cards", "tasks"): p.add_argument("--" + f, default="")
     p.add_argument("--dispatch", help="a dispatch run: the JSON file of what it printed (session-start references/dispatch.md Step 4)")
     p.add_argument("--lanes", default="", help="with --dispatch: the declared lanes (landing.yaml), comma-separated; the block must name each once")
     a = p.parse_args(argv)

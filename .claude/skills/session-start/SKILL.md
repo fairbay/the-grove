@@ -5,7 +5,7 @@ description: >
   "dispatch [project]", "check the lanes". Not mid-session (→ chat-status) or
   archive (→ chat-archive).
 metadata:
-  version: "2026-11-08-01"
+  version: "2026-11-12-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -248,12 +248,13 @@ and chat-archive gate on the same list, so the briefing is where the session
 confirms it has them.
 
 **Expired temporary rules.** Grep the loaded rules (`global-CLAUDE.md` in
-ops; `.claude/global.md` and the repo's `CLAUDE.md` elsewhere) for dated
+ops; `.claude/global.md` and the repo's `CLAUDE.md` elsewhere; the detail
+files in `.claude/global/` everywhere) for dated
 temporary rules — a paragraph or bullet containing "Temporary" or "until"
 followed by an ISO date (`YYYY-MM-DD`), optionally after a weekday:
 
 ```bash
-grep -nE '(Temporary|until)[^.]{0,40}[0-9]{4}-[0-9]{2}-[0-9]{2}' global-CLAUDE.md .claude/global.md CLAUDE.md 2>/dev/null
+grep -nE '(Temporary|until)[^.]{0,40}[0-9]{4}-[0-9]{2}-[0-9]{2}' global-CLAUDE.md .claude/global.md .claude/global/*.md CLAUDE.md 2>/dev/null
 ```
 
 If any date is before today, name it in the briefing in one line ("Expired
@@ -456,7 +457,10 @@ AskUserQuestion and continue on the answer.
   `.claude/policy.json`, as `additionalContext` before the first turn. Handoffs flow either direction;
   `meta.surface` records origin. See `ops/docs/session-continuity-SPEC.md` §11.
 - **← issues_next.py:** dispatch (`references/dispatch.md`, read 7) runs this skill's
-  `scripts/issues_next.py` over MBN `docs/ISSUES.md` for "next from the list" per lane.
+  `scripts/issues_next.py` over MBN `docs/ISSUES.md` for "next from the list" per lane, and
+  `scripts/infra_queue.py` over Grove lists `ops` and `grove` for lane H (the infrastructure queue),
+  and `scripts/deps_check.py` over the list's and the row's cited waits (stale, unowned, unqueued),
+  and `scripts/lane_state.py` (read 9) for the state table's mechanical rows and the data slot by rank.
 - **← pr_state.py:** Phase 0 runs this skill's `scripts/pr_state.py report` (land-and-leave
   entry gate, `ops/docs/land-and-leave-SPEC.md` §7.5, §10).
 - **→ build / systematic-test / systematic-debug:** Hands off the loaded PLAN.md

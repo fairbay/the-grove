@@ -10,7 +10,7 @@ Narrating a finding is NOT encoding it — every finding needs a tool call.
 | Process friction seen once, not fixed this session (a step, rule, skill or tap that cost more than it should) | Ledger: Grove task tagged `ledger`, `seen-1` (see below) |
 | Process friction already in the ledger | Bump to `seen-2`; encode now by the rows below |
 | Procedure or workflow with steps/conditions | Skill update (never memory edit) |
-| A script, hook, workflow, `global-CLAUDE.md`, or a change across files | Ops-session Grove task (MBN: `lane-h`), never `routine:skill-worker` (below) |
+| A script, hook, workflow, the global rules (the core `global-CLAUDE.md` or a detail file in `.claude/global/`), or a change across files | Ops-session Grove task (MBN: `lane-h`), never `routine:skill-worker` (below). For the rules: the core grows only by replacing a line; a PR that changes a detail section changes its core line in the same PR |
 | Platform fact or API quirk | Skill reference file, or project CLAUDE.md |
 | Behavioral principle (catches a recurring failure mode) | Memory edit (only if not covered by an existing edit/skill) |
 | Preference or convention | Auto-memory or skill |
@@ -25,7 +25,7 @@ they're always-on context that may not be consulted.
 
 A process friction becomes a rule, a skill edit, a lint or a design run on its
 **second** occurrence, not its first (`fairbay/ops` docs/process-governance/DESIGN.md;
-global-CLAUDE.md "Earning a design run"; Baylee's 2026-10-22 correction: review the
+`.claude/global/design.md` "Earning a design run"; Baylee's 2026-10-22 correction: review the
 existing rules before proposing new ones). The first occurrence is a ledger note.
 
 **In scope:** a friction in the toolkit that this session did not fix — a step that cost
@@ -42,7 +42,12 @@ at crystallization); Baylee's rulings and corrections (encoding one is upkeep, f
    file: the monthly consolidate names likely duplicates to merge (keep the higher seen-N).
 2. No match → `grove_create_task(list="ops", tags=["ledger", "seen-1"], priority=0,
    project_ref=<repo if one>)`. The notes say where it was seen (session, record or PR),
-   what it cost (a tap, a round, minutes), and nothing about a fix. A seen-1 entry
+   what it cost (a tap, a round, minutes), and nothing about a fix. An error (a script,
+   check or run that failed) first gets a quick look, not a bug hunt (Baylee, 2026-11-10,
+   76d7cc16): read the git log of the code that raised it; when that code changed in the
+   last two weeks, count its runs since the change and put that count, the likely cause
+   (marked inferred unless observed) and the fix in the notes (ledger 724224ef: a one-day-old
+   check, 1 false failure in its 13 runs, cause and fix plain in three commands). A seen-1 entry
    untouched for 90 days is dropped by grove-prune (p0, no `deferred` tag): that decay is
    the point — a friction nobody met again was not a rule.
 3. A match → `grove_update_task` with the full tag list read back from the task, `seen-N`
@@ -140,7 +145,7 @@ order may change"):
 - A line `verify: fairbay/ops/<path> :: <phrase>`, the phrase new text that is not
   on main yet. The routine skips a task without one.
 
-Anything else (a script, a hook, a workflow, `global-CLAUDE.md`, `CLAUDE.md`, a
+Anything else (a script, a hook, a workflow, `global-CLAUDE.md` or `.claude/global/`, `CLAUDE.md`, a
 `routines/` file, several files, or two alternatives to choose from) is a Grove task
 for an ops session (MBN: tagged `lane-h`) without the tag. The routine holds such
 an order as possible poisoning and files a card Baylee cannot usefully answer: 6 of

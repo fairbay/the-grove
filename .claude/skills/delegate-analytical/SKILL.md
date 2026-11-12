@@ -5,7 +5,7 @@ description: >
   proactively. Not for flaw-finding (→ delegate-adversarial), rote
   (→ delegate-mechanical), panel reviews (→ review-panel).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-11-11-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
@@ -13,10 +13,13 @@ metadata:
 # delegate-analytical — sonnet sub-agent for judgment and evaluation
 
 Offload subtasks that require weighing, comparing, or evaluating to a sonnet
-instance via the Anthropic API. The sub-agent runs in isolation — only the
-result enters the main chat.
+sub-agent (the Agent tool with `model: "sonnet"`). The sub-agent runs in
+isolation — only the result enters the main chat. In claude.ai chat there is no
+sub-agent: apply the same lens inline.
 
-Model: `claude-sonnet-5-5` (verified on the API 2026-10-14). Runs on API credits, not the subscription; the command line in delegate-mechanical works here too.
+There is no API helper: `delegate.py` is removed, and no skill reads
+`ANTHROPIC_API_KEY`, which is being retired (unset from the environment after
+Baylee reads its last-used date; Grove 0ee04363, `docs/secrets-move/DESIGN.md` §4.2).
 
 ## What "analytical" means
 
@@ -74,54 +77,30 @@ suppresses the verdict.
 
 ## Workflow
 
-### 1. Assemble payload
+### 1. Assemble the brief
 
-System prompt (under 300 tokens): role, output format, constraints. Include
+Role, output format and constraints first (under 300 tokens). Include
 the evaluation criteria or comparison dimensions explicitly — sonnet needs to
 know WHAT to judge against, not just what to look at. Without explicit criteria
 the verdict drifts toward generic "looks good / could be better."
+Then the task instruction, the content (or its file paths) and the criteria/dimensions.
 
-User message: task instruction + content + criteria/dimensions.
+Plan the brief so only the verdict and action items need surfacing — do not
+plan to echo the brief, raw input, or reasoning back into the main chat.
 
-Plan the prompt so only the verdict and action items need surfacing — do not
-plan to echo the system prompt, raw input, or reasoning back into the main chat.
+### 2. Run the sub-agent
 
-### 2. Call API
-
-**Key check first.** The helper reads `$ANTHROPIC_API_KEY` only (no key file). Run
-`python3 -c "import os; print(bool(os.environ.get('ANTHROPIC_API_KEY')))"`; if it prints
-`False`, skip the helper: in a Code session run the same prompt as an Agent sub-agent with
-`model:` set; in chat apply the lens inline.
-
-```python
-import sys
-sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')  # chat: '/mnt/skills/user/delegate-mechanical/scripts'
-from delegate import call
-
-output, usage = call(
-    model='claude-sonnet-5-5',
-    system=system_prompt,
-    user=user_message,
-)
-```
-
-If the helper raises `DelegateError`, surface its message verbatim — it tells
-Baylee that `ANTHROPIC_API_KEY` is not in this session's environment (no key
-file is read). In a Code session, run the same prompt as an Agent sub-agent with
-`model:` set instead. Do not retry or fall back silently.
+In a Code session, call the Agent tool with `model: "sonnet"` and the role,
+criteria and task in its prompt. Bulk input stays in files: name the paths and
+let the sub-agent read them. A brief that lets it run shell commands or reach
+the web carries the global rules' verbatim Shell and Web paragraphs.
 
 ### 3. Verify and return
 
 Sanity-check output. Report concisely:
-> Sub-agent (sonnet) completed [task] — [input_tokens] in / [output_tokens] out.
+> Sub-agent (sonnet) completed [task].
 
-If the result is bad, retry with sharper criteria or fall back to inline.
-
-## Cost reference (4K input)
-
-| 500 out | 1K out | 2K out |
-|---------|--------|--------|
-| $0.020 | $0.027 | $0.042 |
+If the result is bad, retry once with sharper criteria or fall back to inline.
 
 ## Integration
 

@@ -2,7 +2,7 @@
 """Weekly ops read of decision routing (docs/decision-routing/DESIGN.md section 5, channel 2).
 
 A pure, offline computation over JSON dumps that a session gathers from Grove (MCP) and
-GitHub. It prints signals S1, S2, S4, S5 against the thresholds in each repo's
+GitHub. It prints signals S1, S2, S5 against the thresholds in each repo's
 .claude/policy.json, the activity that has no session record, the newest sync.yml /
 rules.yml conclusions, and a list of actions for the session to file. It never calls Grove
 or GitHub, and it hard-codes no threshold: every number comes from the policy's `signals`
@@ -11,7 +11,7 @@ block, and a missing key is reported as "not judged: <repo> policy lacks signals
 Usage:
   python3 ops_read.py --decisions FILE [--cards FILE] [--activity FILE] [--runs FILE]
       --policy REPO=PATH [--policy REPO=PATH ...] [--default-policy PATH]
-      [--minutes FILE] [--gaps FILE] [--until YYYY-MM-DD] [--days 7] [--json]
+      [--minutes FILE] [--gaps FILE] [--picks FILE] [--until YYYY-MM-DD] [--days 7] [--json]
 
 --minutes FILE: JSON array of {repo, date, minutes}, one row per Actions run in the billing month
 (minutes = the run's duration rounded up to whole minutes). It feeds S11, the account-wide Actions
@@ -26,6 +26,10 @@ logged again after another session of the lane), both report-only.
 the report-only "Guide gaps" line: how many are open and the administrator-guide pages they name (MBN
 docs/admin-guide maintain/freshness-and-the-routine.md, "The counter"). Without it the line says "not read".
 
+--picks FILE: JSON array of the Grove tasks of lists ops and grove, any status (ops_gather.py writes picks.json). It feeds
+the report-only "Lane H picks" line: the week's "H: queue pick <id8>" cleanup lines of dispatch records, split by repo,
+and how many were worked (a later lane H record names the id, or the task is done by the window's end; Grove 6852e250).
+
 Exit 0 normally; 2 on an input error (unreadable file, bad JSON, --policy without '=').
 Python 3.11, stdlib only.
 """
@@ -34,11 +38,9 @@ import json
 import re
 import sys
 from datetime import date, datetime, timedelta, timezone
-from fractions import Fraction
 
 K_S1 = "S1_policy_asks_per_upkeep_session"
 K_S2 = "S2_harness_refusals_per_session"
-K_S4 = "S4_reversals_over_calls_shown"
 K_S5 = "S5_wrong_question_cards"
 K_S10 = "S10_cache_read_tokens_per_day"
 K_S11 = "S11_actions_minutes_month"
@@ -49,6 +51,9 @@ WRAP_KEYS = ("decisions", "tasks", "items", "results", "data", "workflow_runs")
 HASH_RE = re.compile(r"[0-9a-f]{8}")  # session_report.py text_hash
 SESSION_RE = re.compile(r"session_[A-Za-z0-9]+")
 LANE_TAG = re.compile(r"lane-[a-z][0-9]?", re.I)  # a lane id (a, a2), not a word such as lane-sweep
+PICK_RE = re.compile(r"H: queue pick ([0-9a-f]{8})\b")  # dispatch's cleanup line for lane H's infrastructure-queue pick
+ID8_RE = re.compile(r"(?<![0-9a-f])[0-9a-f]{8}(?![0-9a-f])")
+PICK_REPOS = {"fairbay/ops": "ops", "fairbay/grove": "grove"}
 GAP_TAG = "guide-gap"  # a task naming a page the MBN administrator guide lacks or must fix
 GAP_LIMIT = 100  # ops_gather.py reads at most this many (its GAP_LIMIT); a full file is printed as "at least"
 GAP_PAGE_LINE = re.compile(r"^[ \t]*(?:[-*>][ \t]*)?page:[ \t]*(\S.*?)[ \t]*$", re.I | re.M)  # `page: <slug or plain name>`, bullet allowed
@@ -140,7 +145,7 @@ def norm_repo(r):
     if not isinstance(r, str) or not r.strip():
         return None
     r = r.strip()
-    if "/" in r or UUID_RE.match(r):
+    if "/" in r or UUID_RE.fullmatch(r):
         return r
     return "fairbay/" + r
 
@@ -218,10 +223,6 @@ def parse_records(decisions, keep_restated=False):
         if cache is not None and (not isinstance(cache, dict) or any(not is_num(v) or v < 0 for v in cache.values())):
             bad("cache_read_m is not a model -> millions object or null")
             continue
-        shown = ctx.get("calls_shown") or []
-        if not isinstance(shown, list):
-            bad("calls_shown is not a list")
-            continue
         refused = ctx.get("refused") or []
         if not isinstance(refused, list):
             bad("refused is not a list")
@@ -235,7 +236,7 @@ def parse_records(decisions, keep_restated=False):
             "created": created or datetime.min.replace(tzinfo=timezone.utc),
             "repo": repo, "kind": ctx.get("kind") or "upkeep", "source": ctx.get("source"),
             "asks": counts["asks"], "refusals": counts["refusals"],
-            "refused": [str(x) for x in refused], "calls_shown": [str(x) for x in shown],
+            "refused": [str(x) for x in refused],
             "cache_read_m": cache,
             # record 2 (session_report.py --record, 75cbc21d): the whole counter; absent on older records
             "version": ctx.get("record") if isinstance(ctx.get("record"), int) and not isinstance(ctx.get("record"), bool) else 1,
@@ -248,6 +249,10 @@ def parse_records(decisions, keep_restated=False):
             "opening_hash": ctx.get("opening_hash") if isinstance(ctx.get("opening_hash"), str) and HASH_RE.fullmatch(ctx["opening_hash"]) else None,
             "sid": session_id(ctx.get("session")) or f"record:{did or len(records)}", "restated": restated,
             "dispatch": dispatch_prompts(ctx.get("dispatch"), created or datetime.min.replace(tzinfo=timezone.utc)) if ("dispatch" in tags_of(d) or isinstance(ctx.get("dispatch"), dict)) else None,
+            # the 8-hex ids the record's title names (the Lane H picks line). A record carries no structured list of the tasks
+            # it worked (session-record.md: tasks_for_baylee and calls_logged are other things), and its free context can say
+            # "waits on <id>", so only the title counts
+            "names": set(ID8_RE.findall(title)),
         })
         if not records[-1]["lane"]:  # a record 1 may carry its lane only as a lane-<x> tag
             records[-1]["lane"] = next((t[5:].lower() for t in tags_of(d) if LANE_TAG.fullmatch(t)), None)
@@ -266,8 +271,10 @@ def dispatch_prompts(block, created):
     (a prompted lane's prompt is carried under Running, not printed again), or every prompt lane when the block has no
     states; hash None when the block carries no text; known False for a dispatch record with no prompt list (record 1).
     at is the record's time: the run printed it then (a reprint's `first` names the earlier print)."""
+    cleanup = block.get("cleanup") if isinstance(block, dict) and isinstance(block.get("cleanup"), list) else []
+    picks = [m.group(1) for x in cleanup if isinstance(x, str) for m in [PICK_RE.match(x.strip())] if m]
     if not isinstance(block, dict) or not isinstance(block.get("prompts"), (dict, list)):
-        return {"printed": [], "known": False}
+        return {"printed": [], "known": False, "picks": picks}
     prompts, states = block["prompts"], block.get("lanes") if isinstance(block.get("lanes"), dict) else None
     items = prompts.items() if isinstance(prompts, dict) else ((str(x), None) for x in prompts)
     printed = []
@@ -277,26 +284,11 @@ def dispatch_prompts(block, created):
             continue
         h = p.get("hash") if isinstance(p, dict) else None
         printed.append({"lane": lane, "hash": h if isinstance(h, str) and HASH_RE.fullmatch(h) else None, "at": created})
-    return {"printed": printed, "known": True}
+    return {"printed": printed, "known": True, "picks": picks}
 
 
 def sortkey(r):
     return (r["date"], r["created"])
-
-
-def reversal_targets(decisions):
-    """Ids of calls that a decision tagged `reversal` reverses."""
-    out = []
-    for r in decisions:
-        if "reversal" not in tags_of(r):
-            continue
-        sup = r.get("supersedes")
-        if sup:
-            out.append(str(sup))
-        for d in decisions:
-            if d.get("superseded_by") and same_id(str(d["superseded_by"]), str(r.get("id"))) and d.get("id"):
-                out.append(str(d["id"]))
-    return out
 
 
 # ---------------------------------------------------------------- policy
@@ -394,43 +386,9 @@ def signal_s2(repo, pol, week_recs, actions):
     return res
 
 
-def signal_s4(repo, pol, recs, until, targets, actions):
-    vals, bad = thresholds(pol, repo, K_S4, [("max", "num"), ("window_calls_shown", "count"), ("min_shown_before_judging", "num")])
-    if bad:
-        return not_judged(bad)
-    mx, n, minshown = vals["max"], vals["window_calls_shown"], vals["min_shown_before_judging"]
-    shown = []
-    for r in sorted((r for r in recs if r["date"] <= until), key=sortkey, reverse=True):
-        for cid in r["calls_shown"]:
-            if cid not in shown:
-                shown.append(cid)
-    shown = shown[:n]
-    reversed_ids = [c for c in shown if any(same_id(c, t) for t in targets)]
-    res = {"max": mx, "shown": len(shown), "reversed": len(reversed_ids), "reversed_ids": reversed_ids,
-           "min_shown_before_judging": minshown, "window_calls_shown": n}
-    if len(shown) < minshown:
-        res.update(status="not_judged", rate=None, reason=f"not judged ({len(shown)} shown, needs {fmt_num(minshown)})")
-        res["line"] = f"S4 reversals over calls shown (newest {n}, max {fmt_num(mx)}): {res['reason']}"
-        return res
-    rate = len(reversed_ids) / len(shown)
-    breach = Fraction(len(reversed_ids), len(shown)) > Fraction(str(mx))
-    res.update(status="breach" if breach else "ok", rate=rate)
-    res["line"] = (f"S4 reversals over calls shown (newest {n}, max {fmt_num(mx)}): "
-                   f"{len(reversed_ids)}/{len(shown)} = {rate:.2f} -> {res['status']}")
-    if breach:
-        res["line"] += "; reversed: " + ", ".join(short(c) for c in reversed_ids)
-        actions.append({"type": "card", "signal": "S4", "repo": repo,
-                        "dedup_key": f"routing-card S4 {repo} rev-{short(sorted(reversed_ids)[-1])}-{len(reversed_ids)}",
-                        "title": f"S4 {repo}: {len(reversed_ids)} of {len(shown)} shown upkeep calls reversed (limit {fmt_num(mx)})",
-                        "body": f"Reversals over calls shown: {len(reversed_ids)}/{len(shown)} = {rate:.2f}, above {fmt_num(mx)}. Reversed calls:\n"
-                                + "\n".join(f"- {c}" for c in reversed_ids),
-                        "recommendation": "narrow upkeep: move the reversed calls' kind to owner_context"})
-    return res
-
-
 def card_row(card):
     for t in tags_of(card):
-        m = ROW_RE.match(t)
+        m = ROW_RE.fullmatch(t)
         if m:
             return int(m.group(1))
     return "unknown"
@@ -605,6 +563,52 @@ def dispatch_line(every, since, until):
     return res
 
 
+def picks_line(every, since, until, tasks):
+    """Lane H's infrastructure-queue picks (Grove 6852e250; docs/infra-queue/DESIGN.md). Report-only. A pick is a dispatch
+    record's cleanup line "H: queue pick <id8>", once per dispatch run, for the week's runs; its repo is the task's project_ref
+    (fairbay/ops or fairbay/grove; else its list) from `tasks`, the Grove tasks of lists ops and grove in any status
+    (ops_gather.py writes picks.json). A pick counts as worked when (a) a lane-h session record logged after that print and by
+    the window's end names the id in its title (records carry no structured list of the tasks worked), or (b) the task was
+    completed after that print and by the window's end (a done task with no completed_at is not counted). Two tasks sharing
+    the id8 make the pick ambiguous: no repo, no done test. `tasks` None means not read: the repo split and the done test are
+    left out and say so, never 0."""
+    disp = sorted((r for r in every if r["dispatch"] is not None), key=lambda r: r["created"])
+    week = [r for r in disp if since < r["date"] <= until]
+    prints = {}  # (run, id8) -> the run's first print of it
+    for d in week:
+        for p in d["dispatch"].get("picks", []):
+            prints.setdefault((d["sid"], p), d["created"])
+    end = datetime.combine(until + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    h_recs = [r for r in every if not r["restated"] and r["lane"] == "h" and r["dispatch"] is None and r["created"] < end]
+    by_id = {}
+    for t in tasks or []:
+        if isinstance(t, dict) and isinstance(t.get("id"), str) and len(t["id"]) >= 8:
+            by_id.setdefault(t["id"][:8], {})[t["id"]] = t
+    repos, worked = {"ops": 0, "grove": 0, "unread": 0, "ambiguous": 0}, 0
+    for (sid, p), at in prints.items():
+        found = list(by_id.get(p, {}).values())
+        t = found[0] if len(found) == 1 else None
+        repo = (PICK_REPOS.get(norm_repo(t.get("project_ref")) or "") or (t.get("list") if t.get("list") in ("ops", "grove") else None)) if t else None
+        repos[repo or ("ambiguous" if len(found) > 1 else "unread")] += 1
+        done_at = to_dt(t.get("completed_at")) if t else None
+        done = bool(t) and t.get("status") == "done" and done_at is not None and at < done_at < end
+        if done or any(p in r["names"] and r["created"] > at for r in h_recs):
+            worked += 1
+    res = {"printed": len(prints), "ops": repos["ops"], "grove": repos["grove"], "unread": repos["unread"],
+           "ambiguous": repos["ambiguous"], "worked": worked, "tasks_read": tasks is not None}
+    if not week:
+        res["line"] = "Lane H picks: no dispatch record this week"
+        return res
+    if tasks is None:
+        split = "repo not read: no --picks input; ops_gather.py writes picks.json"
+    else:
+        split = (f"ops {repos['ops']}, grove {repos['grove']}" + (f", {repos['unread']} not in --picks" if repos["unread"] else "")
+                 + (f", {repos['ambiguous']} ambiguous (two tasks share the id8)" if repos["ambiguous"] else ""))
+    res["line"] = (f"Lane H picks: printed {len(prints)} ({split}), worked {worked}"
+                   + ("" if tasks is not None else " (by lane H records only; done tasks not read)"))
+    return res
+
+
 def overlap_line(records, since, until):
     """Two sessions of one lane open at once (docs/dispatch/DESIGN.md defect 6), read after the fact: a session logs a record of
     its lane, another session logs one of the same lane, and the first logs again; reported when that return is this week."""
@@ -740,7 +744,7 @@ def signal_s11(pol, minutes, until, actions):
     return res
 
 
-def build(decisions, cards, activity, runs, policies, default_policy, until, days, minutes=None, gaps=None):
+def build(decisions, cards, activity, runs, policies, default_policy, until, days, minutes=None, gaps=None, picks=None):
     since = until - timedelta(days=days)
     in_week = lambda d: since < d <= until
     every, unreadable = parse_records(decisions, keep_restated=True)
@@ -753,7 +757,6 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
             seen.add(key)
             uniq.append(r)
     records = uniq
-    targets = reversal_targets(decisions)
 
     wq = []
     for c in cards:
@@ -811,14 +814,13 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
         if pol is None:
             msg = f"not judged: no policy ({repo})"
             entry["note"] = f"{repo}: no policy given and no --default-policy"
-            for k in ("S1", "S2", "S4", "S5"):
+            for k in ("S1", "S2", "S5"):
                 entry[k] = {"status": "not_judged", "reason": msg, "line": msg}
             entry["interactions"] = []
             out_repos[repo] = entry
             continue
         entry["S1"] = signal_s1(repo, pol, recs, until, actions)
         entry["S2"] = signal_s2(repo, pol, week, actions)
-        entry["S4"] = signal_s4(repo, pol, recs, until, targets, actions)
         entry["S5"] = signal_s5(repo, pol, [c for c in wq if c["repo"] == repo], since, until, days, actions)
         inter = []
         s1w = None
@@ -827,10 +829,6 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
             s1w = [r for r in recs if r["session"] in names and r["refusals"]]
             if s1w:
                 inter.append("S1 high with S2 > 0: harness, leave the policy alone")
-            if entry["S4"]["status"] in ("ok", "breach") and entry["S4"]["reversed"] == 0:
-                inter.append("S1 high with S4 = 0 over ≥ min shown: too timid, lower the bar in the table")
-        if entry["S4"]["status"] == "breach":
-            inter.append("S4 high: too autonomous, widen owner_context")
         entry["interactions"] = inter
         out_repos[repo] = entry
 
@@ -874,6 +872,7 @@ def build(decisions, cards, activity, runs, policies, default_policy, until, day
                "S11": signal_s11(budget_pol, minutes, until, actions),
                "counter": counter_line(records, since, until),
                "dispatch": dispatch_line(every, since, until),
+               "picks": picks_line(every, since, until, picks),
                "overlap": overlap_line(every, since, until),
                "gaps": gap_line(gaps),
                "health": health_line(decisions, since, until)}
@@ -912,7 +911,7 @@ def render(res):
         L += ["", f"### {repo}"]
         if e.get("note"):
             L.append(e["note"])
-        for k in ("S1", "S2", "S4"):
+        for k in ("S1", "S2"):
             L.append(sig_line(k, e[k]))
         s5 = e["S5"]
         L.append(sig_line("S5", s5))
@@ -924,7 +923,7 @@ def render(res):
             L.append(f"- not counted: {n['session']} {n['date']} ({', '.join(n['fields'])} null{'; ' + n['source'] if n['source'] else ''})")
     b = res["budgets"]
     L += ["", "### Budgets (account-wide)", f"- {b['S10']['line']}", f"- {b['S11']['line']}", f"- {b['counter']['line']}",
-          f"- {b['dispatch']['line']}", f"- {b['overlap']['line']}", f"- {b['gaps']['line']}", f"- {b['health']['line']}"]
+          f"- {b['dispatch']['line']}", f"- {b['picks']['line']}", f"- {b['overlap']['line']}", f"- {b['gaps']['line']}", f"- {b['health']['line']}"]
     L += ["", "Activity with no record:"]
     if res["no_record"]:
         L += [f"- {n['text']}" for n in res["no_record"]]
@@ -950,6 +949,7 @@ def parse_args(argv):
     p.add_argument("--runs")
     p.add_argument("--minutes")
     p.add_argument("--gaps")
+    p.add_argument("--picks")
     p.add_argument("--policy", action="append", default=[], metavar="REPO=PATH")
     p.add_argument("--default-policy")
     p.add_argument("--until")
@@ -981,10 +981,11 @@ def main(argv=None):
         runs = load_list(a.runs) if a.runs else []
         minutes = load_minutes(a.minutes) if a.minutes else None
         gaps = load_list(a.gaps) if a.gaps else None
+        picks = load_list(a.picks) if a.picks else None
     except InputError as e:
         print(f"ops_read.py: {e}", file=sys.stderr)
         return 2
-    res = build(decisions, cards, activity, runs, policies, default, until, a.days, minutes, gaps)
+    res = build(decisions, cards, activity, runs, policies, default, until, a.days, minutes, gaps, picks)
     if a.json:
         print(json.dumps(res, indent=2, ensure_ascii=False))
     else:

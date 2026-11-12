@@ -5,18 +5,21 @@ description: >
   filter by tag/keyword, scan. Use proactively. Not for judgment
   (→ delegate-analytical) or async (→ fire-routine).
 metadata:
-  version: "2026-10-26-01"
+  version: "2026-11-11-02"
 ---
 
 **Version gate (chat only):** In claude.ai, compare this skill's `metadata.version` against `fairbay/ops` via git-ops. If behind, warn once and continue. If fetch fails, skip silently. In Claude Code / Routines, skip — skills are synced from source.
 
 # delegate-mechanical — haiku sub-agent for comprehension-only work
 
-Offload subtasks that need comprehension but not judgment to a haiku instance
-via the Anthropic API. The sub-agent runs in isolation — only the result enters
-the main chat.
+Offload subtasks that need comprehension but not judgment to a haiku sub-agent
+(the Agent tool with `model: "haiku"`). The sub-agent runs in isolation — only
+the result enters the main chat. In claude.ai chat there is no sub-agent: apply
+the same lens inline.
 
-Model: `claude-haiku-5-5` (verified on the API 2026-10-14). Runs on API credits, not the subscription.
+There is no API helper: `delegate.py` is removed, and no skill reads
+`ANTHROPIC_API_KEY`, which is being retired (unset from the environment after
+Baylee reads its last-used date; Grove 0ee04363, `docs/secrets-move/DESIGN.md` §4.2).
 
 ## What "mechanical" means
 
@@ -66,64 +69,36 @@ a subset, stop.** Pass raw output with extraction target to haiku.
 
 - Input is small (under ~10 items, single-page doc).
 - Content is already in context from an earlier step.
-- A one-liner (`grep`, `jq`) handles it faster than an API call.
+- A one-liner (`grep`, `jq`) handles it faster than a sub-agent.
 - The task requires judgment beyond comprehension → `delegate-analytical` or
   `delegate-adversarial`.
 
 ## Workflow
 
-### 1. Assemble payload
+### 1. Assemble the brief
 
-System prompt (under 300 tokens): role, output format, constraints. Example:
+Role, output format and constraints first (under 300 tokens). Example:
 "You are a focused assistant. Return only [format]. No reasoning."
+Then the task instruction, the content (or its file paths) and the extraction targets.
 
-User message: task instruction + content + extraction targets.
-
-Do NOT plan to echo the system prompt, raw input, or sub-agent reasoning back
+Do NOT plan to echo the brief, raw input, or sub-agent reasoning back
 into the main chat — that defeats the point of delegation. Plan the prompt so
 only the extracted result needs surfacing.
 
-### 2. Call API
+### 2. Run the sub-agent
 
-**Key check first.** The helper reads `$ANTHROPIC_API_KEY` only (no key file). Run
-`python3 -c "import os; print(bool(os.environ.get('ANTHROPIC_API_KEY')))"`; if it prints
-`False`, skip the helper: in a Code session run the same prompt as an Agent sub-agent with
-`model:` set; in chat apply the lens inline.
-
-```python
-import sys
-sys.path.insert(0, '.claude/skills/delegate-mechanical/scripts')  # chat: '/mnt/skills/user/delegate-mechanical/scripts'
-from delegate import call
-
-output, usage = call(
-    model='claude-haiku-5-5',
-    system=system_prompt,
-    user=user_message,
-)
-```
-
-Or from Bash, with the prompts in files (Code sessions; bulk text never rides in
-tool arguments): `python3 .claude/skills/delegate-mechanical/scripts/delegate.py
---model claude-haiku-5-5 --system-file sys.txt --user-file task.txt`. The reply is on stdout,
-token usage on stderr. The key comes from `$ANTHROPIC_API_KEY` only.
-
-If the helper raises `DelegateError`, surface its message verbatim — it tells
-Baylee that `ANTHROPIC_API_KEY` is not in this session's environment (no key
-file is read). In a Code session, run the same prompt as an Agent sub-agent with
-`model:` set instead. Do not retry or fall back silently.
+In a Code session, call the Agent tool with `model: "haiku"` and the role,
+format and task in its prompt. Bulk input stays in files: name the paths and
+let the sub-agent read them (bulk text never rides in tool arguments). A brief
+that lets it run shell commands or reach the web carries the global rules'
+verbatim Shell and Web paragraphs.
 
 ### 3. Verify and return
 
 Sanity-check output. Report concisely:
-> Sub-agent (haiku) completed [task] — [input_tokens] in / [output_tokens] out.
+> Sub-agent (haiku) completed [task].
 
-If the result is bad, retry with a more specific prompt or fall back to inline.
-
-## Cost reference (4K input)
-
-| 500 out | 1K out | 2K out |
-|---------|--------|--------|
-| $0.006 | $0.009 | $0.014 |
+If the result is bad, retry once with a more specific prompt or fall back to inline.
 
 ## Integration
 

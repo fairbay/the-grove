@@ -223,7 +223,7 @@ def _lanes(root: Path) -> list[str]:
     out = []
     for raw in items if isinstance(items, list) else []:
         x = raw.strip().lower() if isinstance(raw, str) else ""
-        if LANE_ID.match(x) and x not in out:
+        if LANE_ID.fullmatch(x) and x not in out:  # fullmatch: `$` alone lets a trailing line break through
             out.append(x)
     return out
 
